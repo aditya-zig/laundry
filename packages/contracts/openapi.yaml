@@ -1,0 +1,169 @@
+openapi: 3.1.0
+info:
+  title: Wandary API
+  version: 1.0.0
+  description: Versioned /v1 wire contract. Success shapes are direct resources/lists; errors are {code,message,traceId,retryable}.
+servers:
+  - url: http://localhost:4100/v1
+paths:
+  /services:
+    get:
+      operationId: listServices
+      summary: List services (array shape)
+      responses:
+        "200":
+          description: Array of Service
+  /auth/otp/request:
+    post:
+      operationId: requestOtp
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [phone]
+              properties: { phone: { type: string } }
+      responses:
+        "200": { description: "{challengeId,demoCode?}" }
+  /auth/otp/verify:
+    post:
+      operationId: verifyOtp
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [challengeId, code]
+              properties: { challengeId: { type: string }, code: { type: string } }
+      responses:
+        "200": { description: "{token,user:{id,role,name,phone}}" }
+  /me:
+    get:
+      operationId: getMe
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200": { description: Session user }
+  /auth/demo:
+    post:
+      operationId: demoAuth
+      description: Demo mode only. Body {role: customer|rider|operator}.
+      responses:
+        "200": { description: Session }
+  /addresses:
+    get:
+      operationId: listAddresses
+      security: [{ bearerAuth: [] }]
+      responses: { "200": { description: Address array } }
+    post:
+      operationId: createAddress
+      security: [{ bearerAuth: [] }]
+      responses: { "200": { description: Address } }
+  /quotes:
+    post:
+      operationId: createQuote
+      security: [{ bearerAuth: [] }]
+      description: Body QuoteInput, returns Quote.
+      responses: { "200": { description: Quote } }
+  /checkouts:
+    post:
+      operationId: createCheckout
+      security: [{ bearerAuth: [] }]
+      description: Body {quoteId}, returns {orderId,paymentId,paymentUrl,expiresAt,status}.
+      responses: { "200": { description: Checkout } }
+  /orders:
+    get:
+      operationId: listOrders
+      security: [{ bearerAuth: [] }]
+      responses: { "200": { description: Order array } }
+  /orders/{id}:
+    get:
+      operationId: getOrder
+      security: [{ bearerAuth: [] }]
+      responses: { "200": { description: Order } }
+  /orders/{id}/cancel:
+    post:
+      operationId: cancelOrder
+      security: [{ bearerAuth: [] }]
+      description: Body {reason,expectedVersion}.
+      responses: { "200": { description: Order } }
+  /reviews:
+    post:
+      operationId: createReview
+      security: [{ bearerAuth: [] }]
+      responses: { "200": { description: Review } }
+  /services/{id}/reviews:
+    get:
+      operationId: listServiceReviews
+      responses: { "200": { description: Review array } }
+  /demo/payments/{id}/capture:
+    post:
+      operationId: captureDemoPayment
+      description: Demo mode only.
+      responses: { "200": { description: Order } }
+  /partner/jobs:
+    get:
+      operationId: listPartnerJobs
+      security: [{ bearerAuth: [] }]
+      responses: { "200": { description: DeliveryJob array } }
+  /partner/jobs/{id}/accept:
+    post:
+      operationId: acceptJob
+      security: [{ bearerAuth: [] }]
+      responses: { "200": { description: DeliveryJob } }
+  /partner/jobs/{id}/handover:
+    post:
+      operationId: handoverJob
+      security: [{ bearerAuth: [] }]
+      description: Body {expectedVersion,actionId,bagIds,otp?,method}.
+      responses: { "200": { description: DeliveryJob } }
+  /partner/jobs/{id}/exception:
+    post:
+      operationId: jobException
+      security: [{ bearerAuth: [] }]
+      responses: { "200": { description: DeliveryJob } }
+  /ops/orders:
+    get:
+      operationId: listOpsOrders
+      security: [{ bearerAuth: [] }]
+      responses: { "200": { description: Order array } }
+  /ops/orders/{id}/intake:
+    post:
+      operationId: recordIntake
+      security: [{ bearerAuth: [] }]
+      description: Body {expectedVersion,measuredLines}.
+      responses: { "200": { description: Order } }
+  /ops/orders/{id}/care:
+    post:
+      operationId: advanceCare
+      security: [{ bearerAuth: [] }]
+      description: Body {expectedVersion,to}.
+      responses: { "200": { description: Order } }
+  /ops/deliveries:
+    get:
+      operationId: listOpsDeliveries
+      security: [{ bearerAuth: [] }]
+      responses: { "200": { description: DeliveryJob array } }
+  /ops/deliveries/{id}/dispatch:
+    post:
+      operationId: dispatchDelivery
+      security: [{ bearerAuth: [] }]
+      responses: { "200": { description: DeliveryJob } }
+  /ops/refunds:
+    post:
+      operationId: createRefund
+      security: [{ bearerAuth: [] }]
+      responses: { "200": { description: Refund } }
+  /demo/conversations/messages:
+    post:
+      operationId: postConversationMessage
+      description: Body {text,receivedAt?,draftId?} returns {draft,reply,missingFields}.
+      responses: { "200": { description: Conversation result } }
+  /conversation-drafts/{id}/confirm:
+    post:
+      operationId: confirmDraft
+      security: [{ bearerAuth: [] }]
+      description: Body {revision,quoteId,...}; revision-bound confirmation.
+      responses: { "200": { description: Checkout } }
+components:
+  securitySchemes:
+    bearerAuth: { type: http, scheme: bearer, bearerFormat: JWT }

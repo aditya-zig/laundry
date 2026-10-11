@@ -1,0 +1,43 @@
+{
+  "name": "wandary",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "packageManager": "pnpm@10.33.2",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "dev:api": "pnpm --filter @wandary/api dev",
+    "dev:customer": "pnpm --filter @wandary/customer dev",
+    "dev:partner": "pnpm --filter @wandary/partner dev",
+    "dev:ops": "pnpm --filter @wandary/ops dev",
+    "check": "pnpm --recursive check",
+    "test": "pnpm --recursive test",
+    "test:contracts": "pnpm --filter @wandary/contracts test",
+    "test:integration": "pnpm --filter @wandary/api test:integration",
+    "build": "pnpm --recursive build",
+    "test:e2e": "pnpm --filter @wandary/api test:e2e"
+  },
+  "devDependencies": {
+    "@types/node": "^24.19.2",
+    "typescript": "5.7.3",
+    "vitest": "3.2.4"
+  },
+  "wandary": {
+    "pinnedVersions": {
+      "node": "24",
+      "expo": "52.0.0",
+      "expo-router": "4.0.0",
+      "react": "18.3.1",
+      "react-native": "0.76.5",
+      "react-native-web": "0.19.13",
+      "vite": "6.0.0",
+      "@nestjs/common": "11.0.0",
+      "pg": "8.13.0",
+      "vitest": "3.2.4",
+      "zod": "3.23.8"
+    },
+    "notes": "Customer + partner apps use Expo Router with React Native + React Native Web. Ops console uses React + Vite. API uses NestJS + pg. Versions above are the compatible set other agents must install; foundation slice pins them here via metadata so no native toolchain is required to run contract tests."
+  }
+}
