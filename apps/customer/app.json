@@ -4,8 +4,7 @@
     "slug": "wandary-customer",
     "scheme": "wandary-customer",
     "web": {
-      "bundler": "metro",
-      "output": "single"
+      "bundler": "metro"
     },
     "plugins": ["expo-router"],
     "extra": {

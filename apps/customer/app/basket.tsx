@@ -3,14 +3,7 @@ import { Pressable, ScrollView, Text, TextInput, View } from "react-native";
 import { useRouter } from "expo-router";
 import { getBasket, setBasket } from "./services/[id]";
 import { removeLine, totalGarments, updateQuantity } from "../src/cart";
-
-export { getBasket, setBasket };
 import { colors, spacing, minTouchTarget } from "../src/theme";
-
-export let draftAddressId: string | null = null;
-export function setDraftAddressId(id: string | null): void {
-  draftAddressId = id;
-}
 
 export default function Basket() {
   const router = useRouter();

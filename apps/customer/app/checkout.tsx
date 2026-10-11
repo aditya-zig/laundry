@@ -3,7 +3,8 @@ import { ActivityIndicator, Pressable, ScrollView, Text, TextInput, View } from 
 import { useLocalSearchParams, useRouter } from "expo-router";
 import type { Address, Quote } from "@wandary/contracts";
 import { getClient } from "../src/api";
-import { getBasket, draftAddressId, setDraftAddressId } from "./basket";
+import { getBasket } from "./services/[id]";
+import { getDraftAddressId, setDraftAddressId } from "../src/cart";
 import { checkoutBlockReason, formatINR, isQuoteExpired } from "../src/guards";
 import { colors, spacing, minTouchTarget } from "../src/theme";
 
@@ -27,7 +28,7 @@ export default function Checkout() {
   const [areaEligible, setAreaEligible] = useState(true);
 
   const lines = getBasket();
-  const addressId = draftAddressId ?? addresses?.[0]?.id ?? null;
+  const addressId = getDraftAddressId() ?? addresses?.[0]?.id ?? null;
   const gate = checkoutBlockReason({
     areaEligible,
     addressId,
@@ -47,7 +48,7 @@ export default function Checkout() {
       .listAddresses()
       .then((all) => {
         setAddresses(all);
-        if (!draftAddressId && all.length > 0) setDraftAddressId(all[0].id);
+        if (!getDraftAddressId() && all.length > 0) setDraftAddressId(all[0].id);
       })
       .catch((e) => {
         setAddresses([]);

@@ -48,3 +48,11 @@ export function removeLine(lines: CartLine[], index: number): CartLine[] {
 export function totalGarments(lines: CartLine[]): number {
   return lines.reduce((sum, l) => sum + l.quantity, 0);
 }
+
+let draftAddressId: string | null = null;
+export function getDraftAddressId(): string | null {
+  return draftAddressId;
+}
+export function setDraftAddressId(id: string | null): void {
+  draftAddressId = id;
+}
