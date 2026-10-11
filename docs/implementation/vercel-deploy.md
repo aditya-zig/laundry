@@ -8,8 +8,9 @@ Expo web exports would each need their own Vercel project.
 The repo is already linked locally to the `wandary` Vercel project
 (`.vercel/project.json`, git-ignored, never committed):
 projectId `prj_ktaTuC9jUnLMCN5qDY5ghYWswcsI`, org `team_1l58te9lH5HVLaxq47ryTBMn`.
-The remaining step needs your browser auth: `npx vercel login` (or
-`npx vercel link` if the token lives elsewhere), then `npx vercel --prod`.
+Local Vercel auth exists on this machine (stored token), so
+`npx vercel --prod` deploys without an extra browser login.
+Live: https://wandary.vercel.app (ops console static build).
 
 ## Required project setting
 
