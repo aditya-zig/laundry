@@ -1,0 +1,13 @@
+node_modules/
+.expo/
+dist/
+web-build/
+.next/
+coverage/
+.env
+.env.*
+!.env.example
+.superpowers/
+.agent-logs/
+.data/
+*.log
