@@ -16,3 +16,4 @@ coverage/
 __pycache__/
 *.py[cod]
 .venv/
+.vercel

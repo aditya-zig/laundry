@@ -7,6 +7,26 @@ import { AppModule } from "./app.module";
 import { EnvelopeFilter } from "./filters/http-exception.filter";
 import { initializeDb } from "../../../modules/shared/src/db";
 
+function resolveCorsOrigins(): string[] {
+  const defaults = [
+    "http://localhost:3000",
+    "http://localhost:3001",
+    "http://localhost:3002",
+    "http://localhost:8081",
+    "http://localhost:8082",
+    "http://localhost:5173",
+    "http://localhost:19006",
+  ];
+  // Production frontends (e.g. https://wandary-....vercel.app) are not known
+  // at build time. Hosts set CORS_ORIGIN (comma-separated exact origins);
+  // FRONTEND_URL is accepted as a single-origin alias.
+  const extra = (process.env.CORS_ORIGIN ?? process.env.FRONTEND_URL ?? "")
+    .split(",")
+    .map((s) => s.trim().replace(/\/$/, ""))
+    .filter(Boolean);
+  return [...defaults, ...extra];
+}
+
 function resolveServiceAssets(): string {
   // Walk up from both cwd (which differs under pnpm --filter) and this
   // module directory so root, apps/api and dist launches serve the same
@@ -47,7 +67,7 @@ async function bootstrap() {
   await initializeDb();
   const app = await NestFactory.create<NestExpressApplication>(AppModule, { rawBody: true });
   app.enableCors({
-    origin: ["http://localhost:3000", "http://localhost:3001", "http://localhost:3002", "http://localhost:8081", "http://localhost:8082", "http://localhost:5173", "http://localhost:19006"],
+    origin: resolveCorsOrigins(),
     allowedHeaders: ["Content-Type", "Authorization", "Idempotency-Key"],
     methods: ["GET", "POST", "PATCH", "PUT", "DELETE", "OPTIONS"],
   });

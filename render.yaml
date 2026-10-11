@@ -1,0 +1,18 @@
+# Render deploy for the Wandary production API.
+# Dashboard → New → Web Service → this repo/branch, Docker runtime,
+# Dockerfile path: apps/api/Dockerfile. Set env vars per docker-compose.yml
+# header (NODE_ENV=production, DEMO_MODE=false, managed DATABASE_URL,
+# API_ORIGIN, CORS_ORIGIN, WHATSAPP_*, RAZORPAY_*). Attach managed Postgres.
+services:
+  - type: web
+    name: wandary-api
+    runtime: docker
+    dockerfilePath: ./apps/api/Dockerfile
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DEMO_MODE
+        value: false
+      - key: PORT
+        value: 4100

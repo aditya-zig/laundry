@@ -1,4 +1,31 @@
+# Wandary production API host (Render / Fly / Railway or equivalent).
+#
+# The API is a persistent NestJS server on managed Postgres with a
+# transactional outbox; it does not fit Vercel serverless functions.
+# Deploy the Dockerfile at apps/api/Dockerfile with these env vars:
+#
+#   NODE_ENV=production
+#   PORT=4100 (or the host's $PORT)
+#   DATABASE_URL=<managed postgres URL — never localhost/dev credentials>
+#   DEMO_MODE=false
+#   API_ORIGIN=https://<your-api-host>
+#   CORS_ORIGIN=https://<your-vercel-ops-origin>  (comma-separated if several)
+#   WHATSAPP_APP_SECRET, WHATSAPP_VERIFY_TOKEN,
+#   WHATSAPP_TOKEN, WHATSAPP_PHONE_NUMBER_ID=<live Meta/ BSP credentials>
+#   RAZORPAY_KEY_ID, RAZORPAY_KEY_SECRET=<live merchant credentials>
+#
+# The API refuses to boot in NODE_ENV=production unless DEMO_MODE=false,
+# DATABASE_URL is non-local, and the WHATSAPP_* vars are set (see
+# apps/api/src/main.ts assertProductionConfig). Run migrations via
+# initializeDb on boot (automatic) against the managed DB.
+#
+# Then point the Vercel ops project at it:
+# Vercel dashboard → wandary project → Settings → Environment Variables
+# VITE_API_URL=https://<your-api-host>/v1
+
 services:
+  # Local development only. Production uses the host's managed Postgres and
+  # Node runtime (Dockerfile above), not this compose file.
   postgres:
     image: postgres:17-alpine
     restart: unless-stopped

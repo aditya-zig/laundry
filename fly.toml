@@ -1,0 +1,25 @@
+# Fly.io deploy for the Wandary production API.
+# Requires flyctl auth (your credentials): fly launch --dockerfile apps/api/Dockerfile
+# then fly secrets set DATABASE_URL=... DEMO_MODE=false API_ORIGIN=... CORS_ORIGIN=...
+# WHATSAPP_APP_SECRET=... WHATSAPP_VERIFY_TOKEN=... WHATSAPP_TOKEN=...
+# WHATSAPP_PHONE_NUMBER_ID=... RAZORPAY_KEY_ID=... RAZORPAY_KEY_SECRET=...
+# and fly pg attach for managed Postgres. Not runnable without your fly auth.
+app = "wandary-api"
+primary_region = "bom"
+
+[build]
+  dockerfile = "apps/api/Dockerfile"
+
+[http_service]
+  internal_port = 4100
+  force_https = true
+  auto_stop_machines = "stop"
+  auto_start_machines = true
+  min_machines_running = 1
+
+  [[http_service.checks]]
+    grace_period = "15s"
+    interval = "30s"
+    method = "GET"
+    path = "/health"
+    timeout = "5s"
