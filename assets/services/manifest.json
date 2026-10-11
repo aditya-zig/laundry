@@ -19,18 +19,6 @@
   },
   "assets": [
     {
-      "id": "wandary-mark",
-      "name": "Wandary brand mark",
-      "path": "assets/services/wandary-mark.svg",
-      "type": "brand-mark",
-      "alt": "Wandary brand mark: a teal rounded crest holding a cream water-drop inside a dashed bubble ring",
-      "title": "Wandary brand mark",
-      "usage": "App icon, headers, splash moments",
-      "viewBox": "0 0 44 44",
-      "png": "assets/services/wandary-mark.png",
-      "pngUsage": "Native-safe raster sibling of the SVG original; prefer on Android/iOS, keep SVG on web"
-    },
-    {
       "id": "wash-and-fold",
       "name": "Wash and fold service illustration",
       "path": "assets/services/wash-and-fold.svg",

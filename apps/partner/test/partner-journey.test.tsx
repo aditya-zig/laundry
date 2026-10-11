@@ -1,7 +1,7 @@
 // Partner journey behavior tests (A6).
 // Tests exercise observable state, API results and pure helpers from src/.
 import { describe, expect, it } from "vitest";
-import type { DeliveryJob } from "@wandary/contracts";
+import type { DeliveryJob, HandoverInput } from "@wandary/contracts";
 import {
   canAccept,
   checkJobAccess,
@@ -138,15 +138,15 @@ describe("partner journey", () => {
 
     // End-to-end replay simulation: ensures callers receive the exact stable actionId
     const dispatchedActionIds: string[] = [];
-    const mockSyncCaller = async (
-      _id: string,
-      payload: { actionId: string }
-    ) => {
+    const mockSyncCaller: (
+      jobId: string,
+      payload: Omit<HandoverInput, "jobId"> & { expectedVersion: number }
+    ) => Promise<DeliveryJob> = async (_id, payload) => {
       dispatchedActionIds.push(payload.actionId);
       return createMockJob();
     };
 
-    const result = await replayOfflineQueue([offlineItem], mockSyncCaller as any);
+    const result = await replayOfflineQueue([offlineItem], mockSyncCaller);
     expect(result.succeeded).toContain(initialActionId);
     expect(dispatchedActionIds).toEqual([initialActionId]);
   });

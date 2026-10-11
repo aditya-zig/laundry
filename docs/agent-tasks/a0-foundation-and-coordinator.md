@@ -15,7 +15,7 @@
 - `packages/api-client/src/index.ts`
 - `apps/api/src/main.ts`
 - `apps/worker/src/main.ts`
-- `infra/db/migrations/0001-foundation.sql`
+- `modules/schema/migrations/001_backend.sql` (canonical; supersedes the removed early `infra/db` proposal)
 - `packages/test-fixtures/src/index.ts`
 
 **Interfaces:** All signatures and routes in contracts.md; publish generated SDK and createTestContext(): Promise<TestContext> with isolated database, actor and fake ports. Export Nest module registration points without importing private module internals.
