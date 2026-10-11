@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 160" width="240" height="160" role="img" aria-labelledby="t d" focusable="false">
+  <title id="t">Wash and fold service</title>
+  <desc id="d">Cream card: a teal machine window behind a neat stack of folded garments with a folded towel on top and a soap bubble rising past it. Original Wandary catalog illustration.</desc>
+  <rect width="240" height="160" fill="#F6EFE3"/>
+  <rect x="0" y="118" width="240" height="10" fill="#EDE2CE"/>
+  <circle cx="212" cy="34" r="18" fill="#BFDEE0" fill-opacity="0.32"/>
+  <rect x="52" y="24" width="88" height="90" rx="12" fill="#2A7D74"/>
+  <rect x="60" y="32" width="72" height="74" rx="9" fill="#BFDEE0" fill-opacity="0.2"/>
+  <path d="M74 40a26 26 0 0 0 44 44a29 29 0 0 1-44-44Z" fill="#F6EFE3" fill-opacity="0.35"/>
+  <circle cx="96" cy="69" r="17" fill="#F6EFE3"/>
+  <circle cx="96" cy="69" r="17" fill="none" stroke="#26303A" stroke-opacity="0.35" stroke-width="1.5"/>
+  <circle cx="96" cy="69" r="11" fill="none" stroke="#2A7D74" stroke-width="1.75" stroke-dasharray="3 3"/>
+  <rect x="149" y="52" width="60" height="12" rx="5" fill="#26303A"/>
+  <rect x="152" y="64" width="60" height="54" rx="8" fill="#7DBFAE"/>
+  <path d="M152 76h60v42h-60z" fill="#F6EFE3" fill-opacity="0.14"/>
+  <rect x="152" y="30" width="64" height="16" rx="8" fill="#7DBFAE"/>
+  <rect x="157" y="35" width="54" height="6" rx="3" fill="#F6EFE3"/>
+  <path d="M160 90h44v10h-44z" fill="#F6EFE3"/>
+  <path d="M160 106h44v12h-44z" fill="#F6EFE3"/>
+  <path d="M168 64h18v14h-18z" fill="#F6EFE3"/>
+  <path d="M190 64h18v14h-18z" fill="#F6EFE3"/>
+  <circle cx="42" cy="108" r="6" fill="none" stroke="#2A7D74" stroke-width="1.75" stroke-opacity="0.6"/>
+  <circle cx="30" cy="118" r="3.5" fill="#2A7D74" fill-opacity="0.45"/>
+  <path d="M46 40c5 2 8 6 8 11" stroke="#2A7D74" stroke-opacity="0.5" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+</svg>

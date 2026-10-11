@@ -1,0 +1,3 @@
+# Browser verification environment
+
+T3 preview_status and preview_open both returned explicit unavailable errors: no automation host in this headless environment. They instructed not to retry. Use the installed gstack headless Linux browser /home/batman/.codex/skills/gstack/browse/dist/browse for local app interaction and screenshots. Read gstack-browse SKILL.md before using it. OpenCode open-computer-use MCP is connected if useful, but external-agent availability must be tested. Do not claim browser passes absent interaction evidence. All final independent verification must run through OpenCode Muse Spark 1.3 Contributor Free; no paid fallback.

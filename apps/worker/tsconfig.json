@@ -1,0 +1,22 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "module": "CommonJS",
+    "moduleResolution": "Node",
+    "target": "ES2022",
+    "lib": ["ES2023"],
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "strict": true,
+    "declaration": false,
+    "declarationMap": false,
+    "sourceMap": true,
+    "baseUrl": "../..",
+    "paths": {
+      "@wandary/contracts": ["packages/contracts/dist/index.d.ts"]
+    },
+    "types": ["node"]
+  },
+  "include": ["src/**/*.ts", "../../modules/**/*.ts"],
+  "exclude": ["dist"]
+}

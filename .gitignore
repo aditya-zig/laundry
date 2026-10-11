@@ -11,3 +11,8 @@ coverage/
 .agent-logs/
 .data/
 *.log
+
+# Local Python speech tool
+__pycache__/
+*.py[cod]
+.venv/

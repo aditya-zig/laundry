@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 160" width="240" height="160" role="img" aria-labelledby="t d" focusable="false">
+  <title id="t">Steam press service</title>
+  <desc id="d">Cream card: a shirt lying flat beneath a lowered teal dome press with steam curls rising from its rim. Original Wandary catalog illustration.</desc>
+  <rect width="240" height="160" fill="#F6EFE3"/>
+  <rect x="0" y="126" width="240" height="9" fill="#EDE2CE"/>
+  <circle cx="38" cy="32" r="15" fill="#BFDEE0" fill-opacity="0.32"/>
+  <path d="M64 96v-8a56 32 0 0 1 112 0v8z" fill="#2A7D74"/>
+  <path d="M76 90v-4a44 26 0 0 1 88 0v4z" fill="#7DBFAE" fill-opacity="0.55"/>
+  <path d="M64 96h112a6 6 0 0 1-6 6H70a6 6 0 0 1-6-6Z" fill="#26303A"/>
+  <path d="M104 66c6 4 12 4 18 0M124 60c5 4 11 4 16 0" stroke="#BFDEE0" stroke-width="2" fill="none" stroke-linecap="round" stroke-opacity="0.7"/>
+  <rect x="46" y="102" width="148" height="20" rx="6" fill="#F6EFE3" stroke="#26303A" stroke-opacity="0.35" stroke-width="1.5"/>
+  <path d="M56 108h128" stroke="#BFDEE0" stroke-width="3" stroke-linecap="round"/>
+  <path d="M92 51c-3-6 3-9 0-14M126 46c-3-6 3-9 0-14M158 51c-3-6 3-9 0-14" stroke="#2A7D74" stroke-width="2" fill="none" stroke-linecap="round" stroke-opacity="0.75"/>
+  <path d="M62 134v8h10v-8zM168 134v8h10v-8z" fill="#7DBFAE"/>
+  <circle cx="206" cy="44" r="6" fill="none" stroke="#7DBFAE" stroke-width="1.5"/>
+  <circle cx="196" cy="22" r="3" fill="#2A7D74" fill-opacity="0.4"/>
+</svg>

@@ -1,0 +1,3 @@
+# Final QA ownership split
+
+UI/root final verifier owns customer, partner, ops, packages, root config/lock/CI/README, assets/tools and final UI/browser evidence. Backend QA Muse owns apps/api, apps/worker, modules, integration and backend-qa.md ONLY. Preserve existing wire shape; new optional routes/fields must be documented, never edit shared packages from backend lane. Coordinate deps through UI/root owner. No shared file edits. Backend QA finishes/stops tests before main starts managed dev group. Main writes backend-qa-ready after process exit. Root/UI verifier MUST NOT mutate API/modules/worker while backend lane runs. Completion requires both lanes' evidence.

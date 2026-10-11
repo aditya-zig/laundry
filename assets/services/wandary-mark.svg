@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 44 44" width="44" height="44" role="img" aria-labelledby="t d" focusable="false">
+  <title id="t">Wandary brand mark</title>
+  <desc id="d">Teal rounded crest holding a cream water-drop inside a bubble ring, the Wandary laundry emblem.</desc>
+  <rect x="1" y="1" width="42" height="42" rx="11" fill="#2A7D74"/>
+  <circle cx="22" cy="22" r="15" fill="none" stroke="#F6EFE3" stroke-opacity="0.55" stroke-width="1.75" stroke-linecap="round" stroke-dasharray="5.5 4"/>
+  <path d="M22 13.2c4.35 5.1 6.3 8.16 6.3 10.68A6.3 6.3 0 0 1 22 30.2a6.3 6.3 0 0 1-6.3-6.32c0-2.52 1.95-5.58 6.3-10.68Z" fill="#F6EFE3"/>
+  <circle cx="24.7" cy="22.4" r="1.9" fill="#2A7D74" fill-opacity="0.28"/>
+  <circle cx="19.4" cy="25.6" r="1.15" fill="#2A7D74" fill-opacity="0.22"/>
+</svg>

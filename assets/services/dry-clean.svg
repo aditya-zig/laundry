@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 160" width="240" height="160" role="img" aria-labelledby="t d" focusable="false">
+  <title id="t">Dry cleaning service</title>
+  <desc id="d">Cream card: a cream blazer on a teal hanger beneath a round dry-clean badge, with steam wisps drifting past. Original Wandary catalog illustration.</desc>
+  <rect width="240" height="160" fill="#F6EFE3"/>
+  <rect x="0" y="130" width="240" height="8" fill="#EDE2CE"/>
+  <circle cx="205" cy="120" r="14" fill="#BFDEE0" fill-opacity="0.3"/>
+  <path d="M120 24a7 7 0 0 1 7 7c0 4-3 6-7 6s-7-2-7-6a7 7 0 0 1 7-7Z" fill="none" stroke="#26303A" stroke-width="2.5"/>
+  <path d="M120 37v9" stroke="#26303A" stroke-width="2.5"/>
+  <path d="M120 46 62 74a8 8 0 0 0 4 15l6-3v46a6 6 0 0 0 6 6h84a6 6 0 0 0 6-6V86l6 3a8 8 0 0 0 4-15Z" fill="#2A7D74"/>
+  <path d="M120 46 62 74a8 8 0 0 0 4 15l10-5v52h88V84l10 5a8 8 0 0 0 4-15Z" fill="none" stroke="#26303A" stroke-opacity="0.3" stroke-width="1.5"/>
+  <path d="M120 57v17M120 74l18 7-18 41-18-41z" fill="#F6EFE3"/>
+  <path d="M120 57v17" stroke="#26303A" stroke-opacity="0.2" stroke-width="1.5" fill="none"/>
+  <circle cx="52" cy="52" r="17" fill="#2A7D74"/>
+  <text x="52" y="50" font-family="Arial, Helvetica, sans-serif" font-size="9" font-weight="700" fill="#F6EFE3" text-anchor="middle">DRY</text>
+  <text x="52" y="61" font-family="Arial, Helvetica, sans-serif" font-size="9" font-weight="700" fill="#F6EFE3" text-anchor="middle">CLEAN</text>
+  <path d="M176 40c-4-7 4-11 0-18M194 50c-3-6 3-9 0-15" stroke="#7DBFAE" stroke-width="2" fill="none" stroke-linecap="round" stroke-opacity="0.7"/>
+  <path d="M30 112c4-5 10-5 14 0" stroke="#7DBFAE" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+</svg>

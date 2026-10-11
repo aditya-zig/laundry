@@ -247,3 +247,25 @@ export const draftConfirmSchema = z.object({
   revision: z.number().int().min(1),
   quoteId: idSchema,
 });
+
+export const conversationDraftSchema = z.object({
+  draftId: idSchema,
+  revision: z.number().int().min(1),
+  state: z.enum(["COLLECTING", "QUOTED", "CONFIRMED", "CHECKOUT_CREATED", "EXPIRED", "HUMAN_HANDOFF"]),
+  quoteId: idSchema.optional(),
+  expiresAt: instantSchema,
+  missingFields: z.array(z.string()),
+});
+
+export const conversationMessageResultSchema = z.object({
+  draft: conversationDraftSchema,
+  reply: z.string(),
+  missingFields: z.array(z.string()),
+  quote: quoteSchema.optional(),
+});
+
+export const reviewSchema = reviewInputSchema.extend({
+  id: idSchema,
+  version: z.number().int().min(1),
+  createdAt: instantSchema,
+});

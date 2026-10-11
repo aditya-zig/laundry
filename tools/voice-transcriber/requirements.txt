@@ -1,0 +1,12 @@
+# Wandary Local Voice Transcriber - Pinned Dependencies
+# Compatible with CPU int8 inference via faster-whisper
+# NOTE: av pinned to 14.2.0 because faster-whisper 1.2.1 calls
+# av.open(..., metadata_errors=...) which was removed in PyAV 15+.
+# av 19.0.1 raises: TypeError: open() got an unexpected keyword argument 'metadata_errors'.
+faster-whisper==1.2.1
+ctranslate2==4.8.2
+huggingface-hub==2.2.0
+tokenizers==0.23.3
+onnxruntime==1.31.0
+av==14.2.0
+tqdm==4.70.1

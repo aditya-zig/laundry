@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 160" width="240" height="160" role="img" aria-labelledby="t d" focusable="false">
+  <title id="t">Wash and iron service</title>
+  <desc id="d">Cream card: a teal iron gliding on a light ironing board leaving a crisp fold trail, a folded shirt and a thread spool beside it. Original Wandary catalog illustration.</desc>
+  <rect width="240" height="160" fill="#F6EFE3"/>
+  <rect x="0" y="130" width="240" height="8" fill="#EDE2CE"/>
+  <circle cx="196" cy="30" r="16" fill="#BFDEE0" fill-opacity="0.32"/>
+  <rect x="36" y="62" width="152" height="16" rx="8" fill="#BFDEE0"/>
+  <path d="M54 78l-8 44h12l8-44Z" fill="#7DBFAE"/>
+  <path d="M170 78l8 44h-12l-8-44Z" fill="#7DBFAE"/>
+  <path d="M44 66h136" stroke="#F6EFE3" stroke-width="2" stroke-linecap="round" stroke-opacity="0.65"/>
+  <path d="M52 70h96v12h-96z" fill="#F6EFE3"/>
+  <path d="M60 76h80v2h-80z" fill="#7DBFAE" fill-opacity="0.4"/>
+  <path d="M148 44c8 2 14 8 16 16l24 2v-14a18 18 0 0 0-18-14l-22-2z" fill="#26303A"/>
+  <path d="M150 48c7 2 12 7 14 14l22 1" stroke="#F6EFE3" stroke-width="1.75" fill="none" stroke-opacity="0.4"/>
+  <rect x="168" y="58" width="30" height="12" rx="4" fill="#2A7D74"/>
+  <path d="M50 66h84v-3h-84z" fill="#2A7D74"/>
+  <rect x="30" y="104" width="52" height="10" rx="5" fill="#F6EFE3" stroke="#26303A" stroke-opacity="0.3" stroke-width="1.25"/>
+  <path d="M84 44l24-14 8 12-24 12z" fill="#2A7D74"/>
+  <path d="M84 44h32v7h-32z" fill="#26303A"/>
+  <circle cx="212" cy="118" r="8" fill="#7DBFAE"/>
+  <circle cx="212" cy="118" r="3" fill="#F6EFE3"/>
+  <path d="M28 34c4-5 10-5 14 0" stroke="#7DBFAE" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+  <circle cx="180" cy="16" r="3.5" fill="#2A7D74" fill-opacity="0.4"/>
+</svg>

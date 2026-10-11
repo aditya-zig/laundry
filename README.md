@@ -3,16 +3,20 @@
 Laundry pickup and delivery: customer storefront, delivery partner app, WhatsApp
 voice-note ordering, and an internal operations console sharing one order engine.
 
-This slice is the foundation. It owns root configuration, `packages/contracts`,
-`packages/api-client`, `packages/design-tokens`, `packages/test-fixtures`,
-`infra`, and this README. Application code (`apps/customer`, `apps/partner`,
-`apps/ops`, `apps/api`) and domain modules belong to later agents and are
-intentionally absent here.
+This repo holds the working implementation: `apps/api` (NestJS + PostgreSQL),
+`apps/customer` and `apps/partner` (Expo + React Native Web), `apps/ops`
+(React + Vite), domain modules under `modules/`, shared contracts, typed
+client, design tokens and fixtures under `packages/`. External providers
+(payments, logistics, WhatsApp, speech) run through explicitly labeled
+simulators or local tooling until real credentials and contracts are supplied.
+No simulated result is described as a live payment, courier dispatch, or
+WhatsApp delivery.
 
 ## Quick start
 
 ```bash
 cp .env.example .env
+docker compose up -d postgres
 pnpm install
 pnpm test:contracts
 pnpm test:integration
@@ -20,8 +24,12 @@ pnpm check
 ```
 
 Postgres runs on host port **5448** (not 5432) via `docker-compose.yml`.
-Do not start containers for contract tests. API base URL defaults to
-`http://localhost:4100/v1`.
+API base URL defaults to `http://localhost:4100/v1`. Start the API with
+`pnpm dev:api` (or `pnpm --filter @wandary/api start` after
+`pnpm --filter @wandary/api build`); customer/partner web previews with
+`pnpm dev:customer` / `pnpm dev:partner`; ops console with `pnpm dev:ops`.
+Web previews default to the local API when `EXPO_PUBLIC_API_URL` /
+`VITE_API_URL` are unset.
 
 ## Demo credentials
 
@@ -58,11 +66,17 @@ Types and zod schemas live in `@wandary/contracts`. The typed fetch client is
 
 | Script | What it does |
 |---|---|
-| `dev:api`, `dev:customer`, `dev:partner`, `dev:ops` | Placeholders. The owning agents add these apps. |
+| `dev:api` | Runs the NestJS API with reload (`tsx watch`, port `PORT` or 4100). |
+| `dev:customer`, `dev:partner` | Serve the Expo customer / partner web preview. |
+| `dev:ops` | Runs the ops console (Vite dev). |
+| `dev` | Supervises API + apps as one process group (`tools/dev.mjs`). |
+| `db:start` | Starts local Postgres (port 5448). |
 | `check` | Typechecks every package. |
 | `test` | Runs every package suite. |
 | `test:contracts` | Runs the `@wandary/contracts` behavior suite. |
-| `test:integration` | Runs the `@wandary/api-client` mocked-transport suite. |
+| `test:integration` | Runs the `@wandary/api` acceptance suite against real local Postgres (no mocks; refuses non-local databases). |
+| `test:e2e` | Alias of the API acceptance suite. |
+| `test:voice` | Runs the local voice-transcriber Python tests. |
 | `build` | Emits `dist` for every package. |
 
 No script uses `--passWithNoTests`. Suites must exist and pass.

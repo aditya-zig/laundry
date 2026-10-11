@@ -65,13 +65,15 @@ export function checkVersion(
 }
 
 /** In-memory idempotency ledger. Same actor+key+payload replays the
- * original result; same key with a different payload conflicts. */
+ * original result; same key with a different payload conflicts. Payload
+ * hashing is key-order stable so retries that rebuild the same object
+ * with a different key order still replay instead of executing twice. */
 export class IdempotencyStore<T> {
   private seen = new Map<string, { payloadHash: string; result: T; executions: number }>();
   readonly executions = new Map<string, number>();
 
   private hash(payload: unknown): string {
-    return JSON.stringify(payload);
+    return stableStringify(payload);
   }
 
   run(key: string, payload: unknown, fn: () => T): { result: T; replayed: boolean } {
@@ -93,4 +95,14 @@ export class IdempotencyStore<T> {
   executionCount(key: string): number {
     return this.executions.get(key) ?? 0;
   }
+}
+
+/** Key-order stable JSON encoding for idempotency payload hashing. */
+export function stableStringify(value: unknown): string {
+  if (value === null || typeof value !== "object") return JSON.stringify(value) ?? "null";
+  if (Array.isArray(value)) return `[${value.map((v) => stableStringify(v)).join(",")}]`;
+  const entries = Object.entries(value as Record<string, unknown>)
+    .filter(([, v]) => v !== undefined)
+    .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0));
+  return `{${entries.map(([k, v]) => `${JSON.stringify(k)}:${stableStringify(v)}`).join(",")}}`;
 }

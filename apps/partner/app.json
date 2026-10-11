@@ -1,0 +1,16 @@
+{
+  "expo": {
+    "name": "Wandary Partner (demo)",
+    "slug": "wandary-partner",
+    "scheme": "wandary-partner",
+    "web": {
+      "bundler": "metro",
+      "output": "single"
+    },
+    "plugins": ["expo-router"],
+    "extra": {
+      "apiBaseUrl": "http://localhost:4100/v1",
+      "demoNote": "Development preview on port 8082. Handover proof and dispatch states come from the real API; anything simulated is labeled DEMO."
+    }
+  }
+}

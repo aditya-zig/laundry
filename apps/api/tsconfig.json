@@ -1,0 +1,28 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "outDir": "dist",
+    "rootDir": "../..",
+    "module": "CommonJS",
+    "moduleResolution": "Node",
+    "target": "ES2022",
+    "lib": ["ES2023"],
+    "experimentalDecorators": true,
+    "emitDecoratorMetadata": true,
+    "strictPropertyInitialization": false,
+    "declaration": false,
+    "declarationMap": false,
+    "sourceMap": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "strict": true,
+    "baseUrl": "../..",
+    "paths": {
+      "@wandary/contracts": ["packages/contracts/dist/index.d.ts"],
+      "@/*": ["apps/api/src/*"]
+    },
+    "types": ["node"]
+  },
+  "include": ["src/**/*.ts", "../../modules/**/*.ts", "../../packages/contracts/src/**/*.ts"],
+  "exclude": ["dist", "test", "**/*.test.ts"]
+}

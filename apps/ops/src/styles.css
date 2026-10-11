@@ -1,0 +1,95 @@
+:root {
+  --surface: #ffffff;
+  --tint: #eef4ff;
+  --ink: #0f1f3d;
+  --muted: #4a5a78;
+  --action: #0e7c7b;
+  --danger: #b3261e;
+  --warning: #8a5a00;
+  --border: #d7e0f0;
+}
+
+body {
+  margin: 0;
+  font-family: system-ui, sans-serif;
+  color: var(--ink);
+  background: var(--surface);
+}
+
+.shell {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 16px;
+}
+
+header nav {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+header nav a {
+  color: var(--action);
+  font-weight: 700;
+}
+
+button {
+  min-height: 44px;
+  padding: 10px 16px;
+  border-radius: 12px;
+  border: 1px solid var(--action);
+  background: var(--action);
+  color: #fff;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+input,
+select {
+  display: block;
+  margin: 8px 0 12px;
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  min-width: min(320px, 100%);
+}
+
+label {
+  display: block;
+  margin-top: 12px;
+  font-weight: 600;
+}
+
+table {
+  border-collapse: collapse;
+  width: 100%;
+}
+
+th,
+td {
+  border: 1px solid var(--border);
+  padding: 10px;
+  text-align: left;
+}
+
+.card {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 12px;
+  margin-top: 12px;
+}
+
+.err {
+  color: var(--danger);
+}
+
+.warn {
+  color: var(--warning);
+  font-weight: 600;
+}

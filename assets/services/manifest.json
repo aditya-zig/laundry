@@ -1,0 +1,90 @@
+{
+  "name": "wandary-service-assets",
+  "version": "1.0.0",
+  "palette": {
+    "cream": "#F6EFE3",
+    "creamSoft": "#EDE2CE",
+    "ink": "#26303A",
+    "teal": "#2A7D74",
+    "tealSoft": "#7DBFAE",
+    "tealMist": "#BFDEE0"
+  },
+  "authorship": {
+    "author": "Wandary",
+    "credits": "Original SVG code created by Freebuff for Wandary",
+    "license": "Project assets; no third-party media included",
+    "provenanceNote": "Original vector artwork drawn for Wandary; no third-party assets, fonts, scripts or trackers.",
+    "generatedWith": "Freebuff coding agent; vector SVG paths, no raster sources",
+    "pngDerivation": "PNG siblings derived locally from the original SVGs with rsvg-convert (librsvg), no third-party sources. SVGs stay the web originals; PNGs are the native-safe variants (React Native Image has no reliable SVG support on Android/iOS)."
+  },
+  "assets": [
+    {
+      "id": "wandary-mark",
+      "name": "Wandary brand mark",
+      "path": "assets/services/wandary-mark.svg",
+      "type": "brand-mark",
+      "alt": "Wandary brand mark: a teal rounded crest holding a cream water-drop inside a dashed bubble ring",
+      "title": "Wandary brand mark",
+      "usage": "App icon, headers, splash moments",
+      "viewBox": "0 0 44 44",
+      "png": "assets/services/wandary-mark.png",
+      "pngUsage": "Native-safe raster sibling of the SVG original; prefer on Android/iOS, keep SVG on web"
+    },
+    {
+      "id": "wash-and-fold",
+      "name": "Wash and fold service illustration",
+      "path": "assets/services/wash-and-fold.svg",
+      "type": "service-illustration",
+      "alt": "A folded stack of garments beside a teal washing-machine drum with a soap bubble rising",
+      "title": "Wash and fold service",
+      "usage": "Wash-and-fold product card",
+      "viewBox": "0 0 240 160",
+      "png": "assets/services/wash-and-fold.png",
+      "pngUsage": "Native-safe raster sibling of the SVG original; prefer on Android/iOS, keep SVG on web"
+    },
+    {
+      "id": "wash-and-iron",
+      "name": "Wash and iron service illustration",
+      "path": "assets/services/wash-and-iron.svg",
+      "type": "service-illustration",
+      "alt": "A teal iron gliding along an ironing board, leaving a crisp fold trail behind a neatly folded shirt",
+      "title": "Wash and iron service",
+      "usage": "Wash-and-iron product card",
+      "viewBox": "0 0 240 160",
+      "png": "assets/services/wash-and-iron.png",
+      "pngUsage": "Native-safe raster sibling of the SVG original; prefer on Android/iOS, keep SVG on web"
+    },
+    {
+      "id": "steam-press",
+      "name": "Steam press service illustration",
+      "path": "assets/services/steam-press.svg",
+      "type": "service-illustration",
+      "alt": "A lowered teal dome press resting on a board with steam curls rising from a shirt lying flat beneath it",
+      "title": "Steam press service",
+      "usage": "Steam-press product card",
+      "viewBox": "0 0 240 160",
+      "png": "assets/services/steam-press.png",
+      "pngUsage": "Native-safe raster sibling of the SVG original; prefer on Android/iOS, keep SVG on web"
+    },
+    {
+      "id": "dry-clean",
+      "name": "Dry clean service illustration",
+      "path": "assets/services/dry-clean.svg",
+      "type": "service-illustration",
+      "alt": "A blazer on a teal drop-shaped hanger beneath a round dry-clean badge with steam wisps drifting past",
+      "title": "Dry cleaning service",
+      "usage": "Dry-clean product card",
+      "viewBox": "0 0 240 160",
+      "png": "assets/services/dry-clean.png",
+      "pngUsage": "Native-safe raster sibling of the SVG original; prefer on Android/iOS, keep SVG on web"
+    }
+  ],
+  "constraints": {
+    "format": "SVG 1.1",
+    "noRemoteResources": true,
+    "noEmbeddedScripts": true,
+    "noTrackingPixels": true,
+    "accessibleTitleDesc": true,
+    "maxFileSizeKB": 6
+  }
+}

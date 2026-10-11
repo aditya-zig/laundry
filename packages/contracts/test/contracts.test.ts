@@ -1,13 +1,15 @@
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import {
   IdempotencyStore,
   authorizeHandover,
   authorizeOrderRead,
   checkVersion,
+  conversationMessageResultSchema,
   quoteInputSchema,
   quoteSchema,
   reviewInputSchema,
+  stableStringify,
   windowSchema,
   type Actor,
   type DeliveryJob,
@@ -185,5 +187,44 @@ describe("contracts v1 behavior", () => {
   it("fails CI if any workspace script uses passWithNoTests", () => {
     const root = JSON.parse(readFileSync(new URL("../../../package.json", import.meta.url), "utf8"));
     expect(JSON.stringify(root.scripts ?? {})).not.toMatch(/passWithNoTests/);
+  });
+
+  it("hashes idempotency payloads independent of key order so retries replay", () => {
+    expect(stableStringify({ a: 1, b: 2 })).toBe(stableStringify({ b: 2, a: 1 }));
+    const store = new IdempotencyStore<string>();
+    const key = "33333333-3333-4333-8333-333333333333";
+    const first = store.run(key, { addressId: "x", lines: [1, 2] }, () => "once");
+    expect(first.replayed).toBe(false);
+    const retry = store.run(key, { lines: [1, 2], addressId: "x" }, () => "twice");
+    expect(retry.replayed).toBe(true);
+    expect(retry.result).toBe("once");
+    expect(store.executionCount(key)).toBe(1);
+  });
+
+  it("keeps the build writing only to dist with no cross-package path mapping", () => {
+    const build = JSON.parse(readFileSync(new URL("../tsconfig.build.json", import.meta.url), "utf8"));
+    expect(build.compilerOptions.outDir).toBe("dist");
+    expect(build.compilerOptions.rootDir).toBe("src");
+    expect(build.compilerOptions.paths ?? {}).toEqual({});
+    const stray = readdirSync(new URL("../src", import.meta.url)).filter((f) =>
+      f.endsWith(".js") || f.endsWith(".d.ts") || f.endsWith(".map")
+    );
+    expect(stray).toEqual([]);
+  });
+
+  it("parses typed conversation drafts with an optional attached quote", () => {
+    const parsed = conversationMessageResultSchema.safeParse({
+      draft: {
+        draftId: "ffffffff-ffff-4fff-8fff-ffffffffffff",
+        revision: 2,
+        state: "QUOTED",
+        quoteId: "77777777-7777-4777-8777-777777777777",
+        expiresAt: "2026-10-12T10:00:00.000Z",
+        missingFields: [],
+      },
+      reply: "Here is your quote.",
+      missingFields: [],
+    });
+    expect(parsed.success).toBe(true);
   });
 });

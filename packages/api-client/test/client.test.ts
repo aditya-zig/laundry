@@ -64,4 +64,70 @@ describe("api-client integration (mocked transport)", () => {
     expect(url).toBe(`http://localhost:4100/v1/conversation-drafts/${draftId}/confirm`);
     expect(JSON.parse(init.body as string)).toMatchObject({ draftId, revision: 2, quoteId: demoQuote.id });
   });
+
+  it("reuses a caller-supplied idempotency key so a failed checkout retries as one operation", async () => {
+    const checkout = { orderId: demoOrder.id, paymentId: "13131313-1313-4131-8131-131313131313", paymentUrl: "https://pay.example.com/c/1", expiresAt: "2026-10-11T16:00:00.000Z", status: "AWAITING_PAYMENT" };
+    const fetchImpl = vi.fn(async (_url: string, _init?: RequestInit) => jsonResponse(checkout));
+    const client = createClient({
+      fetchImpl: fetchImpl as typeof fetch,
+      generateKey: () => "generated-should-not-win",
+    });
+    await client.createCheckout(demoQuote.id, { idempotencyKey: "retry-key-1" });
+    await client.createCheckout(demoQuote.id, { idempotencyKey: "retry-key-1" });
+    const keys = fetchImpl.mock.calls.map(
+      ([, init]) => (init as RequestInit).headers as Record<string, string>,
+    ).map((h) => h["Idempotency-Key"]);
+    expect(keys).toEqual(["retry-key-1", "retry-key-1"]);
+    const bodies = fetchImpl.mock.calls.map(([, init]) => JSON.parse((init as RequestInit).body as string));
+    expect(bodies[0]).toEqual({ quoteId: demoQuote.id });
+  });
+
+  it("sends expectedVersion on handover instead of dropping it during validation", async () => {
+    const job = demoOrder.deliveries[0];
+    const fetchImpl = vi.fn(async (_url: string, _init?: RequestInit) => jsonResponse(job));
+    const client = createClient({ fetchImpl: fetchImpl as typeof fetch });
+    await client.handoverJob(job.id, {
+      actionId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+      bagIds: ["bag-1"],
+      method: "OTP",
+      otp: "123456",
+      capturedAt: "2026-10-11T11:00:00.000Z",
+      expectedVersion: 3,
+    });
+    const [, init] = fetchImpl.mock.calls[0] as unknown as [string, RequestInit];
+    expect(JSON.parse(init.body as string)).toMatchObject({ jobId: job.id, expectedVersion: 3, method: "OTP" });
+  });
+
+  it("parses conversation messages as typed drafts with an optional quote", async () => {
+    const payload = {
+      draft: {
+        draftId: "ffffffff-ffff-4fff-8fff-ffffffffffff",
+        revision: 2,
+        state: "QUOTED",
+        quoteId: demoQuote.id,
+        expiresAt: "2026-10-12T10:00:00.000Z",
+        missingFields: [],
+      },
+      reply: "Here is your quote.",
+      missingFields: [],
+      quote: demoQuote,
+    };
+    const fetchImpl = vi.fn(async (_url: string, _init?: RequestInit) => jsonResponse(payload));
+    const client = createClient({ fetchImpl: fetchImpl as typeof fetch });
+    const result = await client.postConversationMessage("five shirts tomorrow");
+    expect(result.draft.revision).toBe(2);
+    expect(result.draft.quoteId).toBe(demoQuote.id);
+    expect(result.quote?.id).toBe(demoQuote.id);
+  });
+
+  it("checks service-area eligibility against GET /service-areas/check", async () => {
+    const payload = { serviceable: true, areaId: "demo-area-bengaluru", hours: "09:00-18:00 Asia/Kolkata" };
+    const fetchImpl = vi.fn(async (_url: string, _init?: RequestInit) => jsonResponse(payload));
+    const client = createClient({ fetchImpl: fetchImpl as typeof fetch });
+    const result = await client.checkServiceArea();
+    expect(result.serviceable).toBe(true);
+    expect(result.areaId).toBe("demo-area-bengaluru");
+    const [url] = fetchImpl.mock.calls[0] as unknown as [string, RequestInit];
+    expect(url).toBe("http://localhost:4100/v1/service-areas/check");
+  });
 });
