@@ -78,5 +78,8 @@ persistence/retry recovery and full accessibility/device coverage are not certif
 
 Fresh checks: workspace build and both typechecks pass, 41 contracts/client/app
 tests pass, 23 voice tests pass, cloud API 57/57 and authorization 23/23 pass.
-Local PostgreSQL tests remain blocked by absent Docker daemon sockets; GitHub CI
-provides the PostgreSQL service and must be checked after publication.
+Local PostgreSQL tests remain blocked by absent Docker daemon sockets. After
+publication, GitHub CI run 38221382306 passed all 23 API acceptance tests with a
+real PostgreSQL service, plus the production Convex deployment job. All three
+Git-built Vercel artifacts were confirmed READY at source commit `8da4409` and
+smoke-checked again. See `release-verification-2026-10-12.md`.
