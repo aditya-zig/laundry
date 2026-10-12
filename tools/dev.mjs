@@ -27,12 +27,13 @@ function stop(code = 0) {
 }
 process.on("SIGINT", () => stop());
 process.on("SIGTERM", () => stop());
+const cloud = process.argv.includes('--cloud');
 const apps = [
   ["API", "@wandary/api", "dev"],
   ["Customer", "@wandary/customer", "web"],
   ["Partner", "@wandary/partner", "web"],
   ["Operations", "@wandary/ops", "dev"],
-];
+].filter(([name]) => !cloud || name !== 'API');
 for (const [name, pkg, script] of apps) {
   const child = spawn("pnpm", ["--filter", pkg, script], {
     cwd: root,
@@ -53,5 +54,7 @@ for (const [name, pkg, script] of apps) {
     }
   });
 }
-console.log("Wandary local DEMO: customer :8081, partner :8082, operations :5173, API :4100.");
-console.log("Start the database first: docker compose up -d postgres. Ctrl+C stops all app processes.");
+console.log("Laundry: customer :8081, partner :8082, operations :5173.");
+console.log(cloud
+  ? 'Cloud API mode: set EXPO_PUBLIC_API_URL and VITE_API_URL to your Convex HTTP /v1 URL. Ctrl+C stops all apps.'
+  : 'Local API :4100. Start the database first: docker compose up -d postgres. Ctrl+C stops all apps.');

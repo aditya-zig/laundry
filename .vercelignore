@@ -1,0 +1,12 @@
+.agent-logs
+.data
+.gstack
+.web-dist
+wandary
+.env
+.env.*
+!.env.example
+**/node_modules
+**/dist
+**/.expo
+**/__pycache__

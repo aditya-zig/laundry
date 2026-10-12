@@ -1,3 +1,4 @@
+name: wandary
 # Wandary production API host (Render / Fly / Railway or equivalent).
 #
 # The API is a persistent NestJS server on managed Postgres with a

@@ -1,0 +1,405 @@
+{
+  "at": "2026-10-12T07:50:16.556Z",
+  "demoBase": "https://hidden-trout-436.ap-southeast-2.convex.site/v1",
+  "prodBase": "https://dutiful-kangaroo-719.ap-southeast-2.convex.site/v1",
+  "counts": {
+    "pass": 56,
+    "fail": 0,
+    "blocked": 0
+  },
+  "checks": [
+    {
+      "target": "prod",
+      "id": "prod-health",
+      "name": "production health reachable",
+      "status": "pass",
+      "detail": "demoMode false, liveReady false"
+    },
+    {
+      "target": "prod",
+      "id": "prod-demo-reject",
+      "name": "demo auth rejected in real mode",
+      "status": "pass",
+      "detail": "403 FORBIDDEN"
+    },
+    {
+      "target": "prod",
+      "id": "prod-otp-reject",
+      "name": "unsent OTP lane rejected in real mode",
+      "status": "pass",
+      "detail": "501 PROVIDER_UNAVAILABLE"
+    },
+    {
+      "target": "prod",
+      "id": "prod-webhook-reject",
+      "name": "POST /webhooks/payments/razorpay refused honestly",
+      "status": "pass",
+      "detail": "501 PROVIDER_UNAVAILABLE"
+    },
+    {
+      "target": "prod",
+      "id": "prod-media-reject",
+      "name": "GET /media/00000000-0000-4000-8000-000000000000/download refused honestly",
+      "status": "pass",
+      "detail": "501 PROVIDER_UNAVAILABLE"
+    },
+    {
+      "target": "prod",
+      "id": "prod-voice-reject",
+      "name": "POST /demo/conversations/voice-notes refused honestly",
+      "status": "pass",
+      "detail": "501 PROVIDER_UNAVAILABLE"
+    },
+    {
+      "target": "prod",
+      "id": "prod-whatsapp-handshake",
+      "name": "unconfigured WhatsApp handshake refused",
+      "status": "pass",
+      "detail": "HTTP 502"
+    },
+    {
+      "target": "prod",
+      "id": "prod-auth-boundary",
+      "name": "unauthenticated write rejected",
+      "status": "pass",
+      "detail": "401 UNAUTHENTICATED"
+    },
+    {
+      "target": "prod",
+      "id": "prod-catalog",
+      "name": "public catalog matches service contract",
+      "status": "pass",
+      "detail": "0 services"
+    },
+    {
+      "target": "demo",
+      "id": "demo-health",
+      "name": "cloud demo health reachable",
+      "status": "pass",
+      "detail": "demoMode true"
+    },
+    {
+      "target": "demo",
+      "id": "demo-login",
+      "name": "demo login roles",
+      "status": "pass",
+      "detail": "customer, rider, operator sessions issued; token values withheld"
+    },
+    {
+      "target": "demo",
+      "id": "demo-login",
+      "name": "demo login roles",
+      "status": "pass",
+      "detail": "unknown role rejected 400"
+    },
+    {
+      "target": "demo",
+      "id": "demo-login",
+      "name": "demo login roles",
+      "status": "pass",
+      "detail": "/me reflects customer role"
+    },
+    {
+      "target": "demo",
+      "id": "demo-catalog",
+      "name": "catalog matches contracts",
+      "status": "pass",
+      "detail": "4 services validate"
+    },
+    {
+      "target": "demo",
+      "id": "demo-catalog",
+      "name": "catalog matches contracts",
+      "status": "pass",
+      "detail": "service detail validates"
+    },
+    {
+      "target": "demo",
+      "id": "demo-catalog",
+      "name": "catalog matches contracts",
+      "status": "pass",
+      "detail": "service-area check ok"
+    },
+    {
+      "target": "demo",
+      "id": "demo-quote",
+      "name": "quotes deadlines and capacity",
+      "status": "pass",
+      "detail": "quote ok, total 17696 minor INR"
+    },
+    {
+      "target": "demo",
+      "id": "demo-quote",
+      "name": "quotes deadlines and capacity",
+      "status": "pass",
+      "detail": "early return 422 DEADLINE_UNAVAILABLE"
+    },
+    {
+      "target": "demo",
+      "id": "demo-quote",
+      "name": "quotes deadlines and capacity",
+      "status": "pass",
+      "detail": "third hold in slot 409 NO_CAPACITY"
+    },
+    {
+      "target": "demo",
+      "id": "demo-checkout-idem",
+      "name": "checkout idempotency and conflicts",
+      "status": "pass",
+      "detail": "checkout created, payment pending distinct from confirmed"
+    },
+    {
+      "target": "demo",
+      "id": "demo-checkout-idem",
+      "name": "checkout idempotency and conflicts",
+      "status": "pass",
+      "detail": "same key plus payload replays original order and payment"
+    },
+    {
+      "target": "demo",
+      "id": "demo-checkout-idem",
+      "name": "checkout idempotency and conflicts",
+      "status": "pass",
+      "detail": "same key plus different payload 409 IDEMPOTENCY_CONFLICT"
+    },
+    {
+      "target": "demo",
+      "id": "demo-version",
+      "name": "stale version rejection",
+      "status": "pass",
+      "detail": "stale quote version 409 on checkout"
+    },
+    {
+      "target": "demo",
+      "id": "demo-capture",
+      "name": "capture duplicate",
+      "status": "pass",
+      "detail": "duplicate capture returns same order view, no second order"
+    },
+    {
+      "target": "demo",
+      "id": "demo-capture",
+      "name": "capture duplicate",
+      "status": "pass",
+      "detail": "unknown payment 404"
+    },
+    {
+      "target": "demo",
+      "id": "demo-ownership",
+      "name": "role and ownership",
+      "status": "pass",
+      "detail": "unassigned rider reads customer order 404"
+    },
+    {
+      "target": "demo",
+      "id": "demo-ownership",
+      "name": "role and ownership",
+      "status": "pass",
+      "detail": "customer reads ops queue 403"
+    },
+    {
+      "target": "demo",
+      "id": "demo-ownership",
+      "name": "role and ownership",
+      "status": "pass",
+      "detail": "customer reads partner jobs 403"
+    },
+    {
+      "target": "demo",
+      "id": "demo-dispatch",
+      "name": "operator assignment",
+      "status": "pass",
+      "detail": "non-rider assignee rejected"
+    },
+    {
+      "target": "demo",
+      "id": "demo-dispatch",
+      "name": "operator assignment",
+      "status": "pass",
+      "detail": "assignment retry replays without version bump"
+    },
+    {
+      "target": "demo",
+      "id": "demo-dispatch",
+      "name": "operator assignment",
+      "status": "pass",
+      "detail": "stale assignment version rejected"
+    },
+    {
+      "target": "demo",
+      "id": "demo-dispatch",
+      "name": "operator assignment",
+      "status": "pass",
+      "detail": "non-rider assignee rejected"
+    },
+    {
+      "target": "demo",
+      "id": "demo-dispatch",
+      "name": "operator assignment",
+      "status": "pass",
+      "detail": "assignment retry replays without version bump"
+    },
+    {
+      "target": "demo",
+      "id": "demo-dispatch",
+      "name": "operator assignment",
+      "status": "pass",
+      "detail": "stale assignment version rejected"
+    },
+    {
+      "target": "demo",
+      "id": "demo-otp",
+      "name": "OTP custody proof",
+      "status": "pass",
+      "detail": "return OTP withheld until return window"
+    },
+    {
+      "target": "demo",
+      "id": "demo-otp",
+      "name": "OTP custody proof",
+      "status": "pass",
+      "detail": "handover without OTP 400"
+    },
+    {
+      "target": "demo",
+      "id": "demo-otp",
+      "name": "OTP custody proof",
+      "status": "pass",
+      "detail": "wrong OTP 400"
+    },
+    {
+      "target": "demo",
+      "id": "demo-otp",
+      "name": "OTP custody proof",
+      "status": "pass",
+      "detail": "proof reference required, photos alone never complete handover"
+    },
+    {
+      "target": "demo",
+      "id": "demo-otp",
+      "name": "OTP custody proof",
+      "status": "pass",
+      "detail": "correct OTP completes pickup handover"
+    },
+    {
+      "target": "demo",
+      "id": "demo-custody",
+      "name": "pickup vs return custody",
+      "status": "pass",
+      "detail": "pickup completion leaves order PICKUP_PENDING, not delivered"
+    },
+    {
+      "target": "demo",
+      "id": "demo-ops",
+      "name": "ops intake and care",
+      "status": "pass",
+      "detail": "matching intake reconciles to AT_FACILITY"
+    },
+    {
+      "target": "demo",
+      "id": "demo-ops",
+      "name": "ops intake and care",
+      "status": "pass",
+      "detail": "care progression AT_FACILITY to READY_FOR_RETURN"
+    },
+    {
+      "target": "demo",
+      "id": "demo-ops",
+      "name": "ops intake and care",
+      "status": "pass",
+      "detail": "count mismatch opens AWAITING_ADJUSTMENT"
+    },
+    {
+      "target": "demo",
+      "id": "demo-ops",
+      "name": "ops intake and care",
+      "status": "pass",
+      "detail": "care gated on pending adjustment 409 REQUIRES_APPROVAL"
+    },
+    {
+      "target": "demo",
+      "id": "demo-version",
+      "name": "stale version rejection",
+      "status": "pass",
+      "detail": "stale cancel 409 VERSION_CONFLICT"
+    },
+    {
+      "target": "demo",
+      "id": "demo-custody",
+      "name": "pickup vs return custody",
+      "status": "pass",
+      "detail": "return handover with valid proof delivers the order"
+    },
+    {
+      "target": "demo",
+      "id": "demo-review",
+      "name": "delivered review duplicate",
+      "status": "pass",
+      "detail": "first review for delivered order accepted"
+    },
+    {
+      "target": "demo",
+      "id": "demo-review",
+      "name": "delivered review duplicate",
+      "status": "pass",
+      "detail": "second review for same order 400, one per order"
+    },
+    {
+      "target": "demo",
+      "id": "demo-review",
+      "name": "delivered review duplicate",
+      "status": "pass",
+      "detail": "review of undelivered order 400"
+    },
+    {
+      "target": "demo",
+      "id": "demo-draft",
+      "name": "conversation draft and confirm",
+      "status": "pass",
+      "detail": "partial text stays COLLECTING, asks for service, garment count, pickup time"
+    },
+    {
+      "target": "demo",
+      "id": "demo-draft",
+      "name": "conversation draft and confirm",
+      "status": "pass",
+      "detail": "full text QUOTED at revision 3, quote bound"
+    },
+    {
+      "target": "demo",
+      "id": "demo-draft",
+      "name": "conversation draft and confirm",
+      "status": "pass",
+      "detail": "stale draft revision 409 on confirm"
+    },
+    {
+      "target": "demo",
+      "id": "demo-draft",
+      "name": "conversation draft and confirm",
+      "status": "pass",
+      "detail": "current revision confirms to checkout, bound to draft and quote"
+    },
+    {
+      "target": "demo",
+      "id": "demo-whatsapp-refuse",
+      "name": "unlinked WhatsApp refusal",
+      "status": "pass",
+      "detail": "mismatched draft binding 400"
+    },
+    {
+      "target": "demo",
+      "id": "demo-whatsapp-refuse",
+      "name": "unlinked WhatsApp refusal",
+      "status": "pass",
+      "detail": "invalid sender phone 400, no address disclosed"
+    },
+    {
+      "target": "demo",
+      "id": "demo-whatsapp-refuse",
+      "name": "unlinked WhatsApp refusal",
+      "status": "pass",
+      "detail": "raw inbound webhook 501, nothing booked or faked"
+    }
+  ],
+  "failures": []
+}

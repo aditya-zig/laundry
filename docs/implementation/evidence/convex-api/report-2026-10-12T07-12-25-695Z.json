@@ -1,0 +1,84 @@
+{
+  "at": "2026-10-12T07:12:25.696Z",
+  "demoBase": "https://hidden-trout-436.ap-southeast-2.convex.site/v1",
+  "prodBase": "https://dutiful-kangaroo-719.ap-southeast-2.convex.site/v1",
+  "counts": {
+    "pass": 8,
+    "fail": 1,
+    "blocked": 0
+  },
+  "checks": [
+    {
+      "target": "prod",
+      "id": "prod-health",
+      "name": "production health reachable",
+      "status": "pass",
+      "detail": "demoMode false, liveReady false"
+    },
+    {
+      "target": "prod",
+      "id": "prod-demo-reject",
+      "name": "demo auth rejected in real mode",
+      "status": "pass",
+      "detail": "403 FORBIDDEN"
+    },
+    {
+      "target": "prod",
+      "id": "prod-otp-reject",
+      "name": "unsent OTP lane rejected in real mode",
+      "status": "fail",
+      "detail": "HTTP 200 code null; challenge minted without SMS provider, BUG"
+    },
+    {
+      "target": "prod",
+      "id": "prod-webhook-reject",
+      "name": "POST /webhooks/payments/razorpay refused honestly",
+      "status": "pass",
+      "detail": "501 PROVIDER_UNAVAILABLE"
+    },
+    {
+      "target": "prod",
+      "id": "prod-media-reject",
+      "name": "GET /media/00000000-0000-4000-8000-000000000000/download refused honestly",
+      "status": "pass",
+      "detail": "501 PROVIDER_UNAVAILABLE"
+    },
+    {
+      "target": "prod",
+      "id": "prod-voice-reject",
+      "name": "POST /demo/conversations/voice-notes refused honestly",
+      "status": "pass",
+      "detail": "501 PROVIDER_UNAVAILABLE"
+    },
+    {
+      "target": "prod",
+      "id": "prod-whatsapp-handshake",
+      "name": "unconfigured WhatsApp handshake refused",
+      "status": "pass",
+      "detail": "HTTP 502"
+    },
+    {
+      "target": "prod",
+      "id": "prod-auth-boundary",
+      "name": "unauthenticated write rejected",
+      "status": "pass",
+      "detail": "401 UNAUTHENTICATED"
+    },
+    {
+      "target": "prod",
+      "id": "prod-catalog",
+      "name": "public catalog matches service contract",
+      "status": "pass",
+      "detail": "0 services"
+    }
+  ],
+  "failures": [
+    {
+      "target": "prod",
+      "id": "prod-otp-reject",
+      "name": "unsent OTP lane rejected in real mode",
+      "status": "fail",
+      "detail": "HTTP 200 code null; challenge minted without SMS provider, BUG"
+    }
+  ]
+}

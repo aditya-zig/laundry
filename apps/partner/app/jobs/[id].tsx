@@ -11,6 +11,7 @@ import {
 } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import type { DeliveryJob } from "@wandary/contracts";
+import { ApiError } from "@wandary/api-client";
 import {
   getCachedJob,
   getClient,
@@ -55,6 +56,7 @@ export default function JobDetailScreen() {
   // OTP Form
   const [otpInput, setOtpInput] = useState("");
   const [proofRefInput, setProofRefInput] = useState("");
+  const [bagIdsInput, setBagIdsInput] = useState("");
   const [handoverLoading, setHandoverLoading] = useState(false);
   const [handoverSuccess, setHandoverSuccess] = useState<string | null>(null);
   const [handoverError, setHandoverError] = useState<string | null>(null);
@@ -124,6 +126,11 @@ export default function JobDetailScreen() {
       return;
     }
 
+    const bagIds = job.bagIds.length > 0 ? job.bagIds : [...new Set(bagIdsInput.split(",").map((s) => s.trim()).filter(Boolean))];
+    if (bagIds.length === 0) {
+      setHandoverError("Record the sealed bag IDs before verifying handover.");
+      return;
+    }
     setHandoverLoading(true);
     setHandoverError(null);
     setHandoverSuccess(null);
@@ -136,7 +143,7 @@ export default function JobDetailScreen() {
       const client = getClient();
       const updated = await client.handoverJob(job.id, {
         actionId,
-        bagIds: job.bagIds,
+        bagIds,
         method: "OTP",
         otp: otpInput.trim(),
         proofReference: proofRefInput.trim() || undefined,
@@ -149,12 +156,18 @@ export default function JobDetailScreen() {
       setHandoverSuccess(`Handover confirmed! Status updated to ${updated.status}.`);
       setOtpInput("");
     } catch (err: unknown) {
-      // If network failure or offline, queue with "Pending sync"
+      // Authoritative rejections (wrong OTP, revoked assignment, stale version)
+      // are not offline evidence and must not be retried as queued success.
+      if (err instanceof ApiError && !err.retryable) {
+        setHandoverError(err.message);
+        return;
+      }
+      // If network failure or unknown transient outcome, queue as Pending sync.
       const queuedItem = createOfflineQueueItem({
         jobId: job.id,
         expectedVersion: job.version,
         riderId: currentUser?.id ?? "rider-unknown",
-        bagIds: job.bagIds,
+        bagIds,
         actionId,
         otp: otpInput.trim(),
         proofReference: proofRefInput.trim() || undefined,
@@ -391,11 +404,18 @@ export default function JobDetailScreen() {
               </View>
             ) : null}
 
+            {job.bagIds.length === 0 && (
+              <View>
+                <Text style={styles.inputLabel}>Sealed bag IDs (comma separated)</Text>
+                <TextInput value={bagIdsInput} onChangeText={setBagIdsInput} accessibilityLabel="Sealed bag IDs" placeholder="Read IDs from the actual sealed bags" style={styles.textInput} />
+              </View>
+            )}
             <Text style={styles.inputLabel}>Customer Handover OTP</Text>
             <TextInput
               value={otpInput}
               onChangeText={setOtpInput}
-              placeholder="Enter customer OTP (e.g. 1234)"
+              placeholder="Enter customer OTP"
+              accessibilityLabel="Customer Handover OTP"
               placeholderTextColor={colors.inkMuted}
               keyboardType="number-pad"
               style={styles.textInput}

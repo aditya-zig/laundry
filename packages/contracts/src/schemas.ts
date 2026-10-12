@@ -89,6 +89,14 @@ export const checkoutSchema = z.object({
   status: z.enum(["AWAITING_PAYMENT", "RESOLUTION_REQUIRED"]),
 });
 
+/** Development-only owner response; never part of an order or rider view. */
+export const demoHandoverCodesSchema = z.object({
+  orderId: idSchema,
+  pickupOtp: z.string().regex(/^\d{6}$/).optional(),
+  returnOtp: z.string().regex(/^\d{6}$/).optional(),
+  note: z.string(),
+});
+
 export const orderStatusSchema = z.enum([
   "AWAITING_PAYMENT",
   "CONFIRMED",

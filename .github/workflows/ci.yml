@@ -41,5 +41,26 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm build
       - run: pnpm check
+      - run: pnpm check:convex
       - run: pnpm test
       - run: pnpm test:voice
+  deploy-convex:
+    needs: verify
+    if: github.event_name == 'push' && github.ref == 'refs/heads/build/wandary'
+    runs-on: ubuntu-latest
+    concurrency:
+      group: laundry-production-backend
+      cancel-in-progress: false
+    env:
+      CONVEX_DEPLOY_KEY: ${{ secrets.CONVEX_DEPLOY_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.33.2
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec convex deploy --typecheck enable

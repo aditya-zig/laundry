@@ -12,6 +12,26 @@ simulators or local tooling until real credentials and contracts are supplied.
 No simulated result is described as a live payment, courier dispatch, or
 WhatsApp delivery.
 
+## Cloud deployment
+
+The hosted backend uses **Convex**. Customer, partner, and operations web apps
+are separate Vercel projects using the same versioned REST contract.
+The PostgreSQL implementation remains available for local development.
+
+- [Customer demo](https://laundry-customer-five.vercel.app)
+- [Delivery partner demo](https://laundry-partner.vercel.app)
+- [Operations demo](https://wandary.vercel.app)
+
+These sites use the development Convex deployment and synthetic demo data.
+The separate production deployment has `DEMO_MODE=false`; live authentication,
+payments, WhatsApp, speech, and courier integrations are unavailable and rejected
+explicitly. Deploying infrastructure does not make those integrations ready.
+See [cloud deployment runbook](docs/implementation/cloud-deployment.md).
+
+For local screens connected to Convex, set `EXPO_PUBLIC_API_URL` and
+`VITE_API_URL` to the HTTP actions URL ending in `/v1`, then run
+`pnpm dev:cloud`. No local database is required for this mode.
+
 ## Quick start
 
 ```bash

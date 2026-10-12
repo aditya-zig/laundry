@@ -1,0 +1,8 @@
+Checkout quote — Zen a11y (redacted)
+- DEMO: payment runs through labeled simulator, never live charge.
+- Delivery address: Home (demo) fixture present
+- Request quote -> Total INR 66.08 fixed
+- 1 x garment @5900 INR 59.00, pickup fee 0.00, Tax demo 12% INR 7.08
+- Return window 2026-10-13T22Z to 2026-10-14T04Z
+- Pay (DEMO simulator) -> Checkout created. Complete payment in hosted DEMO checkout below.
+- Hosted DEMO checkout uses demo.local (simulator, not live). IDs redacted.

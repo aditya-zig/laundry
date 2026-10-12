@@ -6,6 +6,7 @@ import {
   conversationMessageResultSchema,
   conversationMessageSchema,
   demoAuthSchema,
+  demoHandoverCodesSchema,
   deliveryJobSchema,
   draftConfirmSchema,
   errorEnvelopeSchema,
@@ -65,6 +66,11 @@ export interface MutatingOpts {
 }
 
 export interface CheckoutOpts extends MutatingOpts {
+  expectedVersion?: number;
+}
+
+export interface DispatchOpts extends MutatingOpts {
+  assignedTo?: string;
   expectedVersion?: number;
 }
 
@@ -147,6 +153,7 @@ export function createClient(options: ClientOptions = {}) {
       ) as Promise<Checkout>,
     listOrders: () => get("/orders", z.array(orderSchema)) as Promise<Order[]>,
     getOrder: (id: string) => get(`/orders/${id}`, orderSchema) as Promise<Order>,
+    getDemoHandoverCodes: (id: string) => get(`/orders/${id}/handover-code`, demoHandoverCodesSchema),
     cancelOrder: (id: string, reason: string, expectedVersion: number, opts?: MutatingOpts) =>
       post(`/orders/${id}/cancel`, cancelOrderSchema.parse({ reason, expectedVersion }), orderSchema, opts) as Promise<Order>,
     captureDemoPayment: (paymentId: string, opts?: MutatingOpts) =>
@@ -186,7 +193,10 @@ export function createClient(options: ClientOptions = {}) {
     advanceCare: (id: string, expectedVersion: number, to: CareTarget, opts?: MutatingOpts) =>
       post(`/ops/orders/${id}/care`, { expectedVersion, to }, orderSchema, opts) as Promise<Order>,
     listOpsDeliveries: () => get("/ops/deliveries", z.array(deliveryJobSchema)) as Promise<DeliveryJob[]>,
-    dispatchDelivery: (id: string, opts?: MutatingOpts) => post(`/ops/deliveries/${id}/dispatch`, {}, deliveryJobSchema, opts) as Promise<DeliveryJob>,
+    dispatchDelivery: (id: string, opts?: DispatchOpts) => post(`/ops/deliveries/${id}/dispatch`, {
+      ...(opts?.assignedTo ? { assignedTo: opts.assignedTo } : {}),
+      ...(opts?.expectedVersion !== undefined ? { expectedVersion: opts.expectedVersion } : {}),
+    }, deliveryJobSchema, opts) as Promise<DeliveryJob>,
     createRefund: (orderId: string, paymentId: string, amountMinor: number, reason: string, opts?: RefundOpts) =>
       post(
         "/ops/refunds",

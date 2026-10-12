@@ -16,6 +16,7 @@ export default function OrderDetail() {
   const [score, setScore] = useState("5");
   const [notice, setNotice] = useState<string | null>(null);
   const [capturing, setCapturing] = useState(false);
+  const [codes, setCodes] = useState<{ pickupOtp?: string; returnOtp?: string } | null>(null);
 
   function load() {
     getClient().getOrder(id).then(setOrder).catch((e) => setError(e instanceof Error ? e.message : "Failed"));
@@ -55,6 +56,18 @@ export default function OrderDetail() {
     }
   }
 
+  async function revealDemoCodes() {
+    setNotice(null);
+    setCodes(null);
+    try {
+      const latest = await getClient().getOrder(id);
+      setOrder(latest);
+      setCodes(await getClient().getDemoHandoverCodes(id));
+    } catch (e) {
+      setNotice(e instanceof Error ? e.message : "Demo handover codes unavailable");
+    }
+  }
+
   async function cancel() {
     setNotice(null);
     try {
@@ -77,6 +90,23 @@ export default function OrderDetail() {
       <Text style={{ color: colors.inkMuted, marginTop: 4 }}>
         Return {order.promisedReturnWindow.start} to {order.promisedReturnWindow.end}
       </Text>
+      <Pressable onPress={load} accessibilityRole="button" style={{ marginTop: 12, minHeight: minTouchTarget, justifyContent: "center" }}>
+        <Text style={{ color: colors.action, fontWeight: "700" }}>Refresh order</Text>
+      </Pressable>
+      {order.paymentStatus === "CAPTURED" && !["CANCELLED", "DELIVERED"].includes(order.status) && (
+        <View>
+          <Pressable onPress={revealDemoCodes} accessibilityRole="button" style={{ minHeight: minTouchTarget, justifyContent: "center" }}>
+            <Text style={{ color: colors.action, fontWeight: "700" }}>Show handover codes (DEMO only)</Text>
+          </Pressable>
+          {codes && (
+            <View>
+              <Text style={{ color: colors.inkMuted }}>DEMO: share a code only at the matching physical handover. Live secure code delivery is not implemented.</Text>
+              {codes.pickupOtp && <Text style={{ color: colors.ink }}>Pickup code: {codes.pickupOtp}</Text>}
+              {codes.returnOtp ? <Text style={{ color: colors.ink }}>Return code: {codes.returnOtp}</Text> : <Text style={{ color: colors.inkMuted }}>Return code is withheld until ready for return.</Text>}
+            </View>
+          )}
+        </View>
+      )}
       <Text style={{ marginTop: spacing.md, fontWeight: "700", color: colors.ink }}>Tracking</Text>
       {TRACKING.map((s) => (
         <Text key={s} style={{ color: order.timeline.some((t) => t.status === s) ? colors.success : colors.inkMuted }}>

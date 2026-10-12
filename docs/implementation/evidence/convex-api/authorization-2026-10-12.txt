@@ -1,0 +1,25 @@
+[PASS] health: dev health demoMode true -- synthetic demo only
+[PASS] login: demo login customer/rider/operator -- sessions issued, values withheld
+[PASS] facility-login: facility has no demo login -- HTTP 400
+[PASS] fixture: synthetic orders created -- 3 orders captured, ids withheld
+[PASS] fixture: adjustment pending opened -- count withheld
+[PASS] rider-cancel: rider cancel rejected, state unchanged -- HTTP 403 version 3->3
+[PASS] adjustment-operator: operator adjustment decision rejected -- HTTP 403
+[PASS] adjustment-rider: rider adjustment decision rejected -- HTTP 403
+[PASS] rider-list: rider order list rejected -- HTTP 403
+[PASS] customer-list: customer order list intact -- HTTP 200 n=38
+[PASS] operator-list: operator ops queue intact -- HTTP 200
+[PASS] rider-timeline: rider timeline rejected -- HTTP 404
+[PASS] support-create-rider: rider support creation rejected -- HTTP 403
+[PASS] support-create-customer: customer support creation intact -- HTTP 200
+[PASS] support-read-rider: rider support read rejected -- HTTP 403
+[PASS] support-message-rider: rider support message rejected, count unchanged -- HTTP 403 messages 1->1
+[PASS] payment-read-rider: rider payment read rejected -- HTTP 403
+[PASS] receipt-read-rider: rider receipt read rejected -- HTTP 403
+[PASS] payment-read-customer: customer payment read intact -- HTTP 200
+[PASS] jobs-unassigned: unassigned jobs hidden from rider list -- HTTP 200 leaked=false allAssigned=true
+[PASS] job-detail-unassigned: unassigned job detail rejected without contact/address -- HTTP 404
+[PASS] accept-unassigned: unassigned self-accept rejected, still unassigned -- HTTP 404 stillUnassigned=true
+[PASS] counts-stable: order counts unchanged by rejected probes -- n 38->38
+
+RESULT: PASS (pass 23, fail 0)

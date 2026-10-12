@@ -1,0 +1,1 @@
+Main started supervised pnpm dev on local ports8081/8082/5173/API4100 using persistent exec session65704. Review server logs privately .agent-logs/resume-dev.log if any startup issue; request restart through report. Main owns root/API deployment edits.

@@ -1,0 +1,6 @@
+Service detail Wash and Fold — Zen a11y (redacted)
+- from INR 59 per garment
+- Indicative turnaround 36h. Final quote confirms return window.
+- T-shirt INR 59.00 per garment, qty 1
+- Add to basket -> 1 item(s) added to basket.
+- Review basket navigates to /basket

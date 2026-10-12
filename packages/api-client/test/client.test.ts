@@ -120,6 +120,27 @@ describe("api-client integration (mocked transport)", () => {
     expect(result.quote?.id).toBe(demoQuote.id);
   });
 
+  it("reads customer-only demo handover codes without manufacturing a return code", async () => {
+    const payload = { orderId: demoOrder.id, pickupOtp: "123456", note: "Demo only" };
+    const fetchImpl = vi.fn(async (_url: string, _init?: RequestInit) => jsonResponse(payload));
+    const client = createClient({ fetchImpl: fetchImpl as typeof fetch, getToken: () => "customer-token" });
+    const codes = await client.getDemoHandoverCodes(demoOrder.id);
+    expect(codes.pickupOtp).toBe("123456");
+    expect(codes.returnOtp).toBeUndefined();
+    const [url, init] = fetchImpl.mock.calls[0];
+    expect(url).toBe(`http://localhost:4100/v1/orders/${demoOrder.id}/handover-code`);
+    expect((init!.headers as Record<string, string>).Authorization).toBe("Bearer customer-token");
+  });
+
+  it("sends explicit operator assignment and current version on dispatch", async () => {
+    const job = demoOrder.deliveries[0];
+    const fetchImpl = vi.fn(async (_url: string, _init?: RequestInit) => jsonResponse(job));
+    const client = createClient({ fetchImpl: fetchImpl as typeof fetch });
+    await client.dispatchDelivery(job.id, { assignedTo: "dddddddd-dddd-4ddd-8ddd-dddddddddddd", expectedVersion: 3 });
+    const [, init] = fetchImpl.mock.calls[0];
+    expect(JSON.parse(init!.body as string)).toEqual({ assignedTo: "dddddddd-dddd-4ddd-8ddd-dddddddddddd", expectedVersion: 3 });
+  });
+
   it("checks service-area eligibility against GET /service-areas/check", async () => {
     const payload = { serviceable: true, areaId: "demo-area-bengaluru", hours: "09:00-18:00 Asia/Kolkata" };
     const fetchImpl = vi.fn(async (_url: string, _init?: RequestInit) => jsonResponse(payload));

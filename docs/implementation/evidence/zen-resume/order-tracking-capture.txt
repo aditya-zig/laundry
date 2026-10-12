@@ -1,0 +1,11 @@
+Order tracking — Zen a11y (redacted)
+Before capture:
+- Status AWAITING_PAYMENT, No payment yet, Total INR 66.08
+- Tracking Pending CONFIRMED..DELIVERED
+- Simulate payment capture (DEMO) present
+After click Simulate payment capture (DEMO):
+- Capturing... -> Status PICKUP_PENDING, Payment received
+- Done CONFIRMED, Done PICKUP_PENDING, Pending AT_FACILITY..DELIVERED
+- DEMO capture recorded. Authoritative order status shown above.
+- Review gated: Reviews open after delivery. Only delivered orders accept one review each.
+Order prefix 1b9af60f only; full IDs/payment IDs omitted.

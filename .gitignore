@@ -17,3 +17,5 @@ __pycache__/
 *.py[cod]
 .venv/
 .vercel
+.gstack/
+.web-dist/

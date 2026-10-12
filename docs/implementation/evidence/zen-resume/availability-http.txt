@@ -1,0 +1,5 @@
+Availability HTTP fallback (read-only, not UI proof) — 2026-10-12
+- https://laundry-customer-five.vercel.app/ -> 200, title Wandary Customer (demo)
+- https://laundry-partner.vercel.app/ -> 200, title Wandary Partner (demo)
+- https://wandary.vercel.app/ -> 200, title Wandary Ops (demo)
+Partner/ops login/list/detail BLOCKED in Zen: existing partner tab points to http://localhost:8082 with empty content; address-bar set_value/type_text/ctrl+l/ctrl+t did not navigate. No unrelated orders touched. No screenshots from MCP (a11y trees only).

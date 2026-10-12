@@ -1,0 +1,10 @@
+Customer home — 2026-10-12 Zen a11y (redacted)
+- Wandary, Laundry pickup minus phone tag. DEMO build.
+- Delivering to Bengaluru 560001
+- Serving demo-area-bengaluru 09:00-18:00 Asia/Kolkata
+- Browse services -> 4 cards:
+  Wash and Press from INR 79 per garment / No reviews yet
+  Dry Cleaning from INR 199 per garment / No reviews yet
+  Wash and Fold from INR 59 per garment / No reviews yet
+  Steam Press from INR 39 per garment / No reviews yet
+- Account: Signed in with demo session. Phone verification required before real checkout.
