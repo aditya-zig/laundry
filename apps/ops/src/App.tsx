@@ -35,7 +35,7 @@ export default function App() {
   if (!authed) {
     return (
       <div className="shell">
-        <h1>Wandary Ops</h1>
+        <h1>Laundry Ops</h1>
         <p>Restricted console. DEMO sign-in only; production staff access needs SSO and MFA.</p>
         <button onClick={signIn}>Continue with demo operator sign-in</button>
         {error && <p className="err">{error}</p>}
@@ -47,7 +47,7 @@ export default function App() {
   return (
     <div className="shell">
       <header>
-        <h1>Wandary Ops</h1>
+        <h1>Laundry Ops</h1>
         <nav>
           <a href="#/orders">Orders</a>
           <a href="#/dispatch">Dispatch</a>

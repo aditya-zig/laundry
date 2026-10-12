@@ -11,7 +11,7 @@ export default function Layout() {
         contentStyle: { backgroundColor: colors.surface },
       }}
     >
-      <Stack.Screen name="index" options={{ title: "Wandary" }} />
+      <Stack.Screen name="index" options={{ title: "Laundry" }} />
       <Stack.Screen name="basket" options={{ title: "Basket" }} />
       <Stack.Screen name="checkout" options={{ title: "Checkout" }} />
       <Stack.Screen name="orders" options={{ title: "Orders" }} />

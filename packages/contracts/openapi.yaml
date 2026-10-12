@@ -1,6 +1,6 @@
 openapi: 3.1.0
 info:
-  title: Wandary API
+  title: Laundry API
   version: 1.0.0
   description: Versioned /v1 wire contract. Success shapes are direct resources/lists; errors are {code,message,traceId,retryable}.
 servers:

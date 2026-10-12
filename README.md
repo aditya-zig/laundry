@@ -1,7 +1,10 @@
-# Wandary (working name)
+# Laundry
 
 Laundry pickup and delivery: customer storefront, delivery partner app, WhatsApp
 voice-note ordering, and an internal operations console sharing one order engine.
+
+The displayed product name is **Laundry**. Existing `@wandary` package names,
+deep-link schemes, repository name and hosted URLs remain unchanged for compatibility.
 
 This repo holds the working implementation: `apps/api` (NestJS + PostgreSQL),
 `apps/customer` and `apps/partner` (Expo + React Native Web), `apps/ops`

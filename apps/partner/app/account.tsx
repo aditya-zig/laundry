@@ -73,7 +73,7 @@ export default function AccountScreen() {
         <View style={styles.payrollCard}>
           <Text style={styles.payrollTitle}>Partner Employment & Payroll</Text>
           <Text style={styles.payrollText}>
-            Wandary does not provide payroll, settlement, or earnings calculation. Payouts and work shifts are governed by your licensed logistics service provider contract.
+            Laundry does not provide payroll, settlement, or earnings calculation. Payouts and work shifts are governed by your licensed logistics service provider contract.
           </Text>
         </View>
 

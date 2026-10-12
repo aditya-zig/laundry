@@ -36,7 +36,7 @@ export default function Home() {
 
   return (
     <ScrollView style={{ backgroundColor: colors.surface, padding: spacing.md }}>
-      <Text style={{ color: colors.ink, fontSize: 28, fontWeight: "700" }}>Wandary</Text>
+      <Text style={{ color: colors.ink, fontSize: 28, fontWeight: "700" }}>Laundry</Text>
       <Text style={{ color: colors.inkMuted, marginTop: 4 }}>Laundry pickup, minus the phone tag. DEMO build.</Text>
       <Text style={{ color: colors.ink, marginTop: spacing.md, fontWeight: "600" }}>
         Delivering to: {address}
