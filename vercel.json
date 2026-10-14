@@ -4,5 +4,8 @@
   "buildCommand": "node tools/build-web.mjs",
   "outputDirectory": ".web-dist",
   "framework": null,
-  "rewrites": [{ "source": "/(.*)", "destination": "/index.html" }]
+  "rewrites": [
+    { "source": "/demo-api/:path*", "destination": "https://hidden-trout-436.ap-southeast-2.convex.site/:path*" },
+    { "source": "/(.*)", "destination": "/index.html" }
+  ]
 }
