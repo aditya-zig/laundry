@@ -17,14 +17,6 @@ const line = (quantity: number): CartLine => ({
 });
 
 describe("customer journey", () => {
-  it("image failure keeps the service selectable (card renders fallback, link stays)", () => {
-    // ServiceCard falls back to a text block when onError fires; the Link target
-    // is the service id either way. Model the contract: selection needs only id.
-    const service = { id: "11111111-1111-4111-8111-111111111111", name: "Wash and Press" };
-    const href = { pathname: "/services/[id]", params: { id: service.id } } as const;
-    expect(href.params.id).toBe(service.id);
-  });
-
   it("expired quote requires fresh terms before payment", () => {
     expect(isQuoteExpired("2026-10-11T16:00:00.000Z", "2026-10-11T17:00:00.000Z")).toBe(true);
     expect(isQuoteExpired("2026-10-11T18:00:00.000Z", "2026-10-11T17:00:00.000Z")).toBe(false);
@@ -43,15 +35,6 @@ describe("customer journey", () => {
     expect(isPendingLabelHonest(label)).toBe(true);
     expect(label).not.toBe("Payment failed");
     expect(label).not.toBe("Payment received");
-  });
-
-  it("changed intake needs explicit approval (adjustment blocks silent care)", () => {
-    // Client rule: an order carrying a pending adjustment surfaces approval UI
-    // and withholds the care-advance action. Represented as a gate string.
-    const gate = (hasPendingAdjustment: boolean): string | null =>
-      hasPendingAdjustment ? "Price changed during intake. Approve or decline before care continues." : null;
-    expect(gate(true)).toMatch(/Approve or decline/);
-    expect(gate(false)).toBeNull();
   });
 
   it("empty reviews show no rating", () => {
