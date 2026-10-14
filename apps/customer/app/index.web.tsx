@@ -23,7 +23,14 @@ export default function Home() {
     setLoading(true);
     setError(null);
     try {
-      setServices(await getClient().listServices());
+      const images: Record<string, string> = {
+        WASH_PRESS: 'wash-and-iron.png', DRY_CLEAN: 'dry-clean.png',
+        WASH_FOLD: 'wash-and-fold.png', PRESS_ONLY: 'steam-press.png',
+      };
+      setServices((await getClient().listServices()).map(service => ({
+        ...service,
+        imageUrl: images[service.code] ? `/assets/services/${images[service.code]}` : service.imageUrl,
+      })));
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Services could not load. Please try again.');
     } finally {
