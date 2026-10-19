@@ -312,3 +312,12 @@ Recommendation: founder agrees an unprocessed return; exact timeout and fees def
 **Interpretation:** Hold processing; escalate to a founder to arrange an unprocessed return with the customer. Timeout/contact-attempt/fee details remain undecided.
 
 Pricing Q20 remains the first agenda item when both partners are present.
+
+## Q25 — Scope clarification
+
+The founder said “my partner with frontend.” Asked whether the partner owns frontend direction/review, writes frontend exclusively, or is present to review.
+
+**Founder answer:**
+> here now we are only doing the plan.md and tooling so a new cloud agent can do and verify when it pushes
+
+**Interpretation:** Current authorization is product planning and execution/verification tooling. Do not assign frontend implementation ownership or start product features from this statement. Future cloud agents implement manually assigned bounded issues and verify their pushed revisions.

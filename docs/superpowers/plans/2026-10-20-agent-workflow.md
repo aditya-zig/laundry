@@ -60,5 +60,5 @@ Files: .github/workflows/agent-verification.yml; .github/ISSUE_TEMPLATE/agent-ta
 
 - [x] Review standards and spec separately; use actual OpenCode Muse review runs where available, local review if provider credits block them, with honest provenance.
 - [x] Run existing appropriate checks, tooling tests, browser smoke and media validation. Report baseline failures explicitly.
-- [ ] Commit only the scoped tooling/planning changes; push chore/cloud-agent-workflow, create/link reviewable PR and inspect CI.
-- [ ] Attach current video through supported GitHub capability and verify the returned PR body/player URL; no merge/deployment.
+- [x] Commit only the scoped tooling/planning changes; push chore/cloud-agent-workflow, create/link reviewable PR and inspect CI.
+- [x] Attach current video through supported GitHub capability and verify the returned PR body/player URL; no merge/deployment.

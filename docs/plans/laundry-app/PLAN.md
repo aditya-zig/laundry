@@ -270,3 +270,7 @@ Overnight and weekend same-day options are capacity-dependent (Q19). Per-kg/Prem
 ## 30. Intake and unanswered approval — Q23/Q24
 
 The paid rider weighs and inspects at the laundry. Founders retain control of pricing adjustments, refunds and final processing exceptions. If increased-weight approval is still unanswered after contact, processing stays on hold and a founder agrees an unprocessed return with the customer. Exact timeout, contact attempts and fees remain deferred. Partner review is pending.
+
+## 31. Current delivery scope — Q25
+
+This branch covers PLAN.md and remote-agent execution/verification tooling. It does not implement the proposed product redesign or assign frontend ownership. Future cloud agents implement manually assigned bounded issues and verify their pushed revisions. Repository browser evidence runs on all pushes and pull requests, regardless of worker branch naming.

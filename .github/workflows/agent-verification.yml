@@ -1,13 +1,12 @@
 name: Agent verification evidence
 on:
   push:
-    branches: [chore/cloud-agent-workflow, 'agent/**', 'issue/**']
   pull_request:
   workflow_dispatch:
 permissions:
   contents: read
 concurrency:
-  group: agent-evidence-${{ github.event.pull_request.number || github.ref }}
+  group: agent-evidence-${{ github.head_ref || github.ref_name }}
   cancel-in-progress: true
 jobs:
   browser-evidence:

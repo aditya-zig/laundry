@@ -296,3 +296,9 @@ Founder selected: “Finish and push the repo tooling first; configure the cloud
 - Interpretation: Hold processing and escalate to founder for agreed unprocessed return. Timeout, attempts and fees remain undecided.
 - Partner answer/challenge: pending
 - Status: founder answered; partner review pending
+
+### Q25 — Current scope
+
+- Founder answer: here now we are only doing the plan.md and tooling so a new cloud agent can do and verify when it pushes
+- Interpretation: Planning/tooling now; no frontend assignment or product implementation authorization inferred.
+- Status: scope confirmed
