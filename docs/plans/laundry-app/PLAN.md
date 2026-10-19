@@ -1,391 +1,310 @@
-# Laundry — shared grilling ledger
+# Laundry — product plan and cloud delivery workflow
 
-Status: founder interview closed for partner handoff; partner review pending · Plan: 0.5 · Interview owner: parent agent in the current session.
+Version: 0.5 · Started: 2026-10-19 · Status: discovery draft; first founder answers recorded, partner review pending.
 
-Both founders can use this file from different sessions. Answers remain attributed; one person's answer does not overwrite another's. Recommendations are proposals, not decisions. There is no deadline-based approval.
+This is the master planning document for the Laundry app. It is deliberately a draft: unresolved product choices are marked OPEN instead of being silently filled in. It becomes an implementation specification only after the grilling is complete and the agreed approval rule is satisfied. No application changes or GitHub issues have been created by this planning session.
 
-## First frontier
+## 1. Requested outcome
 
-### Q01 — What are we planning?
+Build the Laundry app's look from the founders' Notion material. First produce a detailed Markdown plan; then convert approved, bounded work into GitHub issues. Either founder should be able to return later, choose an eligible issue, and ask Codex cloud to implement it without needing this conversation. A partner must be able to review answers, challenge decisions, and continue the interview asynchronously.
 
-Is this a visual redesign that preserves behavior, a working customer app journey, or a wider product build covering customer, delivery partner, and operations?
+The requested sequence is:
 
-Recommendation: start with the customer app's look and working booking journey, then scope other surfaces separately. This is narrow enough to review and still tests whether the look supports an actual task.
+1. Gather evidence from Notion and the existing implementation.
+2. Grill the founders and record answers, disagreements, vocabulary, and decisions.
+3. Agree a versioned product and design plan.
+4. Draft issue-sized vertical slices with acceptance criteria and dependencies.
+5. Publish the reviewed issues when requested.
+6. Manually launch a cloud task for an eligible issue.
+7. Review its change and verification evidence; merge and deploy according to the chosen authority rule.
 
-- Founder answer (2026-10-19): Whole product: customer app, delivery partner app, and operations console.
-- Partner answer/challenge: pending
-- Rationale/evidence: pending
-- Status: founder answered; partner review pending
-- Resolution: founder direction above; incorporate into draft, retain for partner review before joint plan approval
-- Impacts: plan scope, screen inventory, issue granularity, verification
+## 2. Current evidence and source conflicts
 
-### Q02 — How do the founders settle decisions?
+| Source | Observed fact | Planning implication |
+|---|---|---|
+| `/home/batman/Projects/code/Landary` | Git remote is `aditya-zig/laundry`; root README names `build/laundry` as production branch; substantial uncommitted work exists | Candidate implementation, not a safe place for blanket staging or reset |
+| `/home/batman/Projects/code/wandary` | Git remote is `aditya-zig/wandary`; displayed product is Laundry; implementation and design tokens already exist | A second candidate; newer changes do not prove it is authoritative |
+| Both root READMEs | Customer and rider apps use Expo/React Native Web; operations uses React/Vite; local API is NestJS/PostgreSQL; hosted backend is Convex | Preserve actual architecture until founders explicitly choose changes |
+| Existing specs and A0–A9 agent packets | Product, contracts, and task material already exists | Reconcile and reuse before replacing or expanding it |
+| Notion Laundry home | https://app.notion.com/p/3f6074fda55681ee8b3cdc20db4090a2 | Starting source; see `product-findings.md` for fetched pages and provenance |
+| Older Notion build plan | Describes an empty project and an operations framework different from the implementation | Historical planning evidence; not an execution baseline |
+| Later Notion meetings | Include familiar quick-commerce UI, kg quantity, pickup windows, tiers, WhatsApp communication, and local delivery ideas | Candidate requirements requiring founder agreement |
+| Meeting notes | Launch-area and delivery-model descriptions differ | Resolve explicitly; timestamps alone do not settle intent |
 
-Should both approve the same plan version, or should one person have final authority with the other advising?
+Founder-selected source policy: the 18 October Game plan is the product authority; code describes current implementation. Later explicit jointly approved decisions may amend that authority. Other meeting notes are supporting evidence and cannot silently override it. When these disagree, name the conflict and obtain a decision. Keep original source links and approval history. A model-generated summary with a warning needs source checking before it supplies prices, hours, or contractual promises.
 
-Recommendation: either can answer and challenge; both approve the plan version before it becomes build issues. Record any explicit delegation for day-to-day reversible decisions separately.
+## 3. Canonical project — selected (Q04)
 
-- Founder answer (2026-10-19): Both founders approve the same plan version; either can challenge.
-- Partner answer/challenge: pending
-- Status: founder answered; partner review pending
-- Resolution: founder direction above; incorporate into draft, retain for partner review before joint plan approval
-- Impacts: approval record, reopened decisions, partner continuation
+The founder selected `aditya-zig/laundry`, local checkout `Landary`. The current working branch is `build/laundry`; confirm its intended use as the cloud baseline and reconcile required uncommitted changes before execution. Record repository URL, target branch, relevant current commit, and which useful local changes have not reached GitHub. A cloud agent cannot access uncommitted local files.
 
-### Q03 — What may a remote worker deliver?
+Do not merge the two projects or migrate namespaces just to establish this workflow. First identify the intended source and preserve the other checkout.
 
-When you manually launch an issue, should the cloud agent push an issue branch and open a PR, push a branch only, or push directly to the working branch?
+## 4. Scope — whole product selected (Q01)
 
-Recommendation: branch and reviewable PR. Establish merge and deployment authority as separate explicit instructions.
+The founder selected the whole product: customer app, delivery partner app, and operations console. Plan all three and their shared workflows; implementation may still land in small dependency-aware slices. Q07 selects a controlled live pilot, with a connected synthetic-data demo before accepting real orders. Q08 selects installed Android customer/rider apps and operations web, with iPhone later. Browser evidence supports web behavior; native behavior needs an additional gate. Name the first user and the first observable result that makes the work useful. Explicitly identify which existing functions should survive unchanged.
 
-- Founder answer (2026-10-19): Option 1: issue branch and reviewable PR. Additionally, run the app, interact with browser/computer tools, and supply video evidence proving the relevant journey works for review. Design a repeatable verification/fix loop.
-- Partner answer/challenge: pending
-- Status: founder answered; partner review pending
-- Resolution: founder direction above; incorporate into draft, retain for partner review before joint plan approval
-- Impacts: environment permissions, launch prompt, definition of done
+The plan must cover the connected journey across customer booking, operational fulfillment, delivery-partner pickup/return, and customer status/support. The precise service, pricing, timing and custody behavior must follow the product authority and subsequent settled questions.
 
-### Q04 — Which existing implementation is the target?
+## 5. Users and boundaries — OPEN
 
-Observed candidates: `Landary` → `aditya-zig/laundry`, and `wandary` → `aditya-zig/wandary`. Both have existing applications and planning documents; both have local changes. Which should receive the new approved plan and subsequent issues?
+For each included actor, record their job, permissions, information needs, device, and failure recovery. Candidate actors from the current product are customer, delivery partner, and operations staff. A business cofounder reviewing this plan is different from the product's delivery partner role.
 
-Recommendation: select one canonical repo and branch; reuse its implementation and intentionally include any desired local changes before cloud tasks. Confirm business intent rather than choosing solely by latest modification time.
+Determine whether laundry shop staff need their own interface, whether WhatsApp is a support/notification channel or an ordering channel, and which interactions can be handled manually for the first release. Defer these questions until scope and operating model are settled.
 
-- Founder answer (2026-10-19): aditya-zig/laundry (local Landary).
-- Partner answer/challenge: pending
-- Status: founder answered; partner review pending
-- Resolution: founder direction above; incorporate into draft, retain for partner review before joint plan approval
-- Impacts: every future document path, setup instruction, issue and cloud environment
+## 6. Customer journey — OPEN
 
-### Q05 — How should we reconcile Notion conflicts?
+For every included step, specify entry point, information shown, action, validation, success state, and recovery path. Candidate steps to reconcile with existing screens:
 
-Older build notes conflict with current code. Later meetings differ on launch geography and delivery setup. May we treat existing code as the baseline, propose changes from newer notes, and bring every material conflict to the founders for an explicit resolution?
+- Discover services and understand what is included.
+- Check address/serviceability and select quantity.
+- Choose pickup timing and see any return promise.
+- See a transparent price or estimate and confirm the request.
+- Complete the chosen payment flow if included.
+- Track pickup, care, and return with useful next actions.
+- Get help, cancel when permitted, and handle exceptions.
+- Review delivered service if included.
 
-Recommendation: yes. Neither the newest note nor the current code automatically decides the future product. Preserve links and distinguish current facts from desired behavior.
+Do not infer fixed-price checkout from kg selection. Decide how estimated weight, measured weight, adjustments, consent, and payment timing work before specifying the price UI.
 
-- Founder answer (2026-10-19): Use the 18 October Game plan as the product authority.
-- Partner answer/challenge: pending
-- Status: founder answered; partner review pending
-- Resolution: founder direction above; incorporate into draft, retain for partner review before joint plan approval
-- Impacts: source policy and requirements
+## 7. Screen specification — OPEN
 
-### Q06 — Where does the partner review happen?
+Create an entry for every in-scope screen using this format:
 
-Should the partner review in shared Notion with approved Markdown in GitHub, use GitHub files/comments only, or receive a local bundle first?
+| Field | Required detail |
+|---|---|
+| Screen ID and purpose | One job and the user who needs it |
+| Entry/exit | Navigation paths, deep link, back behavior |
+| Content hierarchy | Primary information, secondary detail, primary action |
+| Components and assets | Reused components, approved new components, image fallbacks |
+| Data | Required fields and authoritative source |
+| States | Loading, empty, success, failure, unavailable/offline, expired/stale |
+| Interaction | Inputs, validation, disabled behavior, confirmation, retry |
+| Accessibility | Labels, focus order, readable text, touch targets, status beyond color |
+| Responsive behavior | Small phone, tablet, desktop when applicable |
+| Evidence | Approved mockup/reference and acceptance criteria |
 
-Recommendation: use shared Notion for discussion and GitHub Markdown for approved execution instructions. Keep one authoritative approved version rather than two editable copies that silently disagree. No files have been shared remotely yet.
+No screen is ready for an agent while its important behavior is described only as “make it look good.”
 
-- Founder answer (2026-10-19): Shared Notion discussion plus approved Markdown in GitHub.
-- Partner answer/challenge: pending
-- Status: founder answered; partner review pending
-- Resolution: founder direction above; incorporate into draft, retain for partner review before joint plan approval
-- Impacts: partner access, review process, publication location
+## 8. Visual direction — interaction reference selected; detailed design OPEN
 
-## Round 2 — current decision frontier (current product questions)
+The current Wandary design source uses white and pale-blue surfaces, navy text, teal actions, a system font, 44px minimum touch targets, and a 390px phone baseline. See `the earlier Wandary design reference (historical local source)` and `packages/design-tokens/src/index.ts`.
 
-These are independent choices about the intended first release. Later questions about exact rates, premium inclusions, measurement adjustments, return promises and slot hours depend on these answers.
+Q10 selects familiar shopping/navigation and fast selection, preserving a distinct Laundry identity. Detailed typography, components, image treatment and approved screen mockups remain to be designed and reviewed.
 
-### Q07 — What counts as the first release being ready?
+Before design work becomes build issues, approve the key journey at phone width, shared components, typography, spacing, colors, icon/image treatment, copy tone, and error/empty/loading behavior. Record approved screenshots or mockups in the repository so cloud agents can retrieve them.
 
-Choose a complete connected demo, a controlled live pilot, or broad production launch. All three product surfaces remain in scope; this decides the operating and integration readiness bar.
+## 9. Service model and commercial rules — OPEN
 
-Recommendation: a controlled live pilot in one service area, with a connected synthetic-data demo milestone before accepting real orders. Clearly list which real integrations and operating arrangements are required before the pilot.
+Q09 selects wash-and-fold and wash-and-iron initially. The single-rider pilot and paid delivery-person role must be reflected in capacity and permissions. Resolve geography/boundary, operating radius, tiers, pricing, minimum order, availability, pickup windows, return promises, cancellation, refunds, lost/damaged handling and support hours. Mark manually operated steps as such. Check disputed prices against primary founder/shop evidence rather than adopting an unreliable meeting summary.
 
-- Founder answer (2026-10-20): B: Controlled live pilot, preceded by a connected demo milestone.
-- Partner answer/challenge: pending
-- Status: founder answered; partner review pending
-- Depends on: Q01 (whole product selected)
-- Impacts: production requirements, integration gates, launch milestone, verification
+## 10. Domain vocabulary and state — OPEN
 
-### Q08 — Which platforms must the first release support?
+Read the selected repo's glossary if present. Add resolved domain terms to `CONTEXT.md` as they crystallize; keep that file a glossary. Candidate distinctions already explicit in repository instructions: order state, payment state, and delivery-leg state are separate. Money is represented in integer INR minor units and schedule windows include a timezone.
 
-Do customer and rider need installed Android apps, is mobile web/PWA sufficient initially, and is iPhone native support required immediately? Operations is browser-based unless the founders choose otherwise.
+Resolve ambiguous words such as partner (cofounder, rider, or shop), booking versus confirmed order, estimated quantity versus measured weight, pickup window versus guaranteed arrival, and notification versus order confirmation. Record domain edge cases before changing state machines.
 
-Recommendation: customer and rider Android apps plus their browser builds for quick review, with operations on desktop web. Treat real Android verification as an additional gate; browser videos alone cannot prove native permissions, notifications or background behavior.
+## 11. Architecture and integrations — OPEN
 
-- Founder answer (2026-10-20): Recommended Android customer and delivery apps with operations web; iPhone support later.
-- Partner answer/challenge: pending
-- Status: founder answered; partner review pending
-- Depends on: Q01
-- Impacts: screen/device requirements, release builds, browser versus device evidence
+Begin from the selected repo's current architecture and contracts. Identify whether each planned issue touches visual presentation, app behavior, shared contracts, server logic, or an external integration. Scope architectural changes separately from visual work when they are independently reviewable.
 
-### Q09 — What services belong in the initial catalog?
+Inventory login/OTP, payment, messaging, speech, logistics, maps, and hosting. Classify each as real, simulated, unavailable, or intentionally manual using current evidence. Existing project instructions prohibit presenting simulators as live integrations. Use synthetic data for tests and demos.
 
-Name the initial services and explicit exclusions. Current implementation contains wash-and-fold, wash-and-iron, dry-cleaning and steam-press concepts; that does not establish approved launch availability.
+## 12. Durable decisions and traceability
 
-Recommendation: start with wash-and-fold and wash-and-iron if the operating laundry can support both consistently; keep dry-cleaning and other services out until their handling, pricing and turnaround are confirmed. These are proposals, not verified vendor capabilities.
+Maintain stable question IDs in `GRILLING.md`. Every requirement should point to a settled decision or accepted existing requirement. Every issue should reference the approved plan version and specific requirement IDs. Record difficult, costly trade-offs in short ADRs only when future readers need the rationale; keep routine reversible choices in this plan.
 
-- Founder answer (2026-10-20): Yes to wash-and-fold and wash-and-iron for the initial catalog.
-- Partner answer/challenge: pending
-- Status: founder answered; partner review pending
-- Depends on: Q01 and Q05 (product authority selected)
-- Impacts: tier definitions, per-service quantity/pricing, catalog screens, care/fulfillment flow
+Suggested requirement IDs: `UX-001` for user behavior, `VIS-001` for visual rules, `OPS-001` for operational rules, and `NFR-001` for quality constraints. Assign IDs when requirements are accepted; no fictitious requirements are assigned yet.
 
-### Q10 — What does the Zepto reference mean visually?
+## 13. Partner collaboration — founder-selected (Q02, Q06)
 
-Does the reference mean familiar shopping/navigation and quick selection, a similarly dense visual layout, or a wider redesign? Decide what should remain from the existing pale-blue, navy and teal Laundry design.
+Use the same Markdown question ledger rather than relying on one person's private chat history. Each answer records author, date, rationale, and status. Either founder may add a challenge referencing a question ID. A challenge reopens affected decisions and marks dependent requirements/issues for re-review. Silence is not approval.
 
-Recommendation: borrow familiar navigation and fast selection, while retaining Laundry's own identity. Approve concrete design alternatives before coding screens.
+Proposed statuses: unanswered → answered → challenged/resolved → accepted. Plan states: discovery → ready for review → approved → superseded. Both founders must approve the same version, as selected in Q02. Later edits create a new version and identify affected issues.
 
-- Founder answer (2026-10-20): A: Familiar navigation and fast selection, with Laundry identity.
-- Partner answer/challenge: pending
-- Status: founder answered; partner review pending
-- Depends on: Q01 and Q05
-- Impacts: visual design brief, navigation, reference/mockup approval
+`GRILLING.md` contains the first frontier and a prompt the partner can paste into a fresh agent session. Later questions depend on earlier answers; the topic map is not permission to guess those answers.
 
-### Q11 — Who actually operates the operations console?
+Selected shared review home (Q06): shared Notion for discussion and versioned GitHub Markdown for approved execution context. The draft plan and attributed Q&A are published on `chore/cloud-agent-workflow` in PR #2. The partner needs repository access to review them; Notion discussion publication remains pending. Avoid automatic two-way syncing initially: record each accepted decision in the approved Markdown version and link it from the discussion.
 
-Are you/cofounder coordinating the service and updating all processing information, or will laundry-shop staff sign in and update orders themselves? The delivery partner app remains the rider's interface.
+## 14. Files for repeatable cloud work — proposed layout
 
-Recommendation: founders or a named operations person coordinate v1, while shop communication stays manual until the handoff and responsibility are clear. If shop staff need direct access, model their permissions explicitly within operations rather than assuming they share an administrator account.
-
-- Founder answer (2026-10-20): We will pay the delivery person; he will do it. Exact operations and money permissions are being clarified in Q11.a.
-- Partner answer/challenge: pending
-- Status: founder answered; partner review pending
-- Depends on: Q01
-- Impacts: roles/permissions, intake measurement ownership, care updates, support, vendor handoffs
-
-## How to answer or challenge
+After selecting a repository, adapt existing files before adding new ones:
 
 ```text
-Author: <name>
-Plan version: 0.5
-Q01: <answer and why>
-Q02: <answer and why>
-Challenge Qxx: <what I disagree with; concrete scenario; proposed alternative>
-Evidence: <Notion link, customer observation, or code reference>
+AGENTS.md                         # Short entry point; preserve project-specific rules
+CONTEXT.md                        # Resolved product language
+docs/plans/laundry-app/PLAN.md     # Current draft; both-founder approval pending
+docs/discovery/2026-10-20-founder-questions-and-answers.md # Original answers
+docs/adr/                         # Only consequential trade-offs
+docs/agents/README.md              # One-issue execution instructions
+docs/agent-tasks/                  # Reuse existing packets, link from relevant issues
+.github/ISSUE_TEMPLATE/            # Reviewable, self-contained issue template
+.github/workflows/                 # Reproducible verification, adapted to existing CI
 ```
 
-Record follow-ups as Q01.a, Q01.b, etc. Keep the original ID stable. A new conflict changes a question's status to challenged and identifies affected plan sections. The interview owner recomputes the next frontier from settled prerequisites. Questions about screens, pricing behavior, and operating details that depend on scope wait for that scope decision.
+The master plan stays the detailed product reference. The short agent guide supplies the execution order and points to only the relevant plan sections and task packet. Installed local skills and this chat are not prerequisites for a fresh cloud worker.
 
-## Later branches — topic map, not current questions
+## 15. Remote environment prerequisites
 
-- First user, launch problem and measurable first outcome.
-- Actual operating area, capacity, pickup and return promises.
-- Service catalog, quantity/weight, tiers, pricing and adjustments.
-- Included surfaces, supported devices and navigation.
-- Key screen interactions, visual references and approved design language.
-- Login, order confirmation, payment, notifications and support.
-- Cancellation, stale data, failed payment, unavailable slots, offline recovery.
-- Data/permission boundaries and integration reality.
-- Cloud environment, verification footprint and work ownership.
-- Issue slicing, dependencies, review authority and plan approval.
+Confirm GitHub app/repository access in the founders' Codex account; choose the actual repository and baseline branch; configure the environment's runtime and setup; and verify that the needed tests can run there. Local login does not establish cloud environment readiness.
 
-## Partner continuation prompt
+Current official guidance uses **Work in > Cloud** and a published environment: connect the intended repositories, let Codex prepare and test setup, review results, then publish the environment and start a task. Publishing an environment is a remote setup action; deploying the Laundry app is a different operation. The local experimental `codex cloud` commands are optional and have not been tested against a selected published environment. Current GitHub `@codex` task-trigger guidance concerns the legacy cloud route; do not assume an issue label launches the newer system. Sources: [Codex Cloud](https://learn.chatgpt.com/docs/cloud), [cloud environments](https://learn.chatgpt.com/docs/environments/cloud-environments), [GitHub integration](https://learn.chatgpt.com/docs/third-party/github).
 
-> Continue the Laundry grill-with-docs session. Read PLAN.md, GRILLING.md and product-findings.md in this planning folder, then the selected repository's AGENTS.md and referenced current specs. Preserve the existing question IDs, author attribution and accepted decisions. I am the other cofounder: first show me what has been answered and what remains disputed. Record my review as my answers/challenges; do not treat me as the author of earlier answers. Ask the whole currently unblocked decision frontier with a recommendation for each question. Investigate facts rather than asking me to discover them. Reopen affected decisions when my scenario exposes a conflict. Update the plan and glossary as decisions settle. Create ADRs only for consequential trade-offs. Remain in planning until we explicitly approve the plan according to the recorded decision rule.
+Use repository-pinned Node/package-manager versions and lockfile. Make setup repeatable, document required non-production variables, and establish an isolated test database or supported substitute when the task requires one. The local project expects PostgreSQL through Docker on host port 5448; cloud support for that exact setup must be demonstrated rather than assumed. UI-only checks may have a smaller footprint, but required integration evidence must remain explicit.
 
-## Session log
+Document setup versus task runtime network access and configure only required domains. Provide cloud secrets through the environment's supported secret mechanism. Keep secrets out of committed docs, issue bodies, model prompts, logs, and screenshots.
 
-| Date | Author/session | Change | Approval impact |
-|---|---|---|---|
-| 2026-10-19 | Initial agent session | Created draft plan and first frontier from user request and evidence | No founder choices accepted yet |
+For the new cloud system, repository refresh does not automatically rerun installation/startup; check lockfile and dependency freshness at task start. Its network-secret placeholders and task-time behavior differ from the legacy setup-only secret model. Shared environment availability for the partner must be checked against the account/workspace; sharing the plan does not establish shared cloud access. See the official cloud-environment source above and `cloud-workflow-findings.md`.
 
-| 2026-10-19 | Requesting founder | Answered Q01–Q06; required per-revision browser/computer use and video evidence | Incorporated into version 0.2; partner review and final joint approval remain pending |
+## 16. Ready-to-start issue contract
 
-## Tooling implementation authorization — 20 October 2026
+An issue is ready when it has a concrete user outcome, approved plan version, requirement references, acceptance criteria, relevant starting context, scope boundaries, completed blockers, verification steps, and expected delivery. See `ISSUE-TEMPLATE.md`.
 
-The requesting founder explicitly asked to set up subagents and cloud work tooling in this repo and push it. Tooling implementation and isolated branch/PR delivery are authorized now; this does not approve all unresolved product requirements or app deployment. Continue product questions asynchronously with the question tool.
+Split primarily by demoable behavior. Avoid separate giant “build frontend,” “build backend,” and “test everything” issues. Existing code may make a presentation-only issue appropriate; do not force database work into it. Shared contract or manifest changes need a named owner when work overlaps.
 
-### Q11.a — Paid delivery person permissions
+## 17. Manual dispatch and agent procedure
 
-Does the paid delivery person handle field work only, also weigh/intake and processing updates, or full operations including money? Recommendation: field and intake records with founders controlling adjustments/refunds.
+The founders choose when work starts. The initial system does not need a polling bot or a custom orchestration service. The cloud task prompt names the issue and approved plan version, includes the full issue if issue retrieval is unavailable, and directs the worker to the committed agent guide.
 
-- Founder answer (2026-10-20): 1 — Rider field work and doorstep records; founders control pricing, refunds and final processing.
-- Partner answer/challenge: pending
-- Status: founder answered; partner review pending
+`REMOTE-WORK.md` contains the proposed dispatch prompt, preflight, implementation, verification, result format, and blocked-task behavior. Cloud launch and output mechanisms must be checked against the account's actual capabilities. A local command's presence is not proof of a configured cloud environment.
 
-### Q12 — Premium at launch
+## 18. Delivery authority — branch and PR selected (Q03)
 
-General first until Premium has a defined promise, faster-turnaround Premium, or distinct-care Premium? Recommendation: General first until the offer is concrete.
+Selected: a task may make focused code changes, run checks, push an isolated issue branch and deliver a reviewable PR. Founders review and authorize merge/deployment separately. The founder additionally requires the worker to run and interact with the app using browser/computer tools and provide a watchable video that demonstrates the issue works. Each pushed revision needs current verification evidence; the detailed loop is specified in VERIFICATION.md.
 
-- Founder answer (2026-10-20): 3 more care more speed etc
-- Partner answer/challenge: pending
-- Status: founder answered; partner review pending
+Deployment policy needs reconciliation before product release. The isolated committed baseline still targets `build/wandary` in its Convex deployment job, while the original dirty checkout proposes `build/laundry`. This tooling branch preserves the committed job. Existing Vercel integrations automatically create branch previews. Confirm the eventual production target and separate merge from production promotion before release; this tooling does not authorize production deployment.
 
-### Q13 — Estimated versus measured quantity
+An instruction in an issue is part of task context; it cannot supply missing repository permissions or account credentials. Decide the delivery policy before using the smoke task.
 
-For a 5 kg booking measured at 7 kg, use measured pricing with approval, absorb differences, or fixed box price? Recommendation: show an estimate and obtain customer approval for increases.
+## 19. Verification and done
 
-- Founder answer (2026-10-20): 1 — Measured-weight price, with customer approval for increases.
-- Partner answer/challenge: pending
-- Status: founder answered; partner review pending
+For a given issue, completion means its acceptance criteria are demonstrated, relevant repository checks have run successfully, the diff matches scope, and delivery evidence exists. List the exact commands, exit outcomes, screenshots where UI is involved, and limitations. Distinguish implementation complete, verification blocked, PR open, merged, and deployed.
 
-### Q14 — Pilot area
+For UI changes, inspect the actual affected journey at the agreed phone width and required larger sizes. For changes to orders, payment, permissions, custody, or messaging, use the relevant existing behavior and integration tests. Repository instructions require PostgreSQL-backed acceptance evidence and actual browser checks before claiming full completion; document any unavailable check as a blocker or limitation.
 
-Choose Beniganalli-area or Indiranagar-area pilot, or provide another exact starting boundary. Recommendation: one small explicit service area for the single-rider pilot.
+## 20. Concurrency and failure recovery
 
-- Founder answer (2026-10-20): Indiranagar area; I’ll specify the boundary
-- Partner answer/challenge: pending
-- Status: founder answered; partner review pending
+Start with one cloud worker per issue and avoid concurrently changing the same shared files. A dependent issue becomes eligible after its blockers are merged into the task's baseline, not merely after another worker reports success. If several independent issues run, assign file ownership and an integration owner.
 
-### Q15 — Concrete Premium promise
+On missing access, missing secrets, an unavailable database, unresolved requirements, or contradictory acceptance criteria, the worker reports a precise blocker with observed evidence and the smallest human action needed. It may deliver verified partial work, clearly labeled, without claiming the whole issue is done. Retry from the latest approved baseline and identify earlier attempts so duplicate branches/PRs are avoided.
 
-- Original founder answer (2026-10-20): Extra care + priority handling; exact promise confirmed before launch
-- Full question, recommendation and interpretation: see [partner review Q&A](../../discovery/2026-10-20-founder-questions-and-answers.md).
-- Partner answer/challenge: pending
-- Status: founder answered; partner review pending
+## 21. Change management
 
-### Q16 — Payment timing
+An accepted plan change identifies its rationale, author, affected requirements, affected issues, compatibility impact, and need for renewed approval. Update existing ready issues or retire them before a worker implements stale behavior. A running worker should stop at a safe point when its requirements are superseded.
 
-- Original founder answer (2026-10-20): At delivery/return
-- Full question, recommendation and interpretation: see [partner review Q&A](../../discovery/2026-10-20-founder-questions-and-answers.md).
-- Partner answer/challenge: pending
-- Status: founder answered; partner review pending
+## 22. Setup acceptance test
 
-### Q17 — Pickup and return scheduling ideas
+Before trusting the workflow for product work, use one small, reversible smoke issue after repository/environment setup. From a fresh cloud task, demonstrate that the worker can read committed instructions, prepare the workspace, make the bounded change, execute required checks, and produce the selected delivery artifact. The founders inspect the diff and confirm no local-only knowledge was required.
 
-- Original founder answer (2026-10-20): im thinking 8pm pick up 8am drop . if not possible 5pm pick up 8am drop. weekends . 10am pick 5pm drop . etc like that
-- Full question, recommendation and interpretation: see [partner review Q&A](../../discovery/2026-10-20-founder-questions-and-answers.md).
-- Partner answer/challenge: pending
-- Status: founder answered; partner review pending
-- Scheduling remains tentative and capacity-dependent, not an accepted guaranteed SLA.
+Pass only with an actual cloud run and accessible result. A Markdown file, successful local tests, and configured CLI are preparation evidence, not a completed smoke test.
 
-### Q18 — Kg price and quantity guide
+## 23. Proposed milestones
 
-- Original founder answer (2026-10-20): no we set like a 1kg price and tell them its roughly 5-6 shirts . we provide a size chart like shopping ecomers apps.
-- Full question, recommendation and interpretation: see [partner review Q&A](../../discovery/2026-10-20-founder-questions-and-answers.md).
-- Partner answer/challenge: pending
-- Status: founder answered; partner review pending
-- Quantity guide is approximate; measured weight determines approved final quantity. Container allocation remains separate.
+| Milestone | Deliverable | Exit condition |
+|---|---|---|
+| Discovery | Source reconciliation and completed grilling ledger | Every blocking product/design decision settled |
+| Plan review | Detailed master plan and design references | Required founders approve the same version |
+| Work breakdown | Draft vertical slices and dependency graph | Founders approve scope and granularity |
+| Cloud preparation | Committed guide, configured environment and CI | Fresh cloud smoke task passes |
+| First slice | One issue implemented remotely | Acceptance evidence and selected delivery artifact reviewed |
+| Continued build | Eligible issues worked on demand | Each slice passes the same completion contract |
 
-### Q19 — Schedule promise readiness
+Dates and estimates remain open until scope and capacity are known.
 
-Is overnight timing a pilot target to confirm, a mandatory launch guarantee, or a capacity-based option?
+## 24. Risks that must affect the plan
 
-- Original founder answer (2026-10-20): Offer both overnight and weekend same-day options when capacity permits
-- Partner answer/challenge: pending
-- Status: founder answered; partner review pending
+- Two repository candidates and dirty working trees: identify the baseline and intentionally publish required context before cloud work.
+- Historical documents conflict with code: retain provenance and agree desired behavior explicitly.
+- A polished UI can promise unsupported operations: match quantity, pricing, pickup, and return copy to the actual service model.
+- Local runtime assumptions may fail in cloud: prove setup and checks with a smoke task.
+- Partner approval can drift between chats: version and attribute decisions in shared files.
+- A broad issue encourages a broad unreviewable change: use bounded behavior and dependency-aware slices.
 
-### Q20 — Kg rates and billing increments
+## 25. Approval record
 
-What are wash-and-fold, wash-and-iron and Premium kg rates, minimum order and quantity increments?
+| Item | Status |
+|---|---|
+| Canonical repo/branch | `aditya-zig/laundry` selected; cloud baseline confirmation pending |
+| Product scope | Whole product: customer, delivery partner and operations — Q01; controlled live pilot, Android customer/rider + ops web; iPhone later |
+| Partner decision rule | Both approve the same plan version; either may challenge — Q02 |
+| Shared partner review home | Notion discussion + GitHub Markdown — Q06; GitHub draft published in PR #2, Notion discussion pending |
+| Remote delivery authority | Issue branch + PR with real browser/computer verification and video — Q03; merge/deploy separate |
+| Product authority | 18 October Game plan — Q05; unresolved operational details still require explicit decisions |
+| Complete product/design decision tree | IN PROGRESS |
+| Plan approval | PENDING |
+| Issue publication | FUTURE — user said they will convert the plan later |
+| Cloud environment setup and smoke execution | PENDING — no cloud task launched |
 
-- Original founder answer (2026-10-20): need to done later. bring this to me notice when im with my partner
-- Partner answer/challenge: pending
-- Status: deferred to joint partner review; raise first in that session
+## 26. Verification loop — required by Q03
 
-### Q21 — Unanswered increased-price consent
+For every pushed PR revision, produce verification evidence for the exact head commit: start the app, perform relevant browser/computer interactions, record a watchable video, check acceptance assertions and persist the supporting results. A new push invalidates the previous revision’s review-ready status. Failed runs feed a bounded fix-and-rerun loop; unavailable evidence leaves the PR draft/blocked rather than implying success. The design and proposed rollout live in `VERIFICATION.md`.
 
-Hold processing/contact, return after timeout, or a defined pre-agreed increase limit?
+## Supporting documents
 
-- Original founder answer (2026-10-20): Hold processing and contact the customer
-- Partner answer/challenge: pending
-- Status: founder answered; partner review pending
+- `GRILLING.md`: interview frontier and partner continuation.
+- `REMOTE-WORK.md`: proposed one-issue cloud execution guide.
+- `ISSUE-TEMPLATE.md`: draft contract for issue conversion.
+- `VERIFICATION.md`: per-commit browser interaction, video evidence, repair and approval loop.
+- `product-findings.md`: product/repository/Notion evidence from the context agent, when complete.
+- `cloud-workflow-findings.md`: tooling and official documentation evidence from the workflow agent, when complete.
 
-### Q22 — Payment methods at return
+## 27. Authorized tooling implementation
 
-UPI and cash, UPI only, or payment link plus fallback?
+On 20 October the founder requested setup of subagents and cloud work tooling and asked for a push. Implement this independently in an isolated worktree/issue branch from the committed `origin/build/laundry` baseline, preserving the original dirty checkout. The baseline still uses `@wandary` package names; tooling must discover package names instead of assuming the uncommitted `@laundry` rename is available. No merge or app deployment is authorized. Product discovery and joint plan approval continue.
 
-- Original founder answer (2026-10-20): UPI and cash
-- Partner answer/challenge: pending
-- Status: founder answered; partner review pending
+## 28. Founder refinements — 20 October
 
-## Cloud account timing
+- Paid delivery person: pickup/return and doorstep records; founders control money changes/refunds and final processing (Q11.a).
+- Premium: extra care and priority handling. Exact inclusions and supported speed promise confirmed before launch (Q12, Q15).
+- Measured weight is recorded; customer approves increased price before processing (Q13). Payment is at delivery/return (Q16).
+- Pilot: Indiranagar; exact boundary pending (Q14).
+- Timing ideas: 8 pm pickup → next morning 8 am return, alternative 5 pm pickup → next morning 8 am; weekend idea 10 am → 5 pm. These are tentative capacity-dependent ideas, not fixed appointments or guaranteed SLAs (Q17, Q19).
+- Pricing presentation: per-kg rates with an ecommerce-style approximate quantity guide, such as 1 kg ≈ 5–6 shirts. Do not use the example as an exact billing conversion. Physical box allocation remains a separate unresolved logistics rule (Q18).
+- Rates and minimums/increments are deferred to the joint session (Q20). Unanswered consent means hold/contact and founder-agreed unprocessed return (Q21/Q24); return payment is UPI or cash (Q22).
 
-Founder selected: “Finish and push the repo tooling first; configure the cloud account later.” Repo setup and push continue; cloud environment provisioning and real cloud task smoke are deferred.
+The complete original-answer record for cofounder review is [founder questions and answers](../../discovery/2026-10-20-founder-questions-and-answers.md). No partner approval has been inferred.
 
-### Q23 — Intake ownership
+## 29. Latest founder answers and partner agenda
 
-- Founder answer: Paid rider weighs and inspects at the laundry.
-- Interpretation: Physical intake belongs to the paid rider; founder pricing/processing exception authority remains.
-- Partner answer/challenge: pending
-- Status: founder answered; partner review pending
+Overnight and weekend same-day options are capacity-dependent (Q19). Per-kg/Premium rates, minimums and billing increments are deferred to the joint founder session; raise Q20 first when the partner reviews. Hold processing and contact the customer while increased-price consent is unanswered (Q21). Return payment supports UPI and cash (Q22). Cloud account provisioning is explicitly deferred until after the repo tooling push; do not report a cloud environment or actual cloud task as ready.
 
-### Q24 — Unanswered approval escalation
+## 30. Intake and unanswered approval — Q23/Q24
 
-- Founder answer: Founder agrees unprocessed return; timeout/fees deferred (Recommended).
-- Interpretation: Hold processing and escalate to founder for agreed unprocessed return. Timeout, attempts and fees remain undecided.
-- Partner answer/challenge: pending
-- Status: founder answered; partner review pending
+The paid rider weighs and inspects at the laundry. Founders retain control of pricing adjustments, refunds and final processing exceptions. If increased-weight approval is still unanswered after contact, processing stays on hold and a founder agrees an unprocessed return with the customer. Exact timeout, contact attempts and fees remain deferred. Partner review is pending.
 
-### Q25 — Current scope
+## 31. Current delivery scope — Q25
 
-- Founder answer: here now we are only doing the plan.md and tooling so a new cloud agent can do and verify when it pushes
-- Interpretation: Planning/tooling now; no frontend assignment or product implementation authorization inferred.
-- Status: scope confirmed
+This branch covers PLAN.md and remote-agent execution/verification tooling. It does not implement the proposed product redesign or assign frontend ownership. Future cloud agents implement manually assigned bounded issues and verify their pushed revisions. Repository browser evidence runs on all pushes and pull requests, regardless of worker branch naming.
 
-### Q26 — If the customer estimates 5 kg but intake measures 4 kg, how should billing work?
+## 32. Partner report and stopped frontend work
 
-- Founder answer: Charge the original estimate even if weight is lower
-- Interpretation: The selected estimate is a billing floor even when measured weight is lower. Q29 asks whether to define and clearly disclose it as a minimum package quantity. Higher measured-price increases still require prior consent; minimum/rounding rules and prices remain undecided.
-- Partner answer/challenge: pending
-- Status: founder answered; partner review pending
+The founder requested a neat report pairing every question with options and original answers. See [partner review report](../../discovery/PARTNER-REVIEW.md), covering Q01–Q25 and Q11.a. Discovery is not complete and both-founder approval remains pending. The founder subsequently instructed “stop the frontend stuff”: frontend implementation and further manual app walkthroughs are stopped. Current work is planning/report and repository tooling.
 
-### Q27 — When may a customer cancel?
+## 33. Latest billing and exception answers — Q26–Q28
 
-- Founder answer: Free before pickup; founder handles requests after pickup (Recommended)
-- Interpretation: Free cancellation before pickup. Founder handles requests after pickup, including any unprocessed return. Exact charges and post-processing rules remain open.
-- Partner answer/challenge: pending
-- Status: founder answered; partner review pending
+Q26: charge the original selected estimate even if measured weight is lower. This supersedes any earlier assumption that lower measured weight automatically reduces billing. A 5 kg selection measuring 4 kg is billed at 5 kg; higher measured-price increases still need customer approval before processing. Q29 is clarifying whether the selected kg is a clearly disclosed minimum package quantity. Rates, rounding and other minimum rules remain undecided.
 
-### Q28 — What happens if UPI fails or the customer cannot pay at return?
+Q27: cancellation is free before pickup; founders handle requests after pickup. Exact charges, treatment after processing begins and unprocessed-return rules remain to be completed.
 
-- Founder answer: Try agreed alternative, then contact founder; keep payment unresolved (Recommended)
-- Interpretation: Try an agreed alternative such as cash; then contact a founder before marking payment or delivery complete. Credit, handover or return arrangements require a founder decision.
-- Partner answer/challenge: pending
-- Status: founder answered; partner review pending
+Q28: if return payment fails, try an agreed alternative, then contact a founder. Keep payment unresolved and do not mark payment or delivery complete until the outcome is agreed; founders decide credit, handover and return arrangements.
 
-## Previous frontier — Q29–Q31 (answered below)
+## 34. Partner deferrals and communication — Q29–Q31
 
-- Q29: Is selected kg a clearly disclosed minimum package quantity? Options: yes; revise Q26 to lower measured billing; discuss with partner.
-- Q30: Missing/damaged clothes: founder investigates/agrees remedy with limits before launch; rider settles within limit; or defer entire claims policy.
-- Q31: Confirmation/updates: in-app status + WhatsApp; in-app + push only; or WhatsApp/phone with app status later.
+Q29: the minimum-package/lower-weight billing rule is deferred to the joint partner session. Q26 remains a proposed founder direction; the final billing contract is unresolved and must not be implemented as approved. Raise this after Q20 rates.
 
-Answers are recorded below; recommendations are not decisions.
+Q30: the entire missing/damaged-clothes claims policy is deferred to joint review before launch. Evidence, reporting deadlines, responsibility, remedies, compensation and exclusions are all unresolved.
 
-### Q29 — Should the selected kg be a clearly disclosed minimum package quantity?
+Q31: show order status in the app and use WhatsApp for key updates/contact. Whether the pilot uses manual messages or automatic integration is being clarified in Q32. No delivery reliability is assumed.
 
-- Founder answer: Discuss the minimum-package rule with my partner
-- Interpretation: Deferred to the joint partner session. Q26 is this founder’s proposed direction, not a settled customer billing contract. Decide package/minimum disclosure and lower measured-weight treatment together before product issues implement billing.
-- Partner answer/challenge: pending
-- Status: deferred to joint partner session
+## 35. Messaging, access and capacity — Q32–Q34
 
-### Q30 — What should happen if clothes are missing or damaged?
+Q32: manual versus automated WhatsApp sending is deferred to the partner. Q31’s channel decision remains: in-app status plus WhatsApp key updates/contact.
 
-- Founder answer: Decide the entire claims policy with my partner
-- Interpretation: Entire claims policy deferred: evidence requirements, responsibility, reporting window, remedy, compensation and exclusions all need joint review. No compensation promise or rider authority is approved.
-- Partner answer/challenge: pending
-- Status: deferred to joint partner session
+Q33: real customers sign in with phone OTP; demo sign-in is for testing only. Actual provider delivery and failure handling must be verified before the live pilot.
 
-### Q31 — How should customers receive confirmation and important order updates?
+Q34: founders control slot capacity and opening/closing with rider/operator input. Full slots stop accepting new bookings. Atomic capacity reservation and booking confirmation are being clarified in Q35.
 
-- Founder answer: In-app status + WhatsApp for key updates/contact (Recommended)
-- Interpretation: Order status stays in the app; WhatsApp carries key updates/contact. Q32 asks whether pilot messages are manual or automated. Reliability and failure handling must be verified.
-- Partner answer/challenge: pending
-- Status: founder answered; partner review pending
+## 36. Interview closed and Notion review published
 
-## Previous frontier — Q32–Q34 (answered below)
+The founder closed this interview round and requested partner handoff. The [mobile Notion report](https://app.notion.com/p/3fe074fda5568152b1c4c7461650acaf) under Laundry Home contains 55 cards: 25 recorded-answer cards, 10 joint-discussion cards (together the 35 answered/deferred entries), 12 unanswered interview questions and 8 suggested further questions. Original answers, options and interpretations remain distinct. All partner review fields initially say Not reviewed.
 
-- Q32: pilot WhatsApp updates manual through business account, automated at launch, or deferred to partner.
-- Q33: phone OTP for real customers, founder-created accounts, or joint sign-in decision.
-- Q34: slot capacity controlled by founder with rider/operator input, rider, or operator.
-
-No answers have been assumed.
-
-### Q32 — How should WhatsApp updates be sent in the pilot?
-
-- Founder answer: Decide messaging automation with my partner
-- Interpretation: Manual versus automated sending is deferred to joint review. Q31 still selects WhatsApp alongside in-app status. Do not assume an automatic WhatsApp integration is a launch requirement.
-- Partner answer/challenge: pending
-- Status: deferred to joint partner review
-
-### Q33 — How should real customers sign in?
-
-- Founder answer: Phone OTP for real customers; demo access only for testing (Recommended)
-- Interpretation: Real customer access uses a verified phone OTP provider before live launch. Demo access remains isolated to testing; provider selection and failed OTP handling still need specification.
-- Partner answer/challenge: pending
-- Status: founder answered; partner review pending
-
-### Q34 — Who controls whether slots can accept more orders?
-
-- Founder answer: Founder controls slot capacity with rider/operator input (Recommended)
-- Interpretation: A founder opens/closes slots and sets capacity after checking rider/operator feasibility. Full slots must stop accepting new bookings; capacity reservation is addressed in Q35.
-- Partner answer/challenge: pending
-- Status: founder answered; partner review pending
-
-## Current unanswered frontier — Q35–Q46
-
-All 12 questions, recommendations and options are preserved in [NEXT-QUESTIONS.md](../../discovery/NEXT-QUESTIONS.md). They are awaiting answers. This is the next operating-journey pass; deferred partner decisions and challenges may require further questions.
-
-## Interview closure and partner handoff
-
-The founder closed this round on 20 October. Preserve Q35–Q46 as unanswered for partner review; do not continue interviewing the founder unless asked. [Mobile Notion report](https://app.notion.com/p/3fe074fda5568152b1c4c7461650acaf) contains all recorded answers, joint decisions and unanswered questions, with 8 suggested follow-ups clearly separated. No partner approval is inferred.
+The inline phone list groups founder answers first, then joint decisions, unanswered questions and suggested follow-ups. Pricing Q20 is first in the joint queue. Both-founder approval, unsettled business rules and later cloud setup remain pending. The founder interview is closed; do not ask more unless requested. See docs/discovery/notion-review-map.json for stable question-to-page links.
