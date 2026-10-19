@@ -1,6 +1,6 @@
 # Laundry — shared grilling ledger
 
-Status: round 1 founder answers recorded; partner review pending · Plan: 0.4 · Interview owner: parent agent in the current session.
+Status: round 1 founder answers recorded; partner review pending · Plan: 0.5 · Interview owner: parent agent in the current session.
 
 Both founders can use this file from different sessions. Answers remain attributed; one person's answer does not overwrite another's. Recommendations are proposals, not decisions. There is no deadline-based approval.
 
@@ -147,7 +147,7 @@ Recommendation: founders or a named operations person coordinate v1, while shop 
 
 ```text
 Author: <name>
-Plan version: 0.4
+Plan version: 0.5
 Q01: <answer and why>
 Q02: <answer and why>
 Challenge Qxx: <what I disagree with; concrete scenario; proposed alternative>

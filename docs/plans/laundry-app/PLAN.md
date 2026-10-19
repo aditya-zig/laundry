@@ -274,3 +274,7 @@ The paid rider weighs and inspects at the laundry. Founders retain control of pr
 ## 31. Current delivery scope — Q25
 
 This branch covers PLAN.md and remote-agent execution/verification tooling. It does not implement the proposed product redesign or assign frontend ownership. Future cloud agents implement manually assigned bounded issues and verify their pushed revisions. Repository browser evidence runs on all pushes and pull requests, regardless of worker branch naming.
+
+## 32. Partner report and stopped frontend work
+
+The founder requested a neat report pairing every question with options and original answers. See [partner review report](../../discovery/PARTNER-REVIEW.md), covering Q01–Q25 and Q11.a. Discovery is not complete and both-founder approval remains pending. The founder subsequently instructed “stop the frontend stuff”: frontend implementation and further manual app walkthroughs are stopped. Current work is planning/report and repository tooling.
