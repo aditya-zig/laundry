@@ -426,3 +426,53 @@ The founder said “my partner with frontend.” Asked whether the partner owns 
 **Current reading / follow-up:** Order status stays in the app; WhatsApp carries key updates/contact. Q32 asks whether pilot messages are manual or automated. Reliability and failure handling must be verified.
 
 **Partner review:** ☐ Agree · ☐ Challenge · ☐ Needs discussion
+
+## Round 9 — messaging, sign-in and capacity
+
+### Q32 — How should WhatsApp updates be sent in the pilot?
+
+**Options / response format:**
+
+- Manual business WhatsApp updates for the pilot (recommended)
+- Automatic updates required at launch
+- Decide messaging automation with my partner
+
+**Founder’s original answer:**
+
+> Decide messaging automation with my partner
+
+**Current reading / follow-up:** Manual versus automated sending is deferred to joint review. Q31 still selects WhatsApp alongside in-app status. Do not assume an automatic WhatsApp integration is a launch requirement.
+
+**Partner review:** ☐ Agree · ☐ Challenge · ☐ Needs discussion
+
+### Q33 — How should real customers sign in?
+
+**Options / response format:**
+
+- Phone OTP for real customers; demo access only for testing (recommended)
+- Founder manually creates accounts
+- Choose sign-in with my partner
+
+**Founder’s original answer:**
+
+> Phone OTP for real customers; demo access only for testing (Recommended)
+
+**Current reading / follow-up:** Real customer access uses a verified phone OTP provider before live launch. Demo access remains isolated to testing; provider selection and failed OTP handling still need specification.
+
+**Partner review:** ☐ Agree · ☐ Challenge · ☐ Needs discussion
+
+### Q34 — Who controls whether slots can accept more orders?
+
+**Options / response format:**
+
+- Founder controls slot capacity with rider/operator input (recommended)
+- Rider controls availability
+- Laundry operator controls availability
+
+**Founder’s original answer:**
+
+> Founder controls slot capacity with rider/operator input (Recommended)
+
+**Current reading / follow-up:** A founder opens/closes slots and sets capacity after checking rider/operator feasibility. Full slots must stop accepting new bookings; capacity reservation is addressed in Q35.
+
+**Partner review:** ☐ Agree · ☐ Challenge · ☐ Needs discussion

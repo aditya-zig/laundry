@@ -4,7 +4,7 @@
 
 ## What this report contains
 
-The planning interview is **not complete**. It has 32 recorded entries: Q01–Q31 plus Q11.a. Q20 pricing is explicitly deferred, several answers establish a direction while details remain open, and both founders must approve the same final plan version before product build issues are ready.
+The planning interview is **not complete**. It has 35 answered/deferred entries: Q01–Q34 plus Q11.a. Q20 pricing is explicitly deferred, several answers establish a direction while details remain open, and both founders must approve the same final plan version before product build issues are ready.
 
 This report pairs every question with its options, the requesting founder’s original answer and the current reading of that answer. **Option descriptions are concise summaries of the preserved interview record, not a claim of verbatim UI labels or exact original ordering.** Open-ended questions are marked. Recommendations are the interviewer’s suggestions; the quoted answers are the founder’s decisions. Short answers such as “yes”, “1” and “B” are kept intact and interpreted alongside their question.
 
@@ -538,6 +538,59 @@ This report pairs every question with its options, the requesting founder’s or
 **Current reading / follow-up:** Order status stays in the app; WhatsApp carries key updates/contact. Q32 asks whether pilot messages are manual or automated. Reliability and failure handling must be verified.
 
 **Partner review:** ☐ Agree · ☐ Challenge · ☐ Needs discussion
+
+
+### Q32 — How should WhatsApp updates be sent in the pilot?
+
+**Options / response format:**
+
+- Manual business WhatsApp updates for the pilot (recommended)
+- Automatic updates required at launch
+- Decide messaging automation with my partner
+
+**Founder’s original answer:**
+
+> Decide messaging automation with my partner
+
+**Current reading / follow-up:** Manual versus automated sending is deferred to joint review. Q31 still selects WhatsApp alongside in-app status. Do not assume an automatic WhatsApp integration is a launch requirement.
+
+**Partner review:** ☐ Agree · ☐ Challenge · ☐ Needs discussion
+
+### Q33 — How should real customers sign in?
+
+**Options / response format:**
+
+- Phone OTP for real customers; demo access only for testing (recommended)
+- Founder manually creates accounts
+- Choose sign-in with my partner
+
+**Founder’s original answer:**
+
+> Phone OTP for real customers; demo access only for testing (Recommended)
+
+**Current reading / follow-up:** Real customer access uses a verified phone OTP provider before live launch. Demo access remains isolated to testing; provider selection and failed OTP handling still need specification.
+
+**Partner review:** ☐ Agree · ☐ Challenge · ☐ Needs discussion
+
+### Q34 — Who controls whether slots can accept more orders?
+
+**Options / response format:**
+
+- Founder controls slot capacity with rider/operator input (recommended)
+- Rider controls availability
+- Laundry operator controls availability
+
+**Founder’s original answer:**
+
+> Founder controls slot capacity with rider/operator input (Recommended)
+
+**Current reading / follow-up:** A founder opens/closes slots and sets capacity after checking rider/operator feasibility. Full slots must stop accepting new bookings; capacity reservation is addressed in Q35.
+
+**Partner review:** ☐ Agree · ☐ Challenge · ☐ Needs discussion
+
+## Current round: 12 questions awaiting answers
+
+[Q35–Q46: question, recommendation and all options](NEXT-QUESTIONS.md) covers booking confirmation, price approval/decline, custody, handover proof, care updates, delays, support, rescheduling, service boundary, launch checks and the first cohort. Each answer is explicitly pending. No recommendation is recorded as an answer. This makes 47 question entries asked so far: 35 answered/deferred plus these 12 awaiting answers.
 
 ## Other explicit instructions
 

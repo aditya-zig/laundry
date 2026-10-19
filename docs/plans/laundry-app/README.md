@@ -12,6 +12,6 @@ Started 2026-10-19. These are versioned discovery drafts, not an approved produc
 
 No application files were changed. Tooling and drafts are pushed in [PR #2](https://github.com/aditya-zig/laundry/pull/2). No Notion write, GitHub build issues, Laundry cloud environment or cloud implementation task has been created. Both actual Muse Spark 1.3 work tracks have completed through OpenCode using supplied-context planning. Local browser recording/export was demonstrated on the review worksheet; [BROWSER-SMOKE.md](BROWSER-SMOKE.md) states its exact limits.
 
-Q01–Q31 (including Q11.a) have founder answers or an explicit deferral. Joint partner review and the remaining operational details are pending. The detailed product requirements will be filled from the grilling rather than invented to make the draft look complete.
+Q01–Q34 (including Q11.a) have founder answers or an explicit deferral. Joint partner review and the remaining operational details are pending. The detailed product requirements will be filled from the grilling rather than invented to make the draft look complete.
 
 For a readable question/options/original-answer report to send the partner, use [PARTNER-REVIEW.md](../../discovery/PARTNER-REVIEW.md). Discovery remains incomplete. Frontend implementation and manual UI walkthroughs are stopped; planning and tooling remain the current scope.

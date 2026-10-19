@@ -353,10 +353,35 @@ Answers are recorded below; recommendations are not decisions.
 - Partner answer/challenge: pending
 - Status: founder answered; partner review pending
 
-## Current unanswered frontier — Q32–Q34
+## Previous frontier — Q32–Q34 (answered below)
 
 - Q32: pilot WhatsApp updates manual through business account, automated at launch, or deferred to partner.
 - Q33: phone OTP for real customers, founder-created accounts, or joint sign-in decision.
 - Q34: slot capacity controlled by founder with rider/operator input, rider, or operator.
 
 No answers have been assumed.
+
+### Q32 — How should WhatsApp updates be sent in the pilot?
+
+- Founder answer: Decide messaging automation with my partner
+- Interpretation: Manual versus automated sending is deferred to joint review. Q31 still selects WhatsApp alongside in-app status. Do not assume an automatic WhatsApp integration is a launch requirement.
+- Partner answer/challenge: pending
+- Status: deferred to joint partner review
+
+### Q33 — How should real customers sign in?
+
+- Founder answer: Phone OTP for real customers; demo access only for testing (Recommended)
+- Interpretation: Real customer access uses a verified phone OTP provider before live launch. Demo access remains isolated to testing; provider selection and failed OTP handling still need specification.
+- Partner answer/challenge: pending
+- Status: founder answered; partner review pending
+
+### Q34 — Who controls whether slots can accept more orders?
+
+- Founder answer: Founder controls slot capacity with rider/operator input (Recommended)
+- Interpretation: A founder opens/closes slots and sets capacity after checking rider/operator feasibility. Full slots must stop accepting new bookings; capacity reservation is addressed in Q35.
+- Partner answer/challenge: pending
+- Status: founder answered; partner review pending
+
+## Current unanswered frontier — Q35–Q46
+
+All 12 questions, recommendations and options are preserved in [NEXT-QUESTIONS.md](../../discovery/NEXT-QUESTIONS.md). They are awaiting answers. This is the next operating-journey pass; deferred partner decisions and challenges may require further questions.

@@ -294,3 +294,11 @@ Q29: the minimum-package/lower-weight billing rule is deferred to the joint part
 Q30: the entire missing/damaged-clothes claims policy is deferred to joint review before launch. Evidence, reporting deadlines, responsibility, remedies, compensation and exclusions are all unresolved.
 
 Q31: show order status in the app and use WhatsApp for key updates/contact. Whether the pilot uses manual messages or automatic integration is being clarified in Q32. No delivery reliability is assumed.
+
+## 35. Messaging, access and capacity — Q32–Q34
+
+Q32: manual versus automated WhatsApp sending is deferred to the partner. Q31’s channel decision remains: in-app status plus WhatsApp key updates/contact.
+
+Q33: real customers sign in with phone OTP; demo sign-in is for testing only. Actual provider delivery and failure handling must be verified before the live pilot.
+
+Q34: founders control slot capacity and opening/closing with rider/operator input. Full slots stop accepting new bookings. Atomic capacity reservation and booking confirmation are being clarified in Q35.
