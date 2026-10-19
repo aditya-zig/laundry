@@ -326,3 +326,103 @@ The founder said “my partner with frontend.” Asked whether the partner owns 
 
 - Founder asked whether all questions were done and requested a neat partner report containing question, answer and options. The interview remains incomplete; [partner report](PARTNER-REVIEW.md) consolidates all 26 entries and open decisions.
 - Founder instruction: “stop the frontend stuff”. Frontend implementation and further manual app walkthroughs are stopped. Continue the planning report and repository tooling only.
+
+## Round 7 — billing, cancellation and payment exceptions
+
+### Q26 — If the customer estimates 5 kg but intake measures 4 kg, how should billing work?
+
+**Options / response format:**
+
+- Charge measured weight; minimum/rounding rules decided later (recommended)
+- Charge the original estimate even if weight is lower
+- Decide this with my partner
+
+**Founder’s original answer:**
+
+> Charge the original estimate even if weight is lower
+
+**Current reading / follow-up:** The selected estimate is a billing floor even when measured weight is lower. Q29 asks whether to define and clearly disclose it as a minimum package quantity. Higher measured-price increases still require prior consent; minimum/rounding rules and prices remain undecided.
+
+**Partner review:** ☐ Agree · ☐ Challenge · ☐ Needs discussion
+
+### Q27 — When may a customer cancel?
+
+**Options / response format:**
+
+- Free before pickup; founder handles requests after pickup (recommended)
+- Founder reviews every cancellation, including before pickup
+- Decide the full cancellation policy with my partner
+
+**Founder’s original answer:**
+
+> Free before pickup; founder handles requests after pickup (Recommended)
+
+**Current reading / follow-up:** Free cancellation before pickup. Founder handles requests after pickup, including any unprocessed return. Exact charges and post-processing rules remain open.
+
+**Partner review:** ☐ Agree · ☐ Challenge · ☐ Needs discussion
+
+### Q28 — What happens if UPI fails or the customer cannot pay at return?
+
+**Options / response format:**
+
+- Try agreed alternative, then contact founder; keep payment unresolved (recommended)
+- Allow delivery and later payment within a founder-approved limit
+- Decide failed-payment handling with my partner
+
+**Founder’s original answer:**
+
+> Try agreed alternative, then contact founder; keep payment unresolved (Recommended)
+
+**Current reading / follow-up:** Try an agreed alternative such as cash; then contact a founder before marking payment or delivery complete. Credit, handover or return arrangements require a founder decision.
+
+**Partner review:** ☐ Agree · ☐ Challenge · ☐ Needs discussion
+
+## Round 8 — partner deferrals and communications
+
+### Q29 — Should the selected kg be a clearly disclosed minimum package quantity?
+
+**Options / response format:**
+
+- Yes: selected kg is a clearly disclosed minimum package quantity
+- Revise Q26 and charge lower measured weight
+- Discuss the minimum-package rule with my partner
+
+**Founder’s original answer:**
+
+> Discuss the minimum-package rule with my partner
+
+**Current reading / follow-up:** Deferred to the joint partner session. Q26 is this founder’s proposed direction, not a settled customer billing contract. Decide package/minimum disclosure and lower measured-weight treatment together before product issues implement billing.
+
+**Partner review:** ☐ Agree · ☐ Challenge · ☐ Needs discussion
+
+### Q30 — What should happen if clothes are missing or damaged?
+
+**Options / response format:**
+
+- Founder investigates/agrees remedy; limits decided before launch (recommended)
+- Rider may settle claims within a defined limit
+- Decide the entire claims policy with my partner
+
+**Founder’s original answer:**
+
+> Decide the entire claims policy with my partner
+
+**Current reading / follow-up:** Entire claims policy deferred: evidence requirements, responsibility, reporting window, remedy, compensation and exclusions all need joint review. No compensation promise or rider authority is approved.
+
+**Partner review:** ☐ Agree · ☐ Challenge · ☐ Needs discussion
+
+### Q31 — How should customers receive confirmation and important order updates?
+
+**Options / response format:**
+
+- In-app status + WhatsApp for key updates/contact (recommended)
+- In-app status and push notifications only
+- WhatsApp and phone calls initially; app status later
+
+**Founder’s original answer:**
+
+> In-app status + WhatsApp for key updates/contact (Recommended)
+
+**Current reading / follow-up:** Order status stays in the app; WhatsApp carries key updates/contact. Q32 asks whether pilot messages are manual or automated. Reliability and failure handling must be verified.
+
+**Partner review:** ☐ Agree · ☐ Challenge · ☐ Needs discussion

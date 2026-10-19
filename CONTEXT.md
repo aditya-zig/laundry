@@ -27,7 +27,7 @@ A transport container allocated to carry laundry through collection and return.
 _Avoid_: Weight or garment count when referring to the number of containers.
 
 **Quantity guide**:
-An approximate comparison between kilograms of laundry and familiar garment quantities, helping a customer estimate a load. It is not the measured weight used for final billing.
+An approximate comparison between kilograms of laundry and familiar garment quantities, helping a customer estimate a load. It is guidance, not a physical intake measurement or an exact billing conversion.
 _Avoid_: Size chart when it could mean garment-fit measurements.
 
 **Premium care**:

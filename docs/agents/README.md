@@ -36,13 +36,13 @@ Official references: [Codex Cloud](https://learn.chatgpt.com/docs/cloud), [cloud
 Write/export the complete approved issue body into an ignored file, including acceptance criteria, plan/decision references, integrated blockers, required browser journey and exclusions. Build a reviewable packet first:
 
 ```sh
-pnpm cloud:packet --issue-file .agent-logs/issue.md --branch issue/my-task --plan-version 0.4 --out .agent-logs/task.txt
+pnpm cloud:packet --issue-file .agent-logs/issue.md --branch issue/my-task --plan-version 0.5 --out .agent-logs/task.txt
 ```
 
 Push the chosen baseline branch, then explicitly submit:
 
 ```sh
-pnpm cloud:submit --env YOUR_ENV_ID --issue-file .agent-logs/issue.md --branch issue/my-task --plan-version 0.4
+pnpm cloud:submit --env YOUR_ENV_ID --issue-file .agent-logs/issue.md --branch issue/my-task --plan-version 0.5
 ```
 
 The submitter checks for an explicit environment, a clean tracked/untracked workspace and a matching pushed branch before launching one cloud attempt. It does not fetch, merge, push or deploy for you. If the account/environment is unavailable, it exits with the actual blocker. A local prompt or successful CLI login is not evidence of a successful cloud task.
@@ -61,7 +61,7 @@ DATABASE_URL=postgres://wandary:verification_only@localhost:5448/laundry_verify_
 DATABASE_URL=postgres://wandary:verification_only@localhost:5448/laundry_verify_ci pnpm verify:browser
 ```
 
-The browser suite starts an actual local API and the exported customer/rider/ops web apps. Each role gets a fresh browser context. Smoke checks cover customer catalog → service → basket quantity, rider sign-in/assigned tasks, and operator sign-in/catalog. Successful runs retain video, trace and report, and write `.verification/manifest.json` with base/head/tested commits and file hashes. Missing, stale, modified, empty, failed, skipped or flaky evidence fails the check. The workflow on PR revisions and selected issue-branch pushes retains 30-day artifacts. A new head needs a new run.
+The browser suite starts an actual local API and the exported customer/rider/ops web apps. Each role gets a fresh browser context. Smoke checks cover customer catalog → service → basket quantity, rider sign-in/assigned tasks, and operator sign-in/catalog. Successful runs retain video, trace and report, and write `.verification/manifest.json` with base/head/tested commits and file hashes. Missing, stale, modified, empty, failed, skipped or flaky evidence fails the check. The workflow on PR revisions and all branch pushes retains 30-day artifacts. A new head needs a new run.
 
 This is **existing web smoke**, not full kg-booking/fulfillment acceptance and not Android verification. Implement issue-specific scenarios and native emulator/device evidence when those requirements are ready. For local development only, `VERIFY_ALLOW_DIRTY=1` permits diagnostic runs; the manifest still records dirty state. It cannot be presented as clean published-revision proof.
 

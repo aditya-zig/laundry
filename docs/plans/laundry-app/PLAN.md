@@ -255,7 +255,7 @@ On 20 October the founder requested setup of subagents and cloud work tooling an
 
 - Paid delivery person: pickup/return and doorstep records; founders control money changes/refunds and final processing (Q11.a).
 - Premium: extra care and priority handling. Exact inclusions and supported speed promise confirmed before launch (Q12, Q15).
-- Final quantity: measured weight; customer approves increased price before processing (Q13). Payment is at delivery/return (Q16).
+- Measured weight is recorded; customer approves increased price before processing (Q13). Payment is at delivery/return (Q16).
 - Pilot: Indiranagar; exact boundary pending (Q14).
 - Timing ideas: 8 pm pickup → next morning 8 am return, alternative 5 pm pickup → next morning 8 am; weekend idea 10 am → 5 pm. These are tentative capacity-dependent ideas, not fixed appointments or guaranteed SLAs (Q17, Q19).
 - Pricing presentation: per-kg rates with an ecommerce-style approximate quantity guide, such as 1 kg ≈ 5–6 shirts. Do not use the example as an exact billing conversion. Physical box allocation remains a separate unresolved logistics rule (Q18).
@@ -278,3 +278,19 @@ This branch covers PLAN.md and remote-agent execution/verification tooling. It d
 ## 32. Partner report and stopped frontend work
 
 The founder requested a neat report pairing every question with options and original answers. See [partner review report](../../discovery/PARTNER-REVIEW.md), covering Q01–Q25 and Q11.a. Discovery is not complete and both-founder approval remains pending. The founder subsequently instructed “stop the frontend stuff”: frontend implementation and further manual app walkthroughs are stopped. Current work is planning/report and repository tooling.
+
+## 33. Latest billing and exception answers — Q26–Q28
+
+Q26: charge the original selected estimate even if measured weight is lower. This supersedes any earlier assumption that lower measured weight automatically reduces billing. A 5 kg selection measuring 4 kg is billed at 5 kg; higher measured-price increases still need customer approval before processing. Q29 is clarifying whether the selected kg is a clearly disclosed minimum package quantity. Rates, rounding and other minimum rules remain undecided.
+
+Q27: cancellation is free before pickup; founders handle requests after pickup. Exact charges, treatment after processing begins and unprocessed-return rules remain to be completed.
+
+Q28: if return payment fails, try an agreed alternative, then contact a founder. Keep payment unresolved and do not mark payment or delivery complete until the outcome is agreed; founders decide credit, handover and return arrangements.
+
+## 34. Partner deferrals and communication — Q29–Q31
+
+Q29: the minimum-package/lower-weight billing rule is deferred to the joint partner session. Q26 remains a proposed founder direction; the final billing contract is unresolved and must not be implemented as approved. Raise this after Q20 rates.
+
+Q30: the entire missing/damaged-clothes claims policy is deferred to joint review before launch. Evidence, reporting deadlines, responsibility, remedies, compensation and exclusions are all unresolved.
+
+Q31: show order status in the app and use WhatsApp for key updates/contact. Whether the pilot uses manual messages or automatic integration is being clarified in Q32. No delivery reliability is assumed.

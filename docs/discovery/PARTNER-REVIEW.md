@@ -4,7 +4,7 @@
 
 ## What this report contains
 
-The planning interview is **not complete**. It has 26 recorded entries: Q01–Q25 plus Q11.a. Q20 pricing is explicitly deferred, several answers establish a direction while details remain open, and both founders must approve the same final plan version before product build issues are ready.
+The planning interview is **not complete**. It has 32 recorded entries: Q01–Q31 plus Q11.a. Q20 pricing is explicitly deferred, several answers establish a direction while details remain open, and both founders must approve the same final plan version before product build issues are ready.
 
 This report pairs every question with its options, the requesting founder’s original answer and the current reading of that answer. **Option descriptions are concise summaries of the preserved interview record, not a claim of verbatim UI labels or exact original ordering.** Open-ended questions are marked. Recommendations are the interviewer’s suggestions; the quoted answers are the founder’s decisions. Short answers such as “yes”, “1” and “B” are kept intact and interpreted alongside their question.
 
@@ -14,7 +14,7 @@ This report pairs every question with its options, the requesting founder’s or
 
 ## Start the joint session here
 
-**First: settle Q20 pricing together.** Agree wash-and-fold/wash-and-iron per-kg rates, Premium surcharge, minimum quantity/order value and billing increments. No values have been invented. This is a reminder for the partner session, not a scheduled notification.
+**First: settle Q20 pricing together.** Agree wash-and-fold/wash-and-iron per-kg rates, Premium surcharge, minimum quantity/order value and billing increments. Also settle Q29 minimum-package/lower-weight billing and Q30 the full claims policy, which are explicitly deferred to this joint session. No values have been invented. This is a reminder for the partner session, not a scheduled notification.
 
 | Topic | Current direction | Still needed |
 |---|---|---|
@@ -22,7 +22,7 @@ This report pairs every question with its options, the requesting founder’s or
 | Platforms | Android customer/rider, operations web; iPhone later | Native verification and supported devices |
 | Services | Wash-and-fold and wash-and-iron | Operator confirmation and exact inclusions |
 | Premium | Extra care + priority handling | Actual handling, price and supported speed promise |
-| Quantity | Kg pricing with approximate size guide | Rates, rounding, minimums and box/custody rules |
+| Quantity | Kg pricing + approximate guide; founder proposes retaining selected estimate if measured lower (Q26), pending joint Q29 decision | Minimum-package/lower-weight policy and disclosure (Q29), rates, rounding and box/custody rules |
 | Intake | Paid rider weighs/inspects at the laundry | Condition records, disputes and founder exception procedure |
 | Timing | Overnight/weekend same-day when capacity permits | Exact hours, cutoffs, closed days and capacity limits |
 | Geography | Indiranagar | Exact service boundary |
@@ -248,7 +248,7 @@ This report pairs every question with its options, the requesting founder’s or
 
 > 1
 
-**Current reading / follow-up:** Show estimate; require approval of an increased final price before processing. Decreases and rounding remain open.
+**Current reading / follow-up:** Show estimate; require approval of an increased final price before processing. Q26 later selects charging the original estimate when measured weight is lower; minimum-package disclosure is being clarified in Q29. Rounding remains open.
 
 **Partner review:** ☐ Agree · ☐ Challenge · ☐ Needs discussion
 
@@ -438,6 +438,104 @@ This report pairs every question with its options, the requesting founder’s or
 > here now we are only doing the plan.md and tooling so a new cloud agent can do and verify when it pushes
 
 **Current reading / follow-up:** Founder clarified current scope instead of choosing an ownership option: PLAN.md and tooling now, future cloud-agent implementation/verification. No frontend ownership assignment inferred.
+
+**Partner review:** ☐ Agree · ☐ Challenge · ☐ Needs discussion
+
+
+### Q26 — If the customer estimates 5 kg but intake measures 4 kg, how should billing work?
+
+**Options / response format:**
+
+- Charge measured weight; minimum/rounding rules decided later (recommended)
+- Charge the original estimate even if weight is lower
+- Decide this with my partner
+
+**Founder’s original answer:**
+
+> Charge the original estimate even if weight is lower
+
+**Current reading / follow-up:** Q26 proposes retaining the selected estimate when measured weight is lower. Q29 subsequently defers the minimum-package rule to the partner; final billing policy remains open. Higher measured-price increases still require prior consent; minimum/rounding rules and prices remain undecided.
+
+**Partner review:** ☐ Agree · ☐ Challenge · ☐ Needs discussion
+
+### Q27 — When may a customer cancel?
+
+**Options / response format:**
+
+- Free before pickup; founder handles requests after pickup (recommended)
+- Founder reviews every cancellation, including before pickup
+- Decide the full cancellation policy with my partner
+
+**Founder’s original answer:**
+
+> Free before pickup; founder handles requests after pickup (Recommended)
+
+**Current reading / follow-up:** Free cancellation before pickup. Founder handles requests after pickup, including any unprocessed return. Exact charges and post-processing rules remain open.
+
+**Partner review:** ☐ Agree · ☐ Challenge · ☐ Needs discussion
+
+### Q28 — What happens if UPI fails or the customer cannot pay at return?
+
+**Options / response format:**
+
+- Try agreed alternative, then contact founder; keep payment unresolved (recommended)
+- Allow delivery and later payment within a founder-approved limit
+- Decide failed-payment handling with my partner
+
+**Founder’s original answer:**
+
+> Try agreed alternative, then contact founder; keep payment unresolved (Recommended)
+
+**Current reading / follow-up:** Try an agreed alternative such as cash; then contact a founder before marking payment or delivery complete. Credit, handover or return arrangements require a founder decision.
+
+**Partner review:** ☐ Agree · ☐ Challenge · ☐ Needs discussion
+
+
+### Q29 — Should the selected kg be a clearly disclosed minimum package quantity?
+
+**Options / response format:**
+
+- Yes: selected kg is a clearly disclosed minimum package quantity
+- Revise Q26 and charge lower measured weight
+- Discuss the minimum-package rule with my partner
+
+**Founder’s original answer:**
+
+> Discuss the minimum-package rule with my partner
+
+**Current reading / follow-up:** Deferred to the joint partner session. Q26 is this founder’s proposed direction, not a settled customer billing contract. Decide package/minimum disclosure and lower measured-weight treatment together before product issues implement billing.
+
+**Partner review:** ☐ Agree · ☐ Challenge · ☐ Needs discussion
+
+### Q30 — What should happen if clothes are missing or damaged?
+
+**Options / response format:**
+
+- Founder investigates/agrees remedy; limits decided before launch (recommended)
+- Rider may settle claims within a defined limit
+- Decide the entire claims policy with my partner
+
+**Founder’s original answer:**
+
+> Decide the entire claims policy with my partner
+
+**Current reading / follow-up:** Entire claims policy deferred: evidence requirements, responsibility, reporting window, remedy, compensation and exclusions all need joint review. No compensation promise or rider authority is approved.
+
+**Partner review:** ☐ Agree · ☐ Challenge · ☐ Needs discussion
+
+### Q31 — How should customers receive confirmation and important order updates?
+
+**Options / response format:**
+
+- In-app status + WhatsApp for key updates/contact (recommended)
+- In-app status and push notifications only
+- WhatsApp and phone calls initially; app status later
+
+**Founder’s original answer:**
+
+> In-app status + WhatsApp for key updates/contact (Recommended)
+
+**Current reading / follow-up:** Order status stays in the app; WhatsApp carries key updates/contact. Q32 asks whether pilot messages are manual or automated. Reliability and failure handling must be verified.
 
 **Partner review:** ☐ Agree · ☐ Challenge · ☐ Needs discussion
 

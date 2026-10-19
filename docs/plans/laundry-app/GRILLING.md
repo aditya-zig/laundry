@@ -302,3 +302,61 @@ Founder selected: “Finish and push the repo tooling first; configure the cloud
 - Founder answer: here now we are only doing the plan.md and tooling so a new cloud agent can do and verify when it pushes
 - Interpretation: Planning/tooling now; no frontend assignment or product implementation authorization inferred.
 - Status: scope confirmed
+
+### Q26 — If the customer estimates 5 kg but intake measures 4 kg, how should billing work?
+
+- Founder answer: Charge the original estimate even if weight is lower
+- Interpretation: The selected estimate is a billing floor even when measured weight is lower. Q29 asks whether to define and clearly disclose it as a minimum package quantity. Higher measured-price increases still require prior consent; minimum/rounding rules and prices remain undecided.
+- Partner answer/challenge: pending
+- Status: founder answered; partner review pending
+
+### Q27 — When may a customer cancel?
+
+- Founder answer: Free before pickup; founder handles requests after pickup (Recommended)
+- Interpretation: Free cancellation before pickup. Founder handles requests after pickup, including any unprocessed return. Exact charges and post-processing rules remain open.
+- Partner answer/challenge: pending
+- Status: founder answered; partner review pending
+
+### Q28 — What happens if UPI fails or the customer cannot pay at return?
+
+- Founder answer: Try agreed alternative, then contact founder; keep payment unresolved (Recommended)
+- Interpretation: Try an agreed alternative such as cash; then contact a founder before marking payment or delivery complete. Credit, handover or return arrangements require a founder decision.
+- Partner answer/challenge: pending
+- Status: founder answered; partner review pending
+
+## Previous frontier — Q29–Q31 (answered below)
+
+- Q29: Is selected kg a clearly disclosed minimum package quantity? Options: yes; revise Q26 to lower measured billing; discuss with partner.
+- Q30: Missing/damaged clothes: founder investigates/agrees remedy with limits before launch; rider settles within limit; or defer entire claims policy.
+- Q31: Confirmation/updates: in-app status + WhatsApp; in-app + push only; or WhatsApp/phone with app status later.
+
+Answers are recorded below; recommendations are not decisions.
+
+### Q29 — Should the selected kg be a clearly disclosed minimum package quantity?
+
+- Founder answer: Discuss the minimum-package rule with my partner
+- Interpretation: Deferred to the joint partner session. Q26 is this founder’s proposed direction, not a settled customer billing contract. Decide package/minimum disclosure and lower measured-weight treatment together before product issues implement billing.
+- Partner answer/challenge: pending
+- Status: deferred to joint partner session
+
+### Q30 — What should happen if clothes are missing or damaged?
+
+- Founder answer: Decide the entire claims policy with my partner
+- Interpretation: Entire claims policy deferred: evidence requirements, responsibility, reporting window, remedy, compensation and exclusions all need joint review. No compensation promise or rider authority is approved.
+- Partner answer/challenge: pending
+- Status: deferred to joint partner session
+
+### Q31 — How should customers receive confirmation and important order updates?
+
+- Founder answer: In-app status + WhatsApp for key updates/contact (Recommended)
+- Interpretation: Order status stays in the app; WhatsApp carries key updates/contact. Q32 asks whether pilot messages are manual or automated. Reliability and failure handling must be verified.
+- Partner answer/challenge: pending
+- Status: founder answered; partner review pending
+
+## Current unanswered frontier — Q32–Q34
+
+- Q32: pilot WhatsApp updates manual through business account, automated at launch, or deferred to partner.
+- Q33: phone OTP for real customers, founder-created accounts, or joint sign-in decision.
+- Q34: slot capacity controlled by founder with rider/operator input, rider, or operator.
+
+No answers have been assumed.
