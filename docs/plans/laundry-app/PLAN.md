@@ -1,6 +1,6 @@
 # Laundry — product plan and cloud delivery workflow
 
-Version: 0.4 · Started: 2026-10-19 · Status: discovery draft; first founder answers recorded, partner review pending.
+Version: 0.5 · Started: 2026-10-19 · Status: discovery draft; first founder answers recorded, partner review pending.
 
 This is the master planning document for the Laundry app. It is deliberately a draft: unresolved product choices are marked OPEN instead of being silently filled in. It becomes an implementation specification only after the grilling is complete and the agreed approval rule is satisfied. No application changes or GitHub issues have been created by this planning session.
 
@@ -123,7 +123,7 @@ Proposed statuses: unanswered → answered → challenged/resolved → accepted.
 
 `GRILLING.md` contains the first frontier and a prompt the partner can paste into a fresh agent session. Later questions depend on earlier answers; the topic map is not permission to guess those answers.
 
-Selected shared review home (Q06): shared Notion for discussion and versioned GitHub Markdown for approved execution context. The files currently exist only on this machine. They have not been uploaded, pushed, or shared with the partner; the partner cannot yet access them remotely. Avoid automatic two-way syncing initially: record each accepted decision in the approved Markdown version and link it from the discussion.
+Selected shared review home (Q06): shared Notion for discussion and versioned GitHub Markdown for approved execution context. The draft plan and attributed Q&A are published on `chore/cloud-agent-workflow` in PR #2. The partner needs repository access to review them; Notion discussion publication remains pending. Avoid automatic two-way syncing initially: record each accepted decision in the approved Markdown version and link it from the discussion.
 
 ## 14. Files for repeatable cloud work — proposed layout
 
@@ -132,10 +132,10 @@ After selecting a repository, adapt existing files before adding new ones:
 ```text
 AGENTS.md                         # Short entry point; preserve project-specific rules
 CONTEXT.md                        # Resolved product language
-docs/plans/laundry-app.md          # Approved master plan, migrated from this file
-docs/discovery/laundry-grilling.md # Attributed answers, challenges, decision history
+docs/plans/laundry-app/PLAN.md     # Current draft; both-founder approval pending
+docs/discovery/2026-10-20-founder-questions-and-answers.md # Original answers
 docs/adr/                         # Only consequential trade-offs
-docs/agent-workflow.md             # One-issue execution instructions
+docs/agents/README.md              # One-issue execution instructions
 docs/agent-tasks/                  # Reuse existing packets, link from relevant issues
 .github/ISSUE_TEMPLATE/            # Reviewable, self-contained issue template
 .github/workflows/                 # Reproducible verification, adapted to existing CI
@@ -171,7 +171,7 @@ The founders choose when work starts. The initial system does not need a polling
 
 Selected: a task may make focused code changes, run checks, push an isolated issue branch and deliver a reviewable PR. Founders review and authorize merge/deployment separately. The founder additionally requires the worker to run and interact with the app using browser/computer tools and provide a watchable video that demonstrates the issue works. Each pushed revision needs current verification evidence; the detailed loop is specified in VERIFICATION.md.
 
-Observed deployment coupling: `.github/workflows/ci.yml` runs its Convex deploy job after successful verification on a push to `build/laundry`, when the deployment secret is configured. Both a direct push and a PR merge into that branch can therefore deploy. If merge and deployment must be independent, change that CI policy as an explicitly scoped setup task before merging work there.
+Deployment policy needs reconciliation before product release. The isolated committed baseline still targets `build/wandary` in its Convex deployment job, while the original dirty checkout proposes `build/laundry`. This tooling branch preserves the committed job. Existing Vercel integrations automatically create branch previews. Confirm the eventual production target and separate merge from production promotion before release; this tooling does not authorize production deployment.
 
 An instruction in an issue is part of task context; it cannot supply missing repository permissions or account credentials. Decide the delivery policy before using the smoke task.
 
@@ -226,7 +226,7 @@ Dates and estimates remain open until scope and capacity are known.
 | Canonical repo/branch | `aditya-zig/laundry` selected; cloud baseline confirmation pending |
 | Product scope | Whole product: customer, delivery partner and operations — Q01; controlled live pilot, Android customer/rider + ops web; iPhone later |
 | Partner decision rule | Both approve the same plan version; either may challenge — Q02 |
-| Shared partner review home | Notion discussion + GitHub Markdown — Q06; remote publication pending |
+| Shared partner review home | Notion discussion + GitHub Markdown — Q06; GitHub draft published in PR #2, Notion discussion pending |
 | Remote delivery authority | Issue branch + PR with real browser/computer verification and video — Q03; merge/deploy separate |
 | Product authority | 18 October Game plan — Q05; unresolved operational details still require explicit decisions |
 | Complete product/design decision tree | IN PROGRESS |
@@ -257,9 +257,9 @@ On 20 October the founder requested setup of subagents and cloud work tooling an
 - Premium: extra care and priority handling. Exact inclusions and supported speed promise confirmed before launch (Q12, Q15).
 - Final quantity: measured weight; customer approves increased price before processing (Q13). Payment is at delivery/return (Q16).
 - Pilot: Indiranagar; exact boundary pending (Q14).
-- Timing ideas: 8 pm pickup → next morning 8 am return, alternative 5 pm pickup → next morning 8 am; weekend idea 10 am → 5 pm. These are tentative capacity-dependent ideas, not fixed appointments or guaranteed SLAs (Q17, Q19 pending).
+- Timing ideas: 8 pm pickup → next morning 8 am return, alternative 5 pm pickup → next morning 8 am; weekend idea 10 am → 5 pm. These are tentative capacity-dependent ideas, not fixed appointments or guaranteed SLAs (Q17, Q19).
 - Pricing presentation: per-kg rates with an ecommerce-style approximate quantity guide, such as 1 kg ≈ 5–6 shirts. Do not use the example as an exact billing conversion. Physical box allocation remains a separate unresolved logistics rule (Q18).
-- Rates, minimums/increments, unresponsive consent and payment methods remain pending (Q20–Q22).
+- Rates and minimums/increments are deferred to the joint session (Q20). Unanswered consent means hold/contact and founder-agreed unprocessed return (Q21/Q24); return payment is UPI or cash (Q22).
 
 The complete original-answer record for cofounder review is [founder questions and answers](../../discovery/2026-10-20-founder-questions-and-answers.md). No partner approval has been inferred.
 

@@ -12,4 +12,4 @@ Started 2026-10-19. These are local discovery drafts, not an approved product sp
 
 No application files were changed. No Notion write, GitHub issue/PR, cloud environment or cloud implementation task has been created. Both actual Muse Spark 1.3 work tracks have completed through OpenCode using supplied-context planning. Local browser recording/export was demonstrated on the review worksheet; [BROWSER-SMOKE.md](BROWSER-SMOKE.md) states its exact limits.
 
-Q01–Q22 (including Q11.a) have founder answers or an explicit deferral. Joint partner review and the remaining operational details are pending. The detailed product requirements will be filled from the grilling rather than invented to make the draft look complete.
+Q01–Q25 (including Q11.a) have founder answers or an explicit deferral. Joint partner review and the remaining operational details are pending. The detailed product requirements will be filled from the grilling rather than invented to make the draft look complete.
