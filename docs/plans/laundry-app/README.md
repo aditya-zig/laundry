@@ -15,3 +15,5 @@ No application files were changed. Tooling and drafts are pushed in [PR #2](http
 Q01–Q34 (including Q11.a) have founder answers or an explicit deferral. Joint partner review and the remaining operational details are pending. The detailed product requirements will be filled from the grilling rather than invented to make the draft look complete.
 
 For a readable question/options/original-answer report to send the partner, use [PARTNER-REVIEW.md](../../discovery/PARTNER-REVIEW.md). Discovery remains incomplete. Frontend implementation and manual UI walkthroughs are stopped; planning and tooling remain the current scope.
+
+The founder has closed the interview round. [Start the mobile Notion partner review](https://app.notion.com/p/3fe074fda5568152b1c4c7461650acaf) or read [publication details](../../discovery/NOTION-REVIEW.md). Unanswered and proposed further questions remain a handoff backlog, not a request to continue the founder interview.

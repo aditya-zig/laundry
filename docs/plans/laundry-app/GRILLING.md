@@ -1,6 +1,6 @@
 # Laundry — shared grilling ledger
 
-Status: round 1 founder answers recorded; partner review pending · Plan: 0.5 · Interview owner: parent agent in the current session.
+Status: founder interview closed for partner handoff; partner review pending · Plan: 0.5 · Interview owner: parent agent in the current session.
 
 Both founders can use this file from different sessions. Answers remain attributed; one person's answer does not overwrite another's. Recommendations are proposals, not decisions. There is no deadline-based approval.
 
@@ -385,3 +385,7 @@ No answers have been assumed.
 ## Current unanswered frontier — Q35–Q46
 
 All 12 questions, recommendations and options are preserved in [NEXT-QUESTIONS.md](../../discovery/NEXT-QUESTIONS.md). They are awaiting answers. This is the next operating-journey pass; deferred partner decisions and challenges may require further questions.
+
+## Interview closure and partner handoff
+
+The founder closed this round on 20 October. Preserve Q35–Q46 as unanswered for partner review; do not continue interviewing the founder unless asked. [Mobile Notion report](https://app.notion.com/p/3fe074fda5568152b1c4c7461650acaf) contains all recorded answers, joint decisions and unanswered questions, with 8 suggested follow-ups clearly separated. No partner approval is inferred.

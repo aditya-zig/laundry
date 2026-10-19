@@ -2,9 +2,11 @@
 
 **Prepared:** 20 October 2026 · **Plan:** draft v0.5 · **Approval:** partner review pending
 
+**Mobile Notion review:** [Start here](https://app.notion.com/p/3fe074fda5568152b1c4c7461650acaf) · [Question database](https://app.notion.com/p/941d6fb7718b40c6b5b0a17094701527).
+
 ## What this report contains
 
-The planning interview is **not complete**. It has 35 answered/deferred entries: Q01–Q34 plus Q11.a. Q20 pricing is explicitly deferred, several answers establish a direction while details remain open, and both founders must approve the same final plan version before product build issues are ready.
+The founder has **closed this interview round for partner handoff**. The product specification still has open decisions. It has 35 answered/deferred entries: Q01–Q34 plus Q11.a. Q20 pricing is explicitly deferred, several answers establish a direction while details remain open, and both founders must approve the same final plan version before product build issues are ready.
 
 This report pairs every question with its options, the requesting founder’s original answer and the current reading of that answer. **Option descriptions are concise summaries of the preserved interview record, not a claim of verbatim UI labels or exact original ordering.** Open-ended questions are marked. Recommendations are the interviewer’s suggestions; the quoted answers are the founder’s decisions. Short answers such as “yes”, “1” and “B” are kept intact and interpreted alongside their question.
 
@@ -588,9 +590,13 @@ This report pairs every question with its options, the requesting founder’s or
 
 **Partner review:** ☐ Agree · ☐ Challenge · ☐ Needs discussion
 
-## Current round: 12 questions awaiting answers
+## Unanswered questions carried forward for partner review
 
 [Q35–Q46: question, recommendation and all options](NEXT-QUESTIONS.md) covers booking confirmation, price approval/decline, custody, handover proof, care updates, delays, support, rescheduling, service boundary, launch checks and the first cohort. Each answer is explicitly pending. No recommendation is recorded as an answer. This makes 47 question entries asked so far: 35 answered/deferred plus these 12 awaiting answers.
+
+## Additional proposed follow-ups
+
+[Eight further questions](FURTHER-QUESTIONS.md) cover account recovery, privacy/retention, reconciliation, absent customers, unsuitable items, provider ownership, pilot measures and interrupted/duplicate requests. They were not asked or answered and are not approved requirements.
 
 ## Other explicit instructions
 

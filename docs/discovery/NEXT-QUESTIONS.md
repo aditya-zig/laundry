@@ -1,6 +1,6 @@
-# Laundry — current question round Q35–Q46
+# Laundry — unanswered questions for partner review Q35–Q46
 
-Asked 20 October 2026 using the question tool. **12 questions awaiting answers.** Recommendations are proposals, not decisions. The 35 earlier answered/deferred entries are in [the partner report](PARTNER-REVIEW.md). These questions cover the remaining operating-journey decisions in this pass; deferred joint decisions and any follow-ups remain separate. Frontend implementation/manual walkthroughs remain stopped.
+Asked 20 October 2026 using the question tool. The founder closed this interview round; these are carried forward for partner review, not another request to answer now. **12 questions awaiting answers.** Recommendations are proposals, not decisions. The 35 earlier answered/deferred entries are in [the partner report](PARTNER-REVIEW.md). These questions cover the remaining operating-journey decisions in this pass; deferred joint decisions and any follow-ups remain separate. Frontend implementation/manual walkthroughs remain stopped.
 
 ## Q35 — When is a booking confirmed?
 
