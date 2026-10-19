@@ -19,3 +19,9 @@ __pycache__/
 .vercel
 .gstack/
 .web-dist/
+
+# Agent verification outputs and disposable runtime state
+.verification/
+.agent-tools/
+playwright-report/
+test-results/
