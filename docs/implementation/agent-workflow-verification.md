@@ -9,7 +9,7 @@
 - Seven tooling behavior tests passed: issue packets, exact executor/model, missing cloud environment, provider/partial errors, stale/tampered/missing media and database isolation.
 - Convex type checks and 23 voice utility tests passed.
 - Three actual web smoke flows passed with videos and traces: customer demo/catalog/quantity/basket; rider demo/assigned tasks; operations demo/service catalog.
-- The precommit browser run was diagnostic with a dirty workspace. A clean committed-revision run and CI evidence must accompany the PR. It does not verify Android hardware, payment integration, complete booking fulfillment or Codex Cloud execution.
+- The precommit browser run was diagnostic with a dirty workspace. A subsequent clean committed-revision run passed all three flows and manifest validation; the PR identifies the current revision and CI evidence. It does not verify Android hardware, payment integration, complete booking fulfillment or Codex Cloud execution.
 
 ## Actual OpenCode role probes
 

@@ -291,9 +291,24 @@ The shared browser's Codex Cloud page requires account sign-in and no Laundry en
 
 **Interpretation:** Complete the repo branch/PR now. Account environment setup and a real cloud execution smoke are explicitly deferred, not claimed as completed.
 
-## Next questions — awaiting answers
+## Round 6 — intake ownership and unanswered approval
 
-- **Q23:** Who physically weighs and inspects at laundry intake? Recommended: named laundry operator records weight/condition/proposed price; founders handle exceptions. Alternatives: paid rider at laundry; founder handles every intake.
-- **Q24:** After unsuccessful increased-weight approval contact, what next? Recommended: founder agrees unprocessed return, timeout/fees deferred. Alternatives: hold indefinitely; defer entire policy to joint partner session.
+### Q23 — Who weighs and inspects at intake?
 
-No answer is assumed. Pricing Q20 remains the first agenda item when both partners are present.
+Recommendation: a named laundry operator records measured weight, condition and any proposed price change; founders handle exceptions. Alternatives: paid rider at laundry; founder handles all intake.
+
+**Founder answer:**
+> Paid rider weighs and inspects at the laundry
+
+**Interpretation:** The paid rider owns physical weighing and inspection at the laundry, within the existing founder authority over pricing exceptions and final processing decisions.
+
+### Q24 — What follows unsuccessful price-approval contact?
+
+Recommendation: founder agrees an unprocessed return; exact timeout and fees deferred to the partner session. Alternatives: hold indefinitely; defer the entire policy.
+
+**Founder answer:**
+> Founder agrees unprocessed return; timeout/fees deferred (Recommended)
+
+**Interpretation:** Hold processing; escalate to a founder to arrange an unprocessed return with the customer. Timeout/contact-attempt/fee details remain undecided.
+
+Pricing Q20 remains the first agenda item when both partners are present.

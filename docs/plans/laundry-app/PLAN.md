@@ -266,3 +266,7 @@ The complete original-answer record for cofounder review is [founder questions a
 ## 29. Latest founder answers and partner agenda
 
 Overnight and weekend same-day options are capacity-dependent (Q19). Per-kg/Premium rates, minimums and billing increments are deferred to the joint founder session; raise Q20 first when the partner reviews. Hold processing and contact the customer while increased-price consent is unanswered (Q21). Return payment supports UPI and cash (Q22). Cloud account provisioning is explicitly deferred until after the repo tooling push; do not report a cloud environment or actual cloud task as ready.
+
+## 30. Intake and unanswered approval — Q23/Q24
+
+The paid rider weighs and inspects at the laundry. Founders retain control of pricing adjustments, refunds and final processing exceptions. If increased-weight approval is still unanswered after contact, processing stays on hold and a founder agrees an unprocessed return with the customer. Exact timeout, contact attempts and fees remain deferred. Partner review is pending.

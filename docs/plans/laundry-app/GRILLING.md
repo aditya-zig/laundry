@@ -282,3 +282,17 @@ UPI and cash, UPI only, or payment link plus fallback?
 ## Cloud account timing
 
 Founder selected: “Finish and push the repo tooling first; configure the cloud account later.” Repo setup and push continue; cloud environment provisioning and real cloud task smoke are deferred.
+
+### Q23 — Intake ownership
+
+- Founder answer: Paid rider weighs and inspects at the laundry.
+- Interpretation: Physical intake belongs to the paid rider; founder pricing/processing exception authority remains.
+- Partner answer/challenge: pending
+- Status: founder answered; partner review pending
+
+### Q24 — Unanswered approval escalation
+
+- Founder answer: Founder agrees unprocessed return; timeout/fees deferred (Recommended).
+- Interpretation: Hold processing and escalate to founder for agreed unprocessed return. Timeout, attempts and fees remain undecided.
+- Partner answer/challenge: pending
+- Status: founder answered; partner review pending
