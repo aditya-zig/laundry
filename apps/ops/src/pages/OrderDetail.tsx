@@ -27,8 +27,8 @@ export function OrderDetailPage({ id }: { id: string }) {
   }
   useEffect(load, [id]);
 
-  if (error) return <p className="err">{error}</p>;
-  if (!order) return <p>Loading…</p>;
+  if (error) return <div className="card"><p className="err">{error}</p></div>;
+  if (!order) return <div className="card"><p>Loading…</p></div>;
 
   const blocked = careBlockedReason(order);
   const discrepancy = intakeDiscrepancy(order);
@@ -73,46 +73,62 @@ export function OrderDetailPage({ id }: { id: string }) {
   }
 
   return (
-    <div>
-      <h2>Order {order.id.slice(0, 8)}</h2>
-      <p>
-        Status {order.status} · {formatINR(order.totalMinor)} · payment {order.paymentStatus}
-      </p>
-      {discrepancy && <p className="warn">{discrepancy}</p>}
-      <h3>Intake and count reconciliation</h3>
-      <label>
-        Sealed bag IDs (comma separated)
-        <input value={bagIds} onChange={(e) => setBagIds(e.target.value)} placeholder="bag-1, bag-2" />
-      </label>
-      <label>
-        Reason (required for every override)
-        <input value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Counted 5 shirts, 1 stain noted" />
-      </label>
-      <button onClick={intake}>Record intake</button>
-      <h3>Care workflow</h3>
-      {blocked ? (
-        <p className="warn">{blocked}</p>
-      ) : (
-        <div>
-          <select value={careTo} onChange={(e) => setCareTo(e.target.value as CareTarget)}>
-            {CARE_TARGETS.map((t) => (
-              <option key={t} value={t}>
-                {t}
-              </option>
-            ))}
-          </select>
-          <button onClick={advance}>Advance care</button>
+    <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+      <div className="card">
+        <span className="pill pill-action">{order.status}</span>{" "}
+        <span className="pill">PAYMENT {order.paymentStatus}</span>
+        <h3 style={{ marginTop: 8 }}>Order {order.id.slice(0, 8)}</h3>
+        <p className="muted" style={{ margin: "4px 0 0" }}>
+          {formatINR(order.totalMinor)} · version {order.version}
+        </p>
+        {discrepancy && <p className="warn" style={{ marginTop: 12 }}>{discrepancy}</p>}
+      </div>
+      <div className="grid-2">
+        <div className="card">
+          <h3>Intake and count reconciliation</h3>
+          <p className="muted">Compare the sealed bag against the order lines. Intake stays visible when counts differ.</p>
+          <label>
+            Sealed bag IDs (comma separated)
+            <input value={bagIds} onChange={(e) => setBagIds(e.target.value)} placeholder="bag-1, bag-2" />
+          </label>
+          <label>
+            Reason (required for every override)
+            <input value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Counted 5 shirts, 1 stain noted" />
+          </label>
+          <button onClick={intake}>Record intake</button>
         </div>
-      )}
-      <h3>History</h3>
-      <ul>
-        {order.timeline.map((t, i) => (
-          <li key={i}>
-            {t.status}: {t.label} ({t.at})
-          </li>
-        ))}
-      </ul>
-      {notice && <p>{notice}</p>}
+        <div className="card">
+          <h3>Care workflow</h3>
+          {blocked ? (
+            <p className="warn">{blocked}</p>
+          ) : (
+            <div>
+              <label>
+                Next care state
+                <select value={careTo} onChange={(e) => setCareTo(e.target.value as CareTarget)}>
+                  {CARE_TARGETS.map((t) => (
+                    <option key={t} value={t}>
+                      {t}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <button onClick={advance}>Advance care</button>
+            </div>
+          )}
+        </div>
+      </div>
+      <div className="card">
+        <h3>History</h3>
+        <ul className="timeline">
+          {order.timeline.map((t, i) => (
+            <li key={i}>
+              <strong>{t.status}</strong>: {t.label} ({t.at})
+            </li>
+          ))}
+        </ul>
+        {notice && <p className="notice" style={{ marginTop: 12 }}>{notice}</p>}
+      </div>
     </div>
   );
 }
