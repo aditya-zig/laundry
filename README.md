@@ -110,3 +110,7 @@ Node 24. Customer and partner apps will use Expo 52 with Expo Router on React
 18.3.1 and React Native 0.76.5 (plus React Native Web). Ops will use React
 18.3.1 with Vite 6. The API will use NestJS 11 with `pg` 8. Exact pins live in
 the `wandary.pinnedVersions` field of the root `package.json`.
+
+## On-demand agent work
+
+Start with [agent/cloud tooling](docs/agents/README.md) and the [founder Q&A for partner review](docs/discovery/2026-10-20-founder-questions-and-answers.md). Use `pnpm cloud:doctor`, the configured OpenCode Muse delegates, and `pnpm verify:browser` for current-revision web smoke/video evidence. Cloud account setup and native-device checks have separate readiness gates.

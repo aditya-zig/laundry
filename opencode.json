@@ -1,0 +1,193 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "share": "disabled",
+  "agents": {
+    "laundry-planner": {
+      "description": "Read-only product/spec/grilling delegate on Muse Spark 1.3. Preserves attributed decisions and proposes the current question frontier.",
+      "mode": "all",
+      "model": "openrouter/meta/muse-spark-1.3",
+      "steps": 8,
+      "request": {
+        "body": {
+          "max_tokens": 2000
+        }
+      },
+      "system": "Read AGENTS.md and docs/agents/README.md. Preserve namespaces/contracts and exclusive file ownership. You are an actual OpenCode delegate, not a native GPT subagent. Report your executor, selected model, files/evidence, completed checks and limitations. Do not merge/deploy, change account settings, or infer founder approval. Use only authorized project data. Planning only: read the master plan and grilling ledger. Use 18 October Game plan as product authority. Preserve IDs; parent is sole interviewer. Return a Markdown proposal; do not edit files.",
+      "permissions": [
+        {
+          "action": "*",
+          "resource": "*",
+          "effect": "deny"
+        },
+        {
+          "action": "read",
+          "resource": "*",
+          "effect": "allow"
+        },
+        {
+          "action": "glob",
+          "resource": "*",
+          "effect": "allow"
+        },
+        {
+          "action": "grep",
+          "resource": "*",
+          "effect": "allow"
+        },
+        {
+          "action": "read",
+          "resource": "*.env",
+          "effect": "deny"
+        },
+        {
+          "action": "read",
+          "resource": "*.env.*",
+          "effect": "deny"
+        },
+        {
+          "action": "read",
+          "resource": "**/.env",
+          "effect": "deny"
+        },
+        {
+          "action": "read",
+          "resource": "**/.env.*",
+          "effect": "deny"
+        },
+        {
+          "action": "read",
+          "resource": "*.env.example",
+          "effect": "allow"
+        }
+      ]
+    },
+    "laundry-tooling": {
+      "description": "Tooling implementation delegate on Muse Spark 1.3; scoped edits and verification commands, no pushes or deployment.",
+      "mode": "all",
+      "model": "openrouter/meta/muse-spark-1.3",
+      "steps": 12,
+      "request": {
+        "body": {
+          "max_tokens": 2000
+        }
+      },
+      "system": "Read AGENTS.md and docs/agents/README.md. Preserve namespaces/contracts and exclusive file ownership. You are an actual OpenCode delegate, not a native GPT subagent. Report your executor, selected model, files/evidence, completed checks and limitations. Do not merge/deploy, change account settings, or infer founder approval. Use only authorized project data. Work only on the assigned tooling slice and file allowlist. Coordinator owns manifests/lockfile/AGENTS/infrastructure. Actual app/browser use and watchable current-revision video are required before claiming issue completion. Use a local isolated verification database; preserve failure exits.",
+      "permissions": [
+        {
+          "action": "*",
+          "resource": "*",
+          "effect": "deny"
+        },
+        {
+          "action": "read",
+          "resource": "*",
+          "effect": "allow"
+        },
+        {
+          "action": "glob",
+          "resource": "*",
+          "effect": "allow"
+        },
+        {
+          "action": "grep",
+          "resource": "*",
+          "effect": "allow"
+        },
+        {
+          "action": "read",
+          "resource": "*.env",
+          "effect": "deny"
+        },
+        {
+          "action": "read",
+          "resource": "*.env.*",
+          "effect": "deny"
+        },
+        {
+          "action": "read",
+          "resource": "**/.env",
+          "effect": "deny"
+        },
+        {
+          "action": "read",
+          "resource": "**/.env.*",
+          "effect": "deny"
+        },
+        {
+          "action": "read",
+          "resource": "*.env.example",
+          "effect": "allow"
+        },
+        {
+          "action": "edit",
+          "resource": "tools/**",
+          "effect": "allow"
+        },
+        {
+          "action": "edit",
+          "resource": "docs/**",
+          "effect": "allow"
+        },
+        {
+          "action": "edit",
+          "resource": "e2e/**",
+          "effect": "allow"
+        },
+        {
+          "action": "edit",
+          "resource": ".github/**",
+          "effect": "allow"
+        },
+        {
+          "action": "edit",
+          "resource": "playwright.config.ts",
+          "effect": "allow"
+        },
+        {
+          "action": "shell",
+          "resource": "git status*",
+          "effect": "allow"
+        },
+        {
+          "action": "shell",
+          "resource": "git diff*",
+          "effect": "allow"
+        },
+        {
+          "action": "shell",
+          "resource": "rg *",
+          "effect": "allow"
+        },
+        {
+          "action": "shell",
+          "resource": "pnpm test:tooling*",
+          "effect": "allow"
+        },
+        {
+          "action": "shell",
+          "resource": "pnpm verify:browser*",
+          "effect": "allow"
+        },
+        {
+          "action": "shell",
+          "resource": "node --test tools/*",
+          "effect": "allow"
+        }
+      ]
+    }
+  },
+  "providers": {
+    "openrouter": {
+      "models": {
+        "meta/muse-spark-1.3": {
+          "body": {
+            "max_tokens": 2000
+          },
+          "limit": {
+            "output": 2000
+          }
+        }
+      }
+    }
+  }
+}

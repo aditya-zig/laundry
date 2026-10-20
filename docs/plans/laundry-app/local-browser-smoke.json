@@ -1,0 +1,41 @@
+{
+  "scope": "local planning worksheet browser recording/export only",
+  "status": "passed",
+  "app_business_verification": false,
+  "cloud_verification": false,
+  "pr_attachment_verified": false,
+  "recording": {
+    "path": "/home/batman/Projects/code/.lavish/laundry-planning/evidence/local-browser-recording-smoke.mp4",
+    "codec": "h264",
+    "container": "mp4",
+    "durationSeconds": 10.2168,
+    "width": 1228,
+    "height": 768,
+    "sizeBytes": 412246,
+    "sha256": "26829402df63738e92280d06369ea53d54bdf82031e44a92dd3a6a7759494731"
+  },
+  "actions": [
+    "Select synthetic draft Q07 answer",
+    "Click local portable answer control",
+    "Inspect portable-mode state",
+    "Clear draft answers",
+    "Verify five unanswered questions and zero checked options"
+  ],
+  "founder_decisions_created": false,
+  "viewportsChecked": [
+    {
+      "width": 1280,
+      "height": 800,
+      "scrollWidth": 1265
+    },
+    {
+      "width": 390,
+      "height": 844,
+      "scrollWidth": 375
+    }
+  ],
+  "notes": [
+    "Local review worksheet only; no app files changed",
+    "No cloud execution, GitHub upload or business journey proven"
+  ]
+}

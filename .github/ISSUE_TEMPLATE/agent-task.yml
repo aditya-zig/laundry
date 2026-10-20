@@ -1,0 +1,41 @@
+name: Ready-to-review agent task
+description: A bounded issue with approved behavior, dependencies and recording expectations.
+title: '[Agent] '
+body:
+  - type: textarea
+    id: outcome
+    attributes:
+      label: User outcome and current behavior
+      description: Describe one verifiable change. Link the approved plan version and relevant decision IDs.
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance criteria
+      description: Include success, important error cases and any native-device requirements.
+    validations:
+      required: true
+  - type: textarea
+    id: dependencies
+    attributes:
+      label: Blockers and scope boundaries
+      description: Link blockers that must be integrated, explicit exclusions and shared file ownership.
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Verification journey and evidence
+      description: State the actual browser/computer actions to record, expected result, check commands and fixtures. Read docs/agents/README.md.
+    validations:
+      required: true
+  - type: checkboxes
+    id: readiness
+    attributes:
+      label: Ready gate
+      options:
+        - label: Product decisions are approved and blockers are integrated into the chosen baseline.
+          required: true
+        - label: Delivery is an isolated branch and PR with current video/check evidence; merge and deployment remain separate.
+          required: true

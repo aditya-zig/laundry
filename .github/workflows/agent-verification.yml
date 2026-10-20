@@ -1,0 +1,75 @@
+name: Agent verification evidence
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: agent-evidence-${{ github.head_ref || github.ref_name }}
+  cancel-in-progress: true
+jobs:
+  browser-evidence:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: wandary
+          POSTGRES_PASSWORD: verification_only
+          POSTGRES_DB: laundry_verify_ci
+        ports: ['5448:5432']
+        options: >-
+          --health-cmd "pg_isready -U wandary -d laundry_verify_ci"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      DATABASE_URL: postgres://wandary:verification_only@localhost:5448/laundry_verify_ci
+      DEMO_MODE: 'true'
+      EXPO_PUBLIC_API_URL: http://localhost:4100/v1
+      VITE_API_URL: http://localhost:4100/v1
+      VERIFY_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+      VERIFY_BASE_SHA: ${{ github.event.pull_request.base.sha || '' }}
+      CI: 'true'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.33.2
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec playwright install --with-deps chromium
+      - run: pnpm test:tooling
+      - run: pnpm build
+      - run: pnpm check
+      - run: pnpm test
+      # API tests can reset data. Browser startup and demo seeding follow them.
+      - name: Actual web smoke, recordings and current-revision manifest
+        run: pnpm verify:browser
+      - name: Retain success and failure evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: browser-evidence-${{ github.event.pull_request.head.sha || github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: .verification/
+          include-hidden-files: true
+          retention-days: 30
+          if-no-files-found: error
+      - name: Review packet location
+        if: always()
+        run: |
+          {
+            echo '### Browser evidence'
+            echo 'Head: `${{ github.event.pull_request.head.sha || github.sha }}`'
+            echo 'See this run’s browser-evidence artifact for the manifest, passing-run videos and traces.'
+            echo 'An artifact archive is supporting evidence. Attach a current video to the PR for inline playback.'
+            echo 'No cloud task, paid model, merge or deployment is triggered by this workflow.'
+          } >> "$GITHUB_STEP_SUMMARY"
