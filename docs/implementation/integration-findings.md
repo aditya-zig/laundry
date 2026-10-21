@@ -1,5 +1,12 @@
 # Coordinator integration review notes
 
+Historical inspection leads follow. Before treating one as open, consult the
+[21 October handoff QA](qa-handoff-2026-10-21.md) and
+[backend reliability verification](backend-reliability-2026-10-21.md).
+The empty-audio and ignored-notification stubs mentioned below were already
+replaced in the verified baseline; current media transport repairs are recorded
+separately. Business-rule and live-provider decisions remain open.
+
 These are source-inspection leads for the independent Muse integration verifier, not verified final outcomes. Recheck against finished code.
 
 - Speech adapter currently writes note.bin and treats subprocess stdout as plain transcript, while the Antigravity transcriber validates extensions and emits JSON {text,language,uncertainSpans}. Test actual audio endpoint integration; preserve MIME-derived suffix and parse structured output, including uncertain spans.
