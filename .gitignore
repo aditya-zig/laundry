@@ -19,3 +19,6 @@ __pycache__/
 .vercel
 .gstack/
 .web-dist/
+
+# Local skill clones are install caches, not product code.
+.taste-skill-tmp/
