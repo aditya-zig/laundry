@@ -183,7 +183,7 @@ The application is production-ready only when the integrated candidate passes br
 
 ## 14. Implementation tasks and GitHub tracking
 
-[TASKS.json](TASKS.json) is the machine-readable task list. [ISSUES.md](ISSUES.md) links the published epic and child issues. Every child has a self-contained outcome, hard prerequisites, integration dependencies, exclusive write allowlist, interfaces, failing-test requirements, implementation checklist, verification, exclusions and a cloud dispatch contract. Only P00 and R01 are ready initially; later waves become ready when their pinned baselines exist.
+[TASKS.json](TASKS.json) is the machine-readable task list. [ISSUES.md](ISSUES.md) links the published epic and child issues. [REVIEW.html](REVIEW.html) is a portable visual overview with an interactive ready-task filter. [REA-SETUP.md](REA-SETUP.md) records the approved local installation and remaining reconnect/native-analysis prerequisites. Every child has a self-contained outcome, hard prerequisites, integration dependencies, exclusive write allowlist, interfaces, failing-test requirements, implementation checklist, verification, exclusions and a cloud dispatch contract. Only P00 and R01 are ready initially; later waves become ready when their pinned baselines exist.
 
 Document publication does not launch cloud workers or invoke paid models. Cloud account/environment publication and task submission must be verified by the coordinator before claiming work has started.
 
