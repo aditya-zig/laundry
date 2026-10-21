@@ -1,5 +1,22 @@
 # Backend handoff
 
+## Current verification — 21 October 2026
+
+The notes below are the original integration handoff, not the current defect
+list. At baseline `efef160`, configured WhatsApp media retrieval, structured
+speech output, sender-isolated drafts and the durable notification transport
+were already implemented and fixture-tested. The pilot and restart journey
+were independently reverified; see [handoff QA](qa-handoff-2026-10-21.md).
+
+Follow-up `fix/backend-handoff-20261021` repairs the remaining provider URL,
+redirect, stream-size/body-timeout, acknowledgement and malformed-signature
+failures. See [backend reliability verification](backend-reliability-2026-10-21.md)
+and [customer pilot integration](customer-pilot-integration.md). Neither the
+WhatsApp provider nor the native customer app is production-verified. The
+garment conversation flow remains separate from the kilogram pilot.
+
+## Original integration notes
+
 Backend implementation includes PostgreSQL schema/shared auth/idempotency, catalog, quote/order/payment/fulfillment/logistics/review/support/conversation modules, Nest HTTP controllers, worker and HTTP acceptance suite. This is an integration handoff, not a passing claim.
 
 The worker was interrupted after a stalled model request. All backend ownership is now released to final independent Muse verifier. The latest completed HTTP acceptance run reported 12 tests passed (2.79s), after earlier failures were repaired. Worker import paths then changed. Fresh combined builds/typechecks/acceptance and coordinator inspection leads still require verification and repairs. No local DB/API resource is production.
