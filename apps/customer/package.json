@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "@babel/runtime": "7.26.10",
+    "@expo/vector-icons": "14.1.0",
     "@expo/metro-runtime": "4.0.1",
     "@wandary/api-client": "workspace:*",
     "@wandary/contracts": "workspace:*",
