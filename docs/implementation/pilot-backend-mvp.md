@@ -189,3 +189,30 @@ local skill output, local skill install, the three handover documents, and the
 input manifest that records the hash. The earlier `b1452f...` value came from
 the same pre-repair inputs under a locale-sensitive sort order; the manifest
 records the trace.
+
+## Verification log 2026-10-21
+
+Local (verify database `laundry_verify_mvp`, services owned by the run):
+
+- `node tools/verification/run-pilot.mjs` exit 0: full browser journey
+  (double-submit booking, escaped map address, wrong-code refusals, measured
+  weight consent, payment at return, delivery), API restart persistence for
+  the paid and held orders, video `pilot-flow.webm`, `trace.zip` and
+  `manifest.json` under `.verification/pilot/`.
+- `sha256sum -c docs/implementation/pilot-fingerprint-inputs.sha256` exit 0
+  over 310 files.
+- `pnpm build` and `pnpm check` exit 0 across the workspace.
+- `node tools/verification/pilot-offline-refresh.mjs` PASS twice: stale
+  banner, last-known data, recovery, and parse-failure recovery against the
+  reported order and a second order.
+
+Tooling fixes made under this log: `run-pilot.mjs` opened its service logs
+with `createWriteStream` passed straight into `spawn` stdio (a lazily opened
+stream has no fd, so the job crashed before starting anything; logs are now
+opened with `fs/promises.open` and the numeric fd is passed, with all `launch`
+call sites awaited). The journey selected map markers and queue rows by
+`[data-order-id]` without scoping, so reused verification databases full of
+older orders broke strict-mode locators; markers now carry their own
+`data-order-id`, the customer ticket head selects its order like an
+operations queue row, and the journey targets the run's own ticket, marker
+and queue row exactly.
