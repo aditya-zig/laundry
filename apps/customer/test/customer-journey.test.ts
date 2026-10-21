@@ -8,6 +8,8 @@ import {
   isQuoteExpired,
   paymentStatusLabel,
   reviewEmptyLabel,
+  defaultSchedule,
+  scheduleBlockReason,
 } from "../src/guards";
 
 const line = (quantity: number): CartLine => ({
@@ -17,6 +19,18 @@ const line = (quantity: number): CartLine => ({
 });
 
 describe("customer journey", () => {
+  // Regression: QA-002 — fixed October dates made every new basket start in the past.
+  // Found by /qa on 2026-10-21. Report: docs/implementation/ui-handoff-2026-10-21.md
+  it("new baskets use future windows and reject expired or reversed schedules", () => {
+    const now = Date.parse("2026-10-21T10:00:00.000Z");
+    const schedule = defaultSchedule(now);
+    expect(Date.parse(schedule.pickupStart)).toBeGreaterThan(now);
+    expect(scheduleBlockReason(schedule, now)).toBeNull();
+    expect(scheduleBlockReason({ ...schedule, pickupStart: "2026-10-12T09:00:00.000Z" }, now)).toMatch(/future/);
+    expect(scheduleBlockReason({ ...schedule, pickupEnd: schedule.pickupStart }, now)).toMatch(/after/);
+    expect(scheduleBlockReason({ ...schedule, returnBy: schedule.pickupEnd }, now)).toMatch(/return/i);
+    expect(scheduleBlockReason({ ...schedule, returnBy: "invalid" }, now)).toMatch(/valid/);
+  });
   it("expired quote requires fresh terms before payment", () => {
     expect(isQuoteExpired("2026-10-11T16:00:00.000Z", "2026-10-11T17:00:00.000Z")).toBe(true);
     expect(isQuoteExpired("2026-10-11T18:00:00.000Z", "2026-10-11T17:00:00.000Z")).toBe(false);

@@ -1,5 +1,5 @@
 // Thin API wiring over @wandary/api-client. Screens import this, never fetch.
-import { createClient, type WandaryClient } from "@wandary/api-client";
+import { ApiError, createClient, type WandaryClient } from "@wandary/api-client";
 
 function envBaseUrl(): string | undefined {
   // Static access so Metro inlines EXPO_PUBLIC_API_URL at build time.
@@ -55,4 +55,16 @@ export function getToken(): string | undefined {
 export async function demoSignIn(role: "customer" = "customer"): Promise<void> {
   const session = await getClient().demoAuth(role);
   setSession(session.token);
+}
+
+/** Refresh only rejected demo sessions; connectivity errors remain visible. */
+export async function ensureDemoSession(): Promise<void> {
+  if (getToken()) {
+    try { await getClient().getMe(); return; }
+    catch (error) {
+      if (!(error instanceof ApiError) || error.code !== "UNAUTHENTICATED") throw error;
+      setSession(undefined);
+    }
+  }
+  await demoSignIn();
 }

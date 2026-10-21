@@ -3,16 +3,12 @@ import { ActivityIndicator, Pressable, ScrollView, Text, TextInput, View } from 
 import { useLocalSearchParams, useRouter } from "expo-router";
 import type { Service } from "@wandary/contracts";
 import { getClient } from "../../src/api";
-import { addLine, type CartLine } from "../../src/cart";
+import { addLine } from "../../src/cart";
+import { getBasketLines, resetBasket } from "../../src/cart-store";
 import { colors, spacing, minTouchTarget, radius, typography, maxContentWidth } from "../../src/theme";
 
-let basket: CartLine[] = [];
-export function getBasket(): CartLine[] {
-  return basket;
-}
-export function setBasket(next: CartLine[]): void {
-  basket = next;
-}
+export const getBasket = getBasketLines;
+export const setBasket = resetBasket;
 
 export default function ServiceDetail() {
   const { id } = useLocalSearchParams<{ id: string }>();

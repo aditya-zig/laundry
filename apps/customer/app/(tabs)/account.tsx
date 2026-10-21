@@ -1,6 +1,6 @@
 import { Pressable, ScrollView, Text } from "react-native";
-import { setSession } from "../src/api";
-import { colors, spacing, minTouchTarget } from "../src/theme";
+import { setSession } from "../../src/api";
+import { colors, spacing, minTouchTarget } from "../../src/theme";
 
 export default function Account() {
   return (

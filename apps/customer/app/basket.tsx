@@ -4,13 +4,16 @@ import { useRouter } from "expo-router";
 import { getBasket, setBasket } from "./services/[id]";
 import { removeLine, totalGarments, updateQuantity } from "../src/cart";
 import { colors, spacing, minTouchTarget, radius, typography, maxContentWidth } from "../src/theme";
+import { defaultSchedule, scheduleBlockReason } from "../src/guards";
 
 export default function Basket() {
   const router = useRouter();
   const [lines, setLines] = useState(getBasket());
-  const [pickupStart, setPickupStart] = useState("2026-10-12T09:00:00.000Z");
-  const [pickupEnd, setPickupEnd] = useState("2026-10-12T10:00:00.000Z");
-  const [returnBy, setReturnBy] = useState("2026-10-17T18:00:00.000Z");
+  const [initialSchedule] = useState(defaultSchedule);
+  const [pickupStart, setPickupStart] = useState(initialSchedule.pickupStart);
+  const [pickupEnd, setPickupEnd] = useState(initialSchedule.pickupEnd);
+  const [returnBy, setReturnBy] = useState(initialSchedule.returnBy);
+  const [scheduleError, setScheduleError] = useState<string | null>(null);
 
   function refresh(next: typeof lines) {
     setBasket(next);
@@ -71,11 +74,15 @@ export default function Basket() {
           <Text style={[styles.cardTitle, { marginTop: spacing.md }]}>Requested return by (UTC)</Text>
           <TextInput value={returnBy} onChangeText={setReturnBy} style={styles.input} accessibilityLabel="Requested return deadline" />
         </View>
+        {scheduleError && <Text accessibilityRole="alert" style={{ color: colors.danger, marginTop: spacing.md }}>{scheduleError}</Text>}
         <Pressable
-          onPress={() =>
-            router.push({ pathname: "/checkout", params: { pickupStart, pickupEnd, returnBy } })
-          }
-          style={({ pressed }) => [styles.primaryButton, pressed && { backgroundColor: colors.actionPressed }]}
+          disabled={lines.length === 0}
+          onPress={() => {
+            const error = scheduleBlockReason({ pickupStart, pickupEnd, returnBy });
+            setScheduleError(error);
+            if (!error) router.push({ pathname: "/checkout", params: { pickupStart, pickupEnd, returnBy } });
+          }}
+          style={({ pressed }) => [styles.primaryButton, pressed && { backgroundColor: colors.actionPressed }, lines.length === 0 && { opacity: 0.5 }]}
           accessibilityRole="button"
           accessibilityLabel="Get quote and checkout"
         >
