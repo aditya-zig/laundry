@@ -1,7 +1,7 @@
 // Customer journey behavior tests (A5). Observable state and helpers only,
 // no native runtime. Run with vitest once app dependencies are installed.
 import { describe, expect, it } from "vitest";
-import { addLine, totalGarments, type CartLine } from "../src/cart";
+import { addLine, countForGarment, estimateSubtotalMinor, setGarmentQuantity, totalGarments, type CartLine } from "../src/cart";
 import {
   checkoutBlockReason,
   isPendingLabelHonest,
@@ -53,5 +53,29 @@ describe("customer journey", () => {
     const full = addLine([], line(100));
     expect(totalGarments(full)).toBe(100);
     expect(() => addLine(full, line(1))).toThrow(/100 garments/);
+  });
+
+  it("tile steppers count and step one service+garment pair across lines", () => {
+    const shirt = { serviceId: "s1", garmentTypeId: "g1" };
+    let lines = addLine([], { ...shirt, quantity: 1 });
+    expect(countForGarment(lines, "s1", "g1")).toBe(1);
+    lines = addLine(lines, { ...shirt, quantity: 1 }); // second tile press merges into one line
+    expect(lines).toHaveLength(1);
+    expect(countForGarment(lines, "s1", "g1")).toBe(2);
+    lines = setGarmentQuantity(lines, "s1", "g1", 0); // minus to zero removes the line
+    expect(lines).toHaveLength(0);
+    expect(() => setGarmentQuantity([], "s1", "g1", -1)).toThrow();
+    expect(() => setGarmentQuantity([], "s1", "g1", 101)).toThrow();
+  });
+
+  it("client subtotal estimate uses catalog rates and hides unknown ones", () => {
+    const rates = { g1: 7900 };
+    const mixed = [
+      { serviceId: "s1", garmentTypeId: "g1", quantity: 2 },
+      { serviceId: "s2", garmentTypeId: "?", quantity: 1 },
+    ];
+    expect(estimateSubtotalMinor([{ serviceId: "s1", garmentTypeId: "g1", quantity: 2 }], rates)).toBe(15800);
+    expect(estimateSubtotalMinor(mixed, rates)).toBeNull();
+    expect(estimateSubtotalMinor([], rates)).toBe(0);
   });
 });
