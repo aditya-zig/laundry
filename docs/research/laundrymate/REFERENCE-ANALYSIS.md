@@ -185,7 +185,15 @@ New Age Consumer Services Pvt Ltd, 3rd Floor, 86, Karthik Nagar, Outer Ring Rd, 
 | The garment catalog behind the price list, including which garments are eligible for which service | The public price grid does not state eligibility | The in-app catalog |
 | Whether the 24-hour promise is enforced or aspirational | Only the marketing claim was observed | The in-app promised return window |
 
-The REA static analysis of the client bundle timed out on the 2.8 MB obfuscated `main` bundle. The first run was given 300 seconds and returned `provider_timeout` with a retained partial Evidence record. A second run with a 900 second analysis timeout was still in flight when this document was written. The static findings in section 3 come from direct inspection of the downloaded artifacts, which is sufficient for the claims made there, and the REA outcome is recorded in the handoff rather than assumed.
+The REA static analysis of the client bundle timed out on the 2.8 MB obfuscated `main` bundle. The first run was given 300 seconds and returned `provider_timeout` with a retained partial Evidence record. A second run with a 900 second analysis timeout also returned `provider_timeout`, again with retained Evidence reporting 205 webpack modules, 1326 findings and 482273 visited AST nodes with no parse failures. A third run against the smaller `scripts` bundle completed successfully with 38682 visited AST nodes and no parse failures. The static findings in section 3 come from the REA Evidence and from direct inspection of the downloaded artifacts, which is sufficient for the claims made there, and the REA outcome is recorded in the handoff rather than assumed.
+
+| REA run | Result | Evidence id |
+|---|---|---|
+| Whole bundle tree, 300 s | `provider_timeout`, partial Evidence retained | not retained in the CLI output beyond the error |
+| `main` only, 900 s | `provider_timeout`, partial Evidence retained, 205 modules, 1326 findings | `ev_8ae4696a0454f5c5538deb2fb991c4e1d9cb1e51ce3ce31f23fef8aabd3d9469` |
+| `scripts` only, 600 s | completed, 38682 AST nodes, 0 parse failures | `ev_1bc58b638239a702f069a4184150ce49c71f64ef2cbbbe705594301cd1cf0d82` |
+
+Both completed and partial runs share the root artifact digest `ea116968d11866f8ae18e4fd3370305581af8212e92da193c2396d77eccd7f84` and the inventory manifest `agm_5284b45962f00f572debbcd2d683db308a0a92bbc2f18be891666a11a3a7ea45`, so the runs describe the same downloaded bytes.
 
 ## 11. Reference-to-Laundry feature matrix
 

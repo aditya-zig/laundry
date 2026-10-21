@@ -3,7 +3,8 @@
   "contractTarget": "laundry-wire-v2.0.0",
   "contractFreezeSha": null,
   "contractDigest": null,
-  "integrationBaselineSha": null,
+  "integrationBaselineSha": "f0efdc0",
+  "integrationBaselineBranch": "cloud/P00-source-consolidation",
   "cloudEnvironment": null,
   "designFreeze": null,
   "note": "Planning queue only. Null fields must be populated and verified by coordinator before feature dispatch. Runtime integration dependency cycles permit parallel work; hard start blockers are acyclic.",
@@ -38,6 +39,9 @@
       ],
       "legacyPacket": "a0-foundation-and-coordinator.md",
       "initialState": "READY",
+      "state": "INTEGRATED",
+      "integrationBaselineSha": "f0efdc0",
+      "handoff": "docs/implementation/p00/CONSOLIDATION.md",
       "github": {
         "number": 6,
         "url": "https://github.com/aditya-zig/laundry/issues/6"

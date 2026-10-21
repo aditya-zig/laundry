@@ -66,7 +66,8 @@ sha256:b6af0b88d2e163fa675e827a633d698e4d43a7824b03f84cc232239ebb30a285
 | `curl` capture of the eight public routes | 0 | HTTP 200 for each route, recorded in the analysis file |
 | `sha256sum` of the five downloaded client artifacts | 0 | Digest table in the analysis file |
 | `npx -y rea-agents@6.7.0 analyze-javascript-application <bundles> --json` | 1 | `provider_timeout` after 300 s on the 2.8 MB obfuscated bundle, with a retained partial Evidence record |
-| `npx -y rea-agents@6.7.0 analyze-javascript-application <bundles> --source-path main.*.js --analysis-timeout-ms 900000 --json` | see known failures | Still running at handoff time, see below |
+| `npx -y rea-agents@6.7.0 analyze-javascript-application <bundles> --source-path main.*.js --analysis-timeout-ms 900000 --json` | 1 | `provider_timeout` after 900 s. Partial Evidence retained. 205 webpack modules, 1326 findings, 482273 AST nodes visited, 0 parse failures. Evidence `ev_8ae4696a0454f5c5538deb2fb991c4e1d9cb1e51ce3ce31f23fef8aabd3d9469` |
+| `npx -y rea-agents@6.7.0 analyze-javascript-application <bundles> --source-path scripts.*.js --analysis-timeout-ms 600000 --json` | 0 | Completed. 38682 AST nodes visited, 0 parse failures, 0 findings. Evidence `ev_1bc58b638239a702f069a4184150ce49c71f64ef2cbbbe705594301cd1cf0d82` |
 
 ## Runtime prerequisites
 
@@ -84,13 +85,14 @@ sha256:b6af0b88d2e163fa675e827a633d698e4d43a7824b03f84cc232239ebb30a285
 | Public route capture | passed | 8 routes, HTTP 200, digests recorded |
 | Client artifact inventory | passed | 5 artifacts, digests recorded |
 | REA static analysis of the full bundle tree | failed | provider_timeout, partial Evidence retained |
-| REA static analysis of `main` only with a longer timeout | not run to completion | See known failures |
+| REA static analysis of `main` with a 900 s timeout | failed | provider_timeout, partial Evidence retained with 205 modules and 1326 findings |
+| REA static analysis of `scripts` | passed | Evidence `ev_1bc58b638239a702f069a4184150ce49c71f64ef2cbbbe705594301cd1cf0d82` |
 
 ## Known failures
 
 | ID | Symptom | Reproduction command | Owner | Blocking |
 |---|---|---|---|---|
-| R01-KF-01 | REA times out parsing the 2.8 MB obfuscated `main` bundle at the default 300 s analysis timeout | `npx -y rea-agents@6.7.0 analyze-javascript-application <bundles> --json` | R01 | No |
+| R01-KF-01 | REA times out parsing the 2.8 MB obfuscated `main` bundle at the default 300 s analysis timeout and again at 900 s. The partial Evidence is retained and reports 205 webpack modules and 1326 findings. | `npx -y rea-agents@6.7.0 analyze-javascript-application <bundles> --json` | R01 | No |
 | R01-KF-02 | Native Android analysis is not possible. No APK was supplied, no device is attached, and JADX, Ghidra, Hopper, IDA and Kuna are not configured on this machine | `npx -y rea-agents@6.7.0 doctor --client codex --json` | R01 | No |
 | R01-KF-03 | The membership table's quarterly, half-yearly and annual prices and the offers page cards are not present in the captured text layer | `bash tools/research/laundrymate/capture-public.sh /tmp/laundrymate-capture` | R01 | No |
 | R01-KF-04 | The authenticated application, the rider application and the backend contract are unknown | not applicable | R01 | No |

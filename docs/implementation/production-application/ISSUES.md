@@ -2,11 +2,13 @@
 
 [Coordinating epic #5](https://github.com/aditya-zig/laundry/issues/5) · 23 child tasks · no PRs.
 
-Only P00 and R01 are initially ready. Labels express dispatch eligibility, not launched workers. Read CLOUD-AGENTS.md for pinned prerequisites, leases and evidence gates.
+Only P00 and R01 were initially ready. Labels express dispatch eligibility, not launched workers. Read CLOUD-AGENTS.md for pinned prerequisites, leases and evidence gates.
+
+Integration baseline: `cloud/P00-source-consolidation` at `f0efdc0`.
 
 | Task | Issue | Role | Start blockers | Initial state |
 |---|---|---|---|---|
-| P00 | [#6 — Consolidate source branches and publish a safe cloud integration baseline](https://github.com/aditya-zig/laundry/issues/6) | coordinator | None | READY |
+| P00 | [#6 — Consolidate source branches and publish a safe cloud integration baseline](https://github.com/aditya-zig/laundry/issues/6) | coordinator | None | INTEGRATED |
 | R01 | [#7 — Investigate LaundryMate with REA and publish an evidence-backed feature matrix](https://github.com/aditya-zig/laundry/issues/7) | research | None | READY |
 | P01 | [#8 — Prove a reproducible cloud PostgreSQL/browser/evidence environment](https://github.com/aditya-zig/laundry/issues/8) | coordinator | P00 | BLOCKED_DEPENDENCY |
 | C01 | [#9 — Freeze v2 wire contracts, SDK, module ports and migration integration rules](https://github.com/aditya-zig/laundry/issues/9) | coordinator | P00 | BLOCKED_DEPENDENCY |
