@@ -2,9 +2,9 @@ import { useState } from "react";
 import { ActivityIndicator, Pressable, ScrollView, Text, TextInput, View } from "react-native";
 import { useRouter } from "expo-router";
 import type { Quote } from "@laundry/contracts";
-import { getClient } from "../src/api";
-import { formatINR } from "../src/guards";
-import { colors, spacing, minTouchTarget } from "../src/theme";
+import { getClient } from "../../src/api";
+import { formatINR } from "../../src/guards";
+import { colors, spacing, minTouchTarget } from "../../src/theme";
 
 export default function Help() {
   const router = useRouter();

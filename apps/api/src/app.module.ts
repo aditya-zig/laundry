@@ -8,6 +8,7 @@ import { PartnerController } from "./controllers/partner.controller";
 import { BillingController } from "./controllers/billing.controller";
 import { ConversationController } from "./controllers/conversation.controller";
 import { Public, AuthGuard } from "./guards/auth.guard";
+import { PilotController } from "./controllers/pilot.controller";
 
 @Controller()
 class MiscController {
@@ -32,5 +33,5 @@ class MiscController {
   }
 }
 
-@Module({ controllers: [MiscController, AuthController, CatalogController, OrdersController, OpsController, PartnerController, BillingController, ConversationController] })
+@Module({ controllers: [MiscController, AuthController, CatalogController, OrdersController, OpsController, PartnerController, BillingController, ConversationController, PilotController] })
 export class AppModule {}

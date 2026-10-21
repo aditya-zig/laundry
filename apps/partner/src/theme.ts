@@ -1,5 +1,5 @@
 // Partner app design tokens. Navy/teal palette with 44px minimum touch targets.
-// Values mirror @laundry/design-tokens.
+// Values mirror @laundry/design-tokens. See DESIGN.md.
 
 export const colors = {
   surface: "#FFFFFF",
@@ -9,9 +9,13 @@ export const colors = {
   inkMuted: "#4A5A78",
   action: "#0E7C7B",
   actionPressed: "#0A5F5E",
+  actionSoft: "#DDF3F2",
   danger: "#B3261E",
+  dangerSoft: "#FDECEA",
   warning: "#8A5A00",
+  warningSoft: "#FFF4D6",
   success: "#1B7A3D",
+  successSoft: "#E2F3E7",
   border: "#D7E0F0",
   disabled: "#94A3B8",
 } as const;

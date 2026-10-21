@@ -1,0 +1,23 @@
+commit 39eaa8d0d380f780886c06d44f91fb0760b3ae0c
+Author:     aditya-zig <aditya.s274adi@gmail.com>
+AuthorDate: Wed Oct 21 15:03:17 2026 +0530
+Commit:     aditya-zig <aditya.s274adi@gmail.com>
+CommitDate: Wed Oct 21 15:03:17 2026 +0530
+
+    chore: ignore linked worktrees directory
+
+commit 99738543372ad73a955ed641112e9bf47ee4f94c
+Author:     aditya-zig <aditya.s274adi@gmail.com>
+AuthorDate: Wed Oct 21 15:55:33 2026 +0530
+Commit:     aditya-zig <aditya.s274adi@gmail.com>
+CommitDate: Wed Oct 21 15:55:33 2026 +0530
+
+    fix(conversations): preserve defaults for blank provider settings
+
+commit 328c15a4ba5cd7bccdbd3c77e5d982aca189f83f
+Author:     aditya-zig <aditya.s274adi@gmail.com>
+AuthorDate: Wed Oct 21 16:04:05 2026 +0530
+Commit:     aditya-zig <aditya.s274adi@gmail.com>
+CommitDate: Wed Oct 21 16:04:05 2026 +0530
+
+    docs: record home screen polish in the ui handoff

@@ -2,9 +2,9 @@ import { useEffect, useState } from "react";
 import { ActivityIndicator, Pressable, ScrollView, Text, View } from "react-native";
 import { Link } from "expo-router";
 import type { Order } from "@laundry/contracts";
-import { getClient } from "../src/api";
-import { paymentStatusLabel } from "../src/guards";
-import { colors, spacing, minTouchTarget } from "../src/theme";
+import { getClient } from "../../src/api";
+import { paymentStatusLabel } from "../../src/guards";
+import { colors, spacing, minTouchTarget } from "../../src/theme";
 
 export default function Orders() {
   const [orders, setOrders] = useState<Order[] | null>(null);

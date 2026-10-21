@@ -1,0 +1,30 @@
+A	DESIGN.md
+A	apps/customer/app/(tabs)/_layout.tsx
+R086	apps/customer/app/account.tsx	apps/customer/app/(tabs)/account.tsx
+R097	apps/customer/app/help.tsx	apps/customer/app/(tabs)/help.tsx
+A	apps/customer/app/(tabs)/index.tsx
+R091	apps/customer/app/orders.tsx	apps/customer/app/(tabs)/orders.tsx
+M	apps/customer/app/_layout.tsx
+M	apps/customer/app/basket.tsx
+M	apps/customer/app/checkout.tsx
+D	apps/customer/app/index.tsx
+M	apps/customer/app/services/[id].tsx
+M	apps/customer/package.json
+M	apps/customer/src/api.ts
+A	apps/customer/src/cart-store.ts
+M	apps/customer/src/cart.ts
+M	apps/customer/src/guards.ts
+A	apps/customer/src/schedule-input.ts
+M	apps/customer/src/theme.ts
+A	apps/customer/test/api.regression-1.test.ts
+M	apps/customer/test/customer-journey.test.ts
+M	apps/ops/src/App.tsx
+M	apps/ops/src/pages/OrderDetail.tsx
+M	apps/ops/src/pages/Orders.tsx
+M	apps/ops/src/styles.css
+M	apps/partner/src/theme.ts
+A	docs/implementation/opendesign-ui-refresh.md
+A	docs/implementation/ui-handoff-2026-10-21.md
+M	packages/design-tokens/src/index.ts
+M	packages/design-tokens/test/tokens.test.ts
+M	pnpm-lock.yaml
