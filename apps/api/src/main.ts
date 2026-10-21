@@ -49,8 +49,8 @@ function assertProductionConfig(): void {
   if (process.env.NODE_ENV !== "production") return;
   // Production must never run on implicit demo/default credentials.
   const problems: string[] = [];
-  if ((process.env.DEMO_MODE ?? "true") !== "false") problems.push("DEMO_MODE must be 'false' in production");
-  if (!process.env.DATABASE_URL || /localhost|wandary_dev_only/.test(process.env.DATABASE_URL)) {
+  if (process.env.DEMO_MODE !== "false") problems.push("DEMO_MODE must be explicitly 'false' in production");
+  if (!process.env.DATABASE_URL || /localhost|127\.0\.0\.1|(?:wandary|laundry)_dev_only/.test(process.env.DATABASE_URL)) {
     problems.push("DATABASE_URL must point at the production database");
   }
   for (const k of ["WHATSAPP_APP_SECRET", "WHATSAPP_VERIFY_TOKEN", "WHATSAPP_TOKEN", "WHATSAPP_PHONE_NUMBER_ID"]) {
@@ -84,9 +84,11 @@ async function bootstrap() {
     next();
   });
   const port = Number(process.env.PORT ?? 4100);
-  await app.listen(port);
+  // Loopback by default. A container or LAN demo must opt in with HOST=0.0.0.0.
+  const host = process.env.HOST ?? "127.0.0.1";
+  await app.listen(port, host);
   // eslint-disable-next-line no-console
-  console.log(`[wandary-api] listening on http://localhost:${port}`);
+  console.log(`[wandary-api] listening on http://${host}:${port}`);
 }
 
 bootstrap().catch((e) => {

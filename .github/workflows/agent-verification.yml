@@ -9,6 +9,50 @@ concurrency:
   group: agent-evidence-${{ github.head_ref || github.ref_name }}
   cancel-in-progress: true
 jobs:
+  pilot-evidence:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: wandary
+          POSTGRES_PASSWORD: verification_only
+          POSTGRES_DB: laundry_verify_pilot_ci
+        ports: ['5448:5432']
+        options: >-
+          --health-cmd "pg_isready -U wandary -d laundry_verify_pilot_ci"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      DATABASE_URL: postgres://wandary:verification_only@localhost:5448/laundry_verify_pilot_ci
+      VERIFY_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+      VERIFY_BASE_SHA: ${{ github.event.pull_request.base.sha || '' }}
+      CI: 'true'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.33.2
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec playwright install --with-deps chromium
+      - run: pnpm --filter @wandary/contracts build && pnpm --filter @wandary/api-client build
+      - name: Pilot browser journey, video, trace and restart persistence
+        run: node tools/verification/run-pilot.mjs
+      - name: Retain pilot success and failure evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pilot-evidence-${{ github.event.pull_request.head.sha || github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: .verification/pilot/
+          include-hidden-files: true
+          retention-days: 30
+          if-no-files-found: error
   browser-evidence:
     runs-on: ubuntu-latest
     timeout-minutes: 20

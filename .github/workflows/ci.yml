@@ -13,7 +13,7 @@ jobs:
         env:
           POSTGRES_USER: wandary
           POSTGRES_PASSWORD: wandary_dev_only
-          POSTGRES_DB: wandary
+          POSTGRES_DB: laundry_verify_ci
         ports:
           - 5448:5432
         options: >-
@@ -22,7 +22,7 @@ jobs:
           --health-timeout 5s
           --health-retries 10
     env:
-      DATABASE_URL: postgres://wandary:wandary_dev_only@localhost:5448/wandary
+      DATABASE_URL: postgres://wandary:wandary_dev_only@localhost:5448/laundry_verify_ci
       DEMO_MODE: "true"
       CI: "true"
     steps:

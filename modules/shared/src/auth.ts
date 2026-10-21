@@ -4,8 +4,10 @@ import { ApiError } from "./errors";
 
 export interface Actor { id: string; role: string; scopes: string[] }
 
+/** Demo is opt-in. An unset or misspelled flag must not open credential-free
+ * operator sessions on a host that happens to be reachable. */
 export function demoMode(): boolean {
-  return (process.env.DEMO_MODE ?? "true") !== "false";
+  return process.env.DEMO_MODE === "true";
 }
 
 export function demoOtpCode(): string {
