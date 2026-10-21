@@ -8,9 +8,9 @@
 - Base SHA: `f0efdc0` (the P00 integration baseline)
 - Source branch: new implementation
 - Source SHA: not applicable
-- Tested SHA: recorded in the branch tip at handoff time
+- Tested SHA: `cd52487`
 - Contract version: `laundry-wire-v2.0.0`
-- Contract digest: `sha256:<see the final record>`
+- Contract digest: `sha256:268e5cc8dddcdf02ee39acb978bd83c22d4fa9c509908d6d41fc714b9530c7b6`
 - Contract scope: `packages/contracts`
 - Integration target: `cloud/P00-source-consolidation`
 - Status: IMPLEMENTED
@@ -74,7 +74,7 @@ git ls-tree -r <tested-SHA> -- packages/contracts | sha256sum
 Recorded digest:
 
 ```
-sha256:<see the final record>
+sha256:268e5cc8dddcdf02ee39acb978bd83c22d4fa9c509908d6d41fc714b9530c7b6
 ```
 
 ## Verification
@@ -156,8 +156,8 @@ sha256:<see the final record>
 
 - Base SHA: `f0efdc0`
 - Source SHA: not applicable
-- Tested SHA: recorded in the branch tip at handoff time
-- Contract digest: `sha256:<see the final record>`
+- Tested SHA: `cd52487`
+- Contract digest: `sha256:268e5cc8dddcdf02ee39acb978bd83c22d4fa9c509908d6d41fc714b9530c7b6`
 - Last verification command: `pnpm test`
 - Last verification exit code: 0
 - Remaining blockers: none. Three known failures are recorded above and none of them blocks a consumer.
