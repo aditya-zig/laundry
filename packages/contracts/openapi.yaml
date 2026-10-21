@@ -2,7 +2,7 @@ openapi: 3.1.0
 info:
   title: Laundry API
   version: 1.0.0
-  description: Versioned /v1 wire contract. Success shapes are direct resources/lists; errors are {code,message,traceId,retryable}.
+  description: 'Versioned /v1 wire contract. Success shapes are direct resources/lists; errors are {code,message,traceId,retryable}.'
 servers:
   - url: http://localhost:4100/v1
 paths:
@@ -46,7 +46,7 @@ paths:
   /auth/demo:
     post:
       operationId: demoAuth
-      description: Demo mode only. Body {role: customer|rider|operator}.
+      description: 'Demo mode only. Body {role: customer|rider|operator}.'
       responses:
         "200": { description: Session }
   /addresses:
@@ -62,13 +62,13 @@ paths:
     post:
       operationId: createQuote
       security: [{ bearerAuth: [] }]
-      description: Body QuoteInput, returns Quote.
+      description: 'Body QuoteInput, returns Quote.'
       responses: { "200": { description: Quote } }
   /checkouts:
     post:
       operationId: createCheckout
       security: [{ bearerAuth: [] }]
-      description: Body {quoteId}, returns {orderId,paymentId,paymentUrl,expiresAt,status}.
+      description: 'Body {quoteId}, returns {orderId,paymentId,paymentUrl,expiresAt,status}.'
       responses: { "200": { description: Checkout } }
   /orders:
     get:
@@ -84,7 +84,7 @@ paths:
     post:
       operationId: cancelOrder
       security: [{ bearerAuth: [] }]
-      description: Body {reason,expectedVersion}.
+      description: 'Body {reason,expectedVersion}.'
       responses: { "200": { description: Order } }
   /reviews:
     post:
@@ -114,7 +114,7 @@ paths:
     post:
       operationId: handoverJob
       security: [{ bearerAuth: [] }]
-      description: Body {expectedVersion,actionId,bagIds,otp?,method}.
+      description: 'Body {expectedVersion,actionId,bagIds,otp?,method}.'
       responses: { "200": { description: DeliveryJob } }
   /partner/jobs/{id}/exception:
     post:
@@ -130,13 +130,13 @@ paths:
     post:
       operationId: recordIntake
       security: [{ bearerAuth: [] }]
-      description: Body {expectedVersion,measuredLines}.
+      description: 'Body {expectedVersion,measuredLines}.'
       responses: { "200": { description: Order } }
   /ops/orders/{id}/care:
     post:
       operationId: advanceCare
       security: [{ bearerAuth: [] }]
-      description: Body {expectedVersion,to}.
+      description: 'Body {expectedVersion,to}.'
       responses: { "200": { description: Order } }
   /ops/deliveries:
     get:
@@ -156,14 +156,324 @@ paths:
   /demo/conversations/messages:
     post:
       operationId: postConversationMessage
-      description: Body {text,receivedAt?,draftId?} returns {draft,reply,missingFields}.
+      description: 'Body {text,receivedAt?,draftId?} returns {draft,reply,missingFields}.'
       responses: { "200": { description: Conversation result } }
   /conversation-drafts/{id}/confirm:
     post:
       operationId: confirmDraft
       security: [{ bearerAuth: [] }]
-      description: Body {revision,quoteId,...}; revision-bound confirmation.
+      description: 'Body {revision,quoteId,...}; revision-bound confirmation.'
       responses: { "200": { description: Checkout } }
+  /pilot/config:
+    get:
+      operationId: pilotConfig
+      summary: Demo pilot services, timezone-qualified slots and boundary
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          description: PilotConfig
+          content: { application/json: { schema: { $ref: "#/components/schemas/PilotConfig" } } }
+  /pilot/riders:
+    get:
+      operationId: pilotRiders
+      summary: Delivery partners operations may assign (operator/admin only)
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          description: PilotRider array
+          content: { application/json: { schema: { type: array, items: { $ref: "#/components/schemas/PilotRider" } } } }
+  /pilot/orders:
+    get:
+      operationId: pilotListOrders
+      summary: Orders visible to the signed-in actor
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          description: PilotOrder array
+          content: { application/json: { schema: { type: array, items: { $ref: "#/components/schemas/PilotOrder" } } } }
+    post:
+      operationId: pilotCreateOrder
+      summary: Book a kilogram order; payment is due at return
+      security: [{ bearerAuth: [] }]
+      parameters: [{ $ref: "#/components/parameters/IdempotencyKey" }]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: "#/components/schemas/PilotBooking" } } }
+      responses:
+        "201":
+          description: PilotOrder
+          content: { application/json: { schema: { $ref: "#/components/schemas/PilotOrder" } } }
+        "409": { description: NO_CAPACITY, DEADLINE_UNAVAILABLE or IDEMPOTENCY_CONFLICT }
+  /pilot/orders/{id}:
+    get:
+      operationId: pilotGetOrder
+      summary: Actor-scoped order, history and permitted handover codes
+      security: [{ bearerAuth: [] }]
+      parameters: [{ $ref: "#/components/parameters/OrderId" }]
+      responses:
+        "200":
+          description: PilotOrder
+          content: { application/json: { schema: { $ref: "#/components/schemas/PilotOrder" } } }
+        "404": { description: Not found or not visible to this actor }
+  /pilot/orders/{id}/actions:
+    post:
+      operationId: pilotAction
+      summary: Versioned, idempotent order transition
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { $ref: "#/components/parameters/OrderId" }
+        - { $ref: "#/components/parameters/IdempotencyKey" }
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: "#/components/schemas/PilotAction" } } }
+      responses:
+        "201":
+          description: 'PilotOrder after the transition, or the stored replay'
+          content: { application/json: { schema: { $ref: "#/components/schemas/PilotOrder" } } }
+        "409": { description: VERSION_CONFLICT, HANDOVER_CODE_EXPIRED, PAYMENT_PENDING or an invalid transition }
+  /pilot/orders/{id}/location:
+    get:
+      operationId: pilotReadLocation
+      summary: Latest self-reported position; freshness is recomputed on read
+      security: [{ bearerAuth: [] }]
+      parameters: [{ $ref: "#/components/parameters/OrderId" }]
+      responses:
+        "200":
+          description: PilotLocation
+          content: { application/json: { schema: { $ref: "#/components/schemas/PilotLocation" } } }
+        "404": { description: No report, closed tracking, or not visible to this actor }
+    post:
+      operationId: pilotReportLocation
+      summary: Assigned delivery partner reports a position (manual or browser-derived)
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { $ref: "#/components/parameters/OrderId" }
+        - { $ref: "#/components/parameters/IdempotencyKey" }
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: "#/components/schemas/PilotLocationReport" } } }
+      responses:
+        "201":
+          description: PilotLocation with age and stale recomputed
+          content: { application/json: { schema: { $ref: "#/components/schemas/PilotLocation" } } }
+        "404": { description: Tracking is closed for a delivered or cancelled order }
+  /pilot/slots/{id}:
+    put:
+      operationId: pilotSetSlotCapacity
+      summary: Operations sets demo capacity, never below reservations
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+        - { $ref: "#/components/parameters/IdempotencyKey" }
+      requestBody:
+        required: true
+        content: { application/json: { schema: { type: object, required: [capacity], properties: { capacity: { type: integer, minimum: 0, maximum: 100 } } } } }
+      responses:
+        "200":
+          description: PilotSlot
+          content: { application/json: { schema: { $ref: "#/components/schemas/PilotSlot" } } }
+        "409": { description: NO_CAPACITY when capacity is below reserved }
 components:
+  parameters:
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: true
+      schema: { type: string, format: uuid }
+    OrderId:
+      name: id
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+  schemas:
+    PilotPoint:
+      type: object
+      required: [lat, lng]
+      additionalProperties: false
+      properties:
+        lat: { type: number, minimum: -90, maximum: 90 }
+        lng: { type: number, minimum: -180, maximum: 180 }
+    PilotSlot:
+      type: object
+      required: [id, timeZone, pickupStart, pickupEnd, returnStart, returnEnd, capacity, reserved]
+      properties:
+        id: { type: string, format: uuid }
+        timeZone: { type: string, const: Asia/Kolkata }
+        pickupStart: { type: string, format: date-time }
+        pickupEnd: { type: string, format: date-time }
+        returnStart: { type: string, format: date-time }
+        returnEnd: { type: string, format: date-time }
+        capacity: { type: integer, minimum: 0 }
+        reserved: { type: integer, minimum: 0 }
+    PilotConfig:
+      type: object
+      required: [demo, ratesApproved, timeZone, services, slots, facility, demoBoundary]
+      properties:
+        demo: { type: boolean, const: true }
+        ratesApproved: { type: boolean, const: false }
+        timeZone: { type: string, const: Asia/Kolkata }
+        services:
+          type: array
+          items:
+            type: object
+            required: [code, name, rateMinorPerKg]
+            properties:
+              code: { type: string, enum: [WASH_FOLD, WASH_PRESS] }
+              name: { type: string }
+              rateMinorPerKg: { type: integer, minimum: 1 }
+        slots: { type: array, items: { $ref: "#/components/schemas/PilotSlot" } }
+        facility:
+          allOf:
+            - { $ref: "#/components/schemas/PilotPoint" }
+            - { type: object, required: [name], properties: { name: { type: string } } }
+        demoBoundary:
+          type: object
+          required: [south, north, west, east]
+          properties:
+            south: { type: number }
+            north: { type: number }
+            west: { type: number }
+            east: { type: number }
+    PilotBooking:
+      type: object
+      required: [serviceCode, estimatedWeightGrams, slotId, address]
+      additionalProperties: false
+      properties:
+        serviceCode: { type: string, enum: [WASH_FOLD, WASH_PRESS] }
+        estimatedWeightGrams: { type: integer, minimum: 1, maximum: 50000 }
+        slotId: { type: string, format: uuid }
+        address:
+          allOf:
+            - { $ref: "#/components/schemas/PilotPoint" }
+            - { type: object, required: [line], properties: { line: { type: string, minLength: 5, maxLength: 240 } } }
+    PilotRider:
+      type: object
+      required: [id, name]
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+    PilotLocationSource:
+      type: string
+      enum: [BROWSER_GEOLOCATION, MANUAL]
+      description: Self-reported provenance. Browser-derived coordinates are not attested GPS.
+    PilotLocationReport:
+      type: object
+      required: [lat, lng, capturedAt, source]
+      additionalProperties: false
+      properties:
+        lat: { type: number, minimum: -90, maximum: 90 }
+        lng: { type: number, minimum: -180, maximum: 180 }
+        capturedAt: { type: string, format: date-time }
+        source: { $ref: "#/components/schemas/PilotLocationSource" }
+    PilotLocation:
+      type: object
+      required: [lat, lng, capturedAt, reportedAt, source, ageSeconds, stale, staleAfterSeconds]
+      properties:
+        lat: { type: number }
+        lng: { type: number }
+        capturedAt: { type: string, format: date-time }
+        reportedAt: { type: string, format: date-time }
+        source: { $ref: "#/components/schemas/PilotLocationSource" }
+        ageSeconds: { type: integer, minimum: 0 }
+        stale: { type: boolean }
+        staleAfterSeconds: { type: integer, minimum: 1 }
+    PilotOrderEvent:
+      type: object
+      required: [action, label, at]
+      properties:
+        action: { type: string }
+        label: { type: string }
+        at: { type: string, format: date-time }
+    PilotOrder:
+      type: object
+      required: [id, version, customerId, riderId, slotId, serviceCode, status, pickupStatus, returnStatus, paymentStatus, estimatedWeightGrams, measuredWeightGrams, rateMinorPerKg, totalMinor, proposedTotalMinor, currency, address, timeZone, pickupStart, pickupEnd, returnStart, returnEnd, createdAt, holdReason, events]
+      properties:
+        id: { type: string, format: uuid }
+        version: { type: integer, minimum: 1 }
+        customerId: { type: string, format: uuid }
+        riderId: { type: [string, "null"], format: uuid }
+        slotId: { type: string, format: uuid }
+        serviceCode: { type: string, enum: [WASH_FOLD, WASH_PRESS] }
+        status:
+          type: string
+          enum: [BOOKED, PICKED_UP, AWAITING_APPROVAL, INTAKE_COMPLETE, IN_CARE, QUALITY_CHECK, READY_FOR_RETURN, RETURNING, DELIVERED, ON_HOLD, CANCELLED]
+        pickupStatus: { type: string, enum: [PENDING, ASSIGNED, COMPLETED] }
+        returnStatus: { type: string, enum: [PENDING, READY, ASSIGNED, COMPLETED] }
+        paymentStatus: { type: string, enum: [UNPAID, UNRESOLVED, PAID] }
+        estimatedWeightGrams: { type: integer }
+        measuredWeightGrams: { type: [integer, "null"] }
+        rateMinorPerKg: { type: integer }
+        totalMinor: { type: integer, minimum: 0 }
+        proposedTotalMinor: { type: [integer, "null"] }
+        currency: { type: string, const: INR }
+        address:
+          allOf:
+            - { $ref: "#/components/schemas/PilotPoint" }
+            - { type: object, required: [line], properties: { line: { type: string } } }
+        timeZone: { type: string, const: Asia/Kolkata }
+        pickupStart: { type: string, format: date-time }
+        pickupEnd: { type: string, format: date-time }
+        returnStart: { type: string, format: date-time }
+        returnEnd: { type: string, format: date-time }
+        pickupCodeExpiresAt: { type: [string, "null"], format: date-time }
+        returnCodeExpiresAt: { type: [string, "null"], format: date-time }
+        createdAt: { type: string, format: date-time }
+        pickupCode:
+          type: string
+          description: Customer-only. Omitted for riders and operations.
+        returnCode:
+          type: string
+          description: Customer-only and only once the return is ready.
+        holdReason: { type: [string, "null"] }
+        events: { type: array, items: { $ref: "#/components/schemas/PilotOrderEvent" } }
+    PilotAction:
+      oneOf:
+        - { $ref: "#/components/schemas/PilotActionAssign" }
+        - { $ref: "#/components/schemas/PilotActionCode" }
+        - { $ref: "#/components/schemas/PilotActionIntake" }
+        - { $ref: "#/components/schemas/PilotActionSimple" }
+        - { $ref: "#/components/schemas/PilotActionPayment" }
+        - { $ref: "#/components/schemas/PilotActionIssue" }
+        - { $ref: "#/components/schemas/PilotActionReissue" }
+        - { $ref: "#/components/schemas/PilotActionResolveHold" }
+      discriminator: { propertyName: action }
+    PilotActionBase:
+      type: object
+      required: [action, expectedVersion]
+      properties:
+        action: { type: string }
+        expectedVersion: { type: integer, minimum: 1 }
+    PilotActionAssign:
+      allOf:
+        - { $ref: "#/components/schemas/PilotActionBase" }
+        - { type: object, required: [action, riderId], properties: { action: { type: string, const: ASSIGN }, riderId: { type: string, format: uuid } } }
+    PilotActionCode:
+      allOf:
+        - { $ref: "#/components/schemas/PilotActionBase" }
+        - { type: object, required: [action, code], properties: { action: { type: string, enum: [PICKUP, DELIVER] }, code: { type: string, pattern: '^\d{6}$' } } }
+    PilotActionIntake:
+      allOf:
+        - { $ref: "#/components/schemas/PilotActionBase" }
+        - { type: object, required: [action, measuredWeightGrams, bagCount], properties: { action: { type: string, const: INTAKE }, measuredWeightGrams: { type: integer, minimum: 1, maximum: 50000 }, bagCount: { type: integer, minimum: 1, maximum: 20 } } }
+    PilotActionSimple:
+      allOf:
+        - { $ref: "#/components/schemas/PilotActionBase" }
+        - { type: object, required: [action], properties: { action: { type: string, enum: [APPROVE_PRICE, DECLINE_PRICE, START_CARE, QUALITY_CHECK, READY_FOR_RETURN, START_RETURN, CANCEL] } } }
+    PilotActionPayment:
+      allOf:
+        - { $ref: "#/components/schemas/PilotActionBase" }
+        - { type: object, required: [action, method, amountMinor, reference], properties: { action: { type: string, const: CONFIRM_PAYMENT }, method: { type: string, enum: [CASH, UPI] }, amountMinor: { type: integer, minimum: 1 }, reference: { type: string, minLength: 6, maxLength: 100 } } }
+    PilotActionIssue:
+      allOf:
+        - { $ref: "#/components/schemas/PilotActionBase" }
+        - { type: object, required: [action, reason], properties: { action: { type: string, const: PAYMENT_ISSUE }, reason: { type: string, minLength: 3, maxLength: 240 } } }
+    PilotActionReissue:
+      allOf:
+        - { $ref: "#/components/schemas/PilotActionBase" }
+        - { type: object, required: [action, leg], properties: { action: { type: string, const: REISSUE_HANDOVER_CODE }, leg: { type: string, enum: [PICKUP, RETURN] } } }
+    PilotActionResolveHold:
+      allOf:
+        - { $ref: "#/components/schemas/PilotActionBase" }
+        - { type: object, required: [action, resolution, customerAgreed, note], properties: { action: { type: string, const: RESOLVE_HOLD }, resolution: { type: string, const: RETURN_UNPROCESSED }, customerAgreed: { type: boolean, const: true }, note: { type: string, minLength: 10, maxLength: 500 } } }
   securitySchemes:
     bearerAuth: { type: http, scheme: bearer, bearerFormat: JWT }

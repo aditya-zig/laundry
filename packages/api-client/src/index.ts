@@ -14,6 +14,14 @@ import {
   otpRequestSchema,
   otpVerifySchema,
   orderSchema,
+  pilotActionSchema,
+  pilotBookingSchema,
+  pilotConfigSchema,
+  pilotLocationReportSchema,
+  pilotLocationSchema,
+  pilotOrderSchema,
+  pilotRiderSchema,
+  pilotSlotSchema,
   quoteInputSchema,
   quoteSchema,
   reviewInputSchema,
@@ -27,6 +35,14 @@ import {
   type ErrorEnvelope,
   type HandoverInput,
   type Order,
+  type PilotAction,
+  type PilotBooking,
+  type PilotConfig,
+  type PilotLocation,
+  type PilotLocationReport,
+  type PilotOrder,
+  type PilotRider,
+  type PilotSlot,
   type Quote,
   type QuoteInput,
   type Review,
@@ -125,6 +141,8 @@ export function createClient(options: ClientOptions = {}) {
   const get = <T>(path: string, schema: z.ZodType<T>) => request("GET", path, { schema, idempotent: false });
   const post = <T>(path: string, body: unknown, schema: z.ZodType<T>, opts?: MutatingOpts) =>
     request("POST", path, { body, schema, idempotencyKey: opts?.idempotencyKey });
+  const put = <T>(path: string, body: unknown, schema: z.ZodType<T>, opts?: MutatingOpts) =>
+    request("PUT", path, { body, schema, idempotencyKey: opts?.idempotencyKey });
 
   return {
     listServices: () => get("/services", z.array(serviceSchema)) as Promise<Service[]>,
@@ -215,6 +233,25 @@ export function createClient(options: ClientOptions = {}) {
       ) as Promise<ConversationMessageResult & { quote?: Quote }>,
     confirmDraft: (draftId: string, revision: number, quoteId: string, opts?: MutatingOpts) =>
       post(`/conversation-drafts/${draftId}/confirm`, draftConfirmSchema.parse({ draftId, revision, quoteId }), checkoutSchema, opts) as Promise<Checkout>,
+
+    /* Pilot surface: a kg-based laundry order from booking through pickup,
+     * intake approval, care, payment at return and handover. */
+
+    pilotConfig: () => get("/pilot/config", pilotConfigSchema) as Promise<PilotConfig>,
+    pilotRiders: () => get("/pilot/riders", z.array(pilotRiderSchema)) as Promise<PilotRider[]>,
+    pilotListOrders: () => get("/pilot/orders", z.array(pilotOrderSchema)) as Promise<PilotOrder[]>,
+    pilotOrder: (id: string) => get(`/pilot/orders/${id}`, pilotOrderSchema) as Promise<PilotOrder>,
+    pilotCreateOrder: (input: PilotBooking, opts?: MutatingOpts) =>
+      post("/pilot/orders", pilotBookingSchema.parse(input), pilotOrderSchema, opts) as Promise<PilotOrder>,
+    pilotAction: (id: string, action: PilotAction, opts?: MutatingOpts) =>
+      post(`/pilot/orders/${id}/actions`, pilotActionSchema.parse(action), pilotOrderSchema, opts) as Promise<PilotOrder>,
+    pilotSetSlotCapacity: (slotId: string, capacity: number, opts?: MutatingOpts) =>
+      put(`/pilot/slots/${slotId}`, { capacity }, pilotSlotSchema, opts) as Promise<PilotSlot>,
+    /** The latest position the assigned delivery partner reported, with the
+     * capture time, the source and the server-measured age. */
+    pilotLocation: (id: string) => get(`/pilot/orders/${id}/location`, pilotLocationSchema) as Promise<PilotLocation>,
+    pilotReportLocation: (id: string, report: PilotLocationReport, opts?: MutatingOpts) =>
+      post(`/pilot/orders/${id}/location`, pilotLocationReportSchema.parse(report), pilotLocationSchema, opts) as Promise<PilotLocation>,
   };
 }
 

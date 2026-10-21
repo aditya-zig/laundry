@@ -17,3 +17,13 @@ Use the configured OpenCode `laundry-planner` and `laundry-tooling` delegates on
 Deliver an isolated issue branch/PR, actual browser/computer use and watchable current-revision video, check results and evidence manifest. `pnpm verify:browser` covers existing web smoke only; native Android requirements need device/emulator evidence. Follow `docs/plans/laundry-app/VERIFICATION.md`, preserve nonzero failures, and report unavailable cloud/browser/upload capabilities precisely. No merge or deployment without its explicit authority.
 
 When the partner joins product review, raise deferred Q20 pricing first: per-kg service rates, Premium price, minimums and increments. Preserve the raw Q&A and do not fill those numbers from historic notes. Cloud account provisioning is deferred until after this tooling push.
+
+## Agent skills
+
+### Issue tracker
+
+GitHub repository `aditya-zig/laundry`, with `gh-axi` for supported issue and PR operations. See `docs/agents/issue-tracker.md`.
+
+### Domain docs
+
+Single-context: one `CONTEXT.md` glossary at the repo root, ADRs under `docs/adr/` when needed. See `docs/agents/domain.md`.

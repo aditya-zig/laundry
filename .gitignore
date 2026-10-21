@@ -25,3 +25,11 @@ __pycache__/
 .agent-tools/
 playwright-report/
 test-results/
+
+# Pilot evidence and local skill output stay out of the PR.
+docs/implementation/evidence/pilot/
+.taste-skill/
+
+# Local agent skill install, not part of the product build.
+.agents/
+skills-lock.json
