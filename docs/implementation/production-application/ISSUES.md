@@ -6,14 +6,14 @@ Only P00 and R01 were initially ready. Labels express dispatch eligibility, not 
 
 Integration baseline: `cloud/P00-source-consolidation` at `f0efdc0`.
 
-Contract freeze: `laundry-wire-v2.0.0` at `cd52487`, digest `sha256:268e5cc8dddcdf02ee39acb978bd83c22d4fa9c509908d6d41fc714b9530c7b6`.
+Contract target: `laundry-wire-v2.0.0`. The earlier freeze claim is withdrawn. C01 remains blocked on complete schema/SDK coverage, fixtures, OpenAPI and integration infrastructure. See `../contracts/RETRY-SAFETY.md`. Feature dispatch remains blocked.
 
 | Task | Issue | Role | Start blockers | Initial state |
 |---|---|---|---|---|
 | P00 | [#6 — Consolidate source branches and publish a safe cloud integration baseline](https://github.com/aditya-zig/laundry/issues/6) | coordinator | None | INTEGRATED |
 | R01 | [#7 — Investigate LaundryMate with REA and publish an evidence-backed feature matrix](https://github.com/aditya-zig/laundry/issues/7) | research | None | IMPLEMENTED |
 | P01 | [#8 — Prove a reproducible cloud PostgreSQL/browser/evidence environment](https://github.com/aditya-zig/laundry/issues/8) | coordinator | P00 | BLOCKED_DEPENDENCY |
-| C01 | [#9 — Freeze v2 wire contracts, SDK, module ports and migration integration rules](https://github.com/aditya-zig/laundry/issues/9) | coordinator | P00 | IMPLEMENTED |
+| C01 | [#9 — Freeze v2 wire contracts, SDK, module ports and migration integration rules](https://github.com/aditya-zig/laundry/issues/9) | coordinator | P00 | BLOCKED_CONTRACT |
 | D01 | [#10 — Create the taste-led design system and reference screens for all three apps](https://github.com/aditya-zig/laundry/issues/10) | design | P00 | BLOCKED_DEPENDENCY |
 | B01 | [#11 — Implement production identity, sessions, scoped staff access and owned addresses](https://github.com/aditya-zig/laundry/issues/11) | backend | P01, C01 | BLOCKED_DEPENDENCY |
 | B02 | [#12 — Implement all four services, approved rate cards and unified KG/PIECE pricing](https://github.com/aditya-zig/laundry/issues/12) | backend | P01, C01 | BLOCKED_DEPENDENCY |

@@ -1,8 +1,8 @@
 {
   "planVersion": "1.0",
   "contractTarget": "laundry-wire-v2.0.0",
-  "contractFreezeSha": "cd52487",
-  "contractDigest": "sha256:268e5cc8dddcdf02ee39acb978bd83c22d4fa9c509908d6d41fc714b9530c7b6",
+  "contractFreezeSha": null,
+  "contractDigest": null,
   "integrationBaselineSha": "f0efdc0",
   "integrationBaselineBranch": "cloud/P00-source-consolidation",
   "cloudEnvironment": null,
@@ -160,7 +160,7 @@
       ],
       "legacyPacket": "a0-foundation-and-coordinator.md",
       "initialState": "BLOCKED_DEPENDENCY",
-      "state": "IMPLEMENTED",
+      "state": "BLOCKED_CONTRACT",
       "handoff": "docs/implementation/handoffs/C01/HANDOFF.md",
       "github": {
         "number": 9,

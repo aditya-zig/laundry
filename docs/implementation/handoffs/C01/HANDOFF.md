@@ -1,5 +1,9 @@
 # C01 handoff: freeze the v2 wire contracts
 
+## Status correction, 22 October 2026
+
+This is a partial implementation, not an approved freeze. The earlier readiness claims below are historical and do not authorize feature dispatch. OpenAPI, fixtures, complete schema-to-route-to-SDK coverage, transaction infrastructure and v2 consumer checks remain required. See `docs/implementation/contracts/RETRY-SAFETY.md` for the current SDK fix, local verification and remaining gates. No fresh-cloud, browser or Android acceptance is claimed.
+
 ## Identity
 
 - Task ID: C01

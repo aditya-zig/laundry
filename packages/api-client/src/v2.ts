@@ -9,6 +9,8 @@ export interface V2ClientOptions {
 }
 
 export interface V2MutatingOpts {
+  /** Persist this key with the original payload before sending a mutation.
+   * Reuse both after a timeout or restart. Editing intent needs a new key. */
   idempotencyKey?: string;
   signal?: AbortSignal;
 }
@@ -17,11 +19,13 @@ export class UnknownOutcomeError extends Error {
   readonly code = "PROVIDER_OUTCOME_UNKNOWN" as const;
   readonly outcome = "UNKNOWN" as const;
   override readonly cause: unknown;
+  readonly idempotencyKey: string | undefined;
 
-constructor(message: string, cause?: unknown) {
+  constructor(message: string, cause?: unknown, idempotencyKey?: string) {
     super(message);
     this.name = "UnknownOutcomeError";
     this.cause = cause;
+    this.idempotencyKey = idempotencyKey;
   }
 }
 
@@ -32,8 +36,9 @@ export class V2ApiError extends Error {
   readonly retryable: boolean;
   readonly fieldErrors: unknown;
   readonly currentVersion: number | undefined;
+  readonly idempotencyKey: string | undefined;
 
-constructor(
+  constructor(
     status: number,
     envelope: {
       code: string;
@@ -43,6 +48,7 @@ constructor(
       fieldErrors?: unknown;
       currentVersion?: number;
     },
+    idempotencyKey?: string,
   ) {
     super(`${envelope.code}: ${envelope.message}`);
     this.name = "V2ApiError";
@@ -52,6 +58,7 @@ constructor(
     this.retryable = envelope.retryable;
     this.fieldErrors = envelope.fieldErrors;
     this.currentVersion = envelope.currentVersion;
+    this.idempotencyKey = idempotencyKey;
   }
 }
 
@@ -86,7 +93,7 @@ export function createV2Client(options: V2ClientOptions = {}) {
   const fetchImpl = options.fetchImpl ?? fetch;
   const generateKey = options.generateKey ?? (() => crypto.randomUUID());
 
-async function request<T>(
+  async function request<T>(
     method: string,
     path: string,
     schema: Schema<T>,
@@ -97,22 +104,22 @@ async function request<T>(
       Accept: "application/json",
     };
 
-if (body !== undefined) headers["Content-Type"] = "application/json";
+    if (body !== undefined) headers["Content-Type"] = "application/json";
 
-const token = options.getToken?.();
+    const token = options.getToken?.();
     if (token) headers.Authorization = `Bearer ${token}`;
 
-if (method !== "GET") {
-      const key = opts.idempotencyKey;
-      if (!key && !generateKey) {
-        throw new Error("An idempotency key is required");
-      }
-      headers["Idempotency-Key"] = key ?? generateKey();
+    const isMutation = method !== "GET";
+    const idempotencyKey = isMutation
+      ? v2.idempotencyKeySchema.parse(opts.idempotencyKey ?? generateKey())
+      : undefined;
+    if (idempotencyKey !== undefined) {
+      headers["Idempotency-Key"] = idempotencyKey;
     }
 
-let response: Response;
+    let response: Response;
 
-try {
+    try {
       response = await fetchImpl(`${baseUrl}${path}`, {
         method,
         headers,
@@ -120,61 +127,61 @@ try {
         signal: opts.signal,
       });
     } catch (error) {
+      if (!isMutation) throw error;
       throw new UnknownOutcomeError(
         "The request outcome is unknown. Retry only with the same idempotency key.",
         error,
+        idempotencyKey,
       );
     }
 
-const payload: unknown = await response.json().catch(() => null);
+    let payload: unknown;
+    try {
+      payload = await response.json();
+    } catch (error) {
+      if (isMutation) {
+        throw new UnknownOutcomeError(
+          "The response could not be read. Reconcile or retry with the same idempotency key.",
+          error,
+          idempotencyKey,
+        );
+      }
+      throw error;
+    }
 
-if (!response.ok) {
+    if (!response.ok) {
       const parsed = v2.errorEnvelopeSchema.safeParse(payload);
 
-if (parsed.success) {
-        const envelope = parsed.data;
-        if (response.status >= 500 && envelope.retryable) {
-          throw new V2ApiError(response.status, {
-            code: String(envelope.code),
-            message: envelope.message,
-            traceId: envelope.traceId,
-            retryable: envelope.retryable,
-            fieldErrors: "fieldErrors" in envelope ? envelope.fieldErrors : undefined,
-            currentVersion: "currentVersion" in envelope &&
-              typeof envelope.currentVersion === "number"
-              ? envelope.currentVersion
-              : undefined,
-          });
-        }
-
-throw new V2ApiError(response.status, {
-          code: String(envelope.code),
-          message: envelope.message,
-          traceId: envelope.traceId,
-          retryable: envelope.retryable,
-          fieldErrors: "fieldErrors" in envelope ? envelope.fieldErrors : undefined,
-          currentVersion: "currentVersion" in envelope &&
-            typeof envelope.currentVersion === "number"
-            ? envelope.currentVersion
-            : undefined,
-        });
+      if (parsed.success) {
+        throw new V2ApiError(response.status, parsed.data, idempotencyKey);
       }
 
-if (response.status >= 500) {
+      if (isMutation && response.status >= 500) {
         throw new UnknownOutcomeError(
           `The server returned HTTP ${response.status}; the request outcome is unknown.`,
+          undefined,
+          idempotencyKey,
         );
       }
 
-throw new V2ApiError(response.status, {
+      throw new V2ApiError(response.status, {
         code: "UNKNOWN_ERROR",
         message: `Request failed with HTTP ${response.status}`,
         traceId: "trace-unknown",
         retryable: false,
-      });
+      }, idempotencyKey);
     }
 
-return schema.parse(payload);
+    try {
+      return schema.parse(payload);
+    } catch (error) {
+      if (!isMutation) throw error;
+      throw new UnknownOutcomeError(
+        "The successful response violated the contract. Reconcile or retry with the same idempotency key.",
+        error,
+        idempotencyKey,
+      );
+    }
   }
 
 function get<T>(path: string, schema: Schema<T>): Promise<T> {
