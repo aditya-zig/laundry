@@ -2,6 +2,8 @@
 
 ## Status correction, 22 October 2026
 
+Latest identity and routing work is documented in `docs/implementation/contracts/IDENTITY-AND-ROUTING.md`. It supersedes older SDK and inventory counts below. C01 is still blocked.
+
 This is a partial implementation, not an approved freeze. The earlier readiness claims below are historical and do not authorize feature dispatch. OpenAPI, fixtures, complete schema-to-route-to-SDK coverage, transaction infrastructure and v2 consumer checks remain required. See `docs/implementation/contracts/RETRY-SAFETY.md` for the current SDK fix, local verification and remaining gates. No fresh-cloud, browser or Android acceptance is claimed.
 
 ## Identity

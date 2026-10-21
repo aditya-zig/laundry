@@ -30,12 +30,15 @@ const errorEnvelope = {
   currentVersion: 4,
 };
 
+const id = "11111111-1111-4111-8111-111111111111";
+const challenge = { challengeId: id, expiresAt: "2026-10-22T09:00:00Z" };
+
 describe("v2 client headers", () => {
   it("sends an idempotency key on a mutation", async () => {
     const calls: Call[] = [];
     const client = createV2Client({
       baseUrl: "http://api.test/v2",
-      fetchImpl: stub(calls, () => json({ challengeId: "c1" })),
+      fetchImpl: stub(calls, () => json(challenge)),
     });
 
     await client.requestOtp("+919000000000");
@@ -48,7 +51,7 @@ describe("v2 client headers", () => {
   it("reuses a caller supplied idempotency key", async () => {
     const calls: Call[] = [];
     const client = createV2Client({
-      fetchImpl: stub(calls, () => json({ challengeId: "c1" })),
+      fetchImpl: stub(calls, () => json(challenge)),
     });
 
     await client.requestOtp("+919000000000", { idempotencyKey: "key-42" });
@@ -142,7 +145,7 @@ describe("v2 mutation recovery", () => {
       generateKey,
       fetchImpl: stub(calls, () => {
         if (calls.length === 1) throw new Error("response lost after commit");
-        return json({ challengeId: "c1" });
+        return json(challenge);
       }),
     });
 
@@ -267,5 +270,168 @@ describe("v2 mutation recovery", () => {
     await expect(client.listServices()).rejects.toBe(failure);
     expect(calls).toHaveLength(1);
     expect(calls[0].init.headers).not.toHaveProperty("Idempotency-Key");
+  });
+});
+
+describe("v2 identity validation", () => {
+  it.each([
+    {},
+    { challengeId: id },
+    { ...challenge, demoCode: "123456" },
+  ])("rejects an invalid production OTP response %j", async (body) => {
+    const calls: Call[] = [];
+    const client = createV2Client({ fetchImpl: stub(calls, () => json(body)) });
+    await expect(client.requestOtp("+919000000000", { idempotencyKey: "otp-1" }))
+      .rejects.toMatchObject({ name: "UnknownOutcomeError", idempotencyKey: "otp-1" });
+    expect(calls).toHaveLength(1);
+  });
+
+  it("rejects an incomplete session after OTP verification", async () => {
+    const calls: Call[] = [];
+    const client = createV2Client({ fetchImpl: stub(calls, () => json({ token: "demo" })) });
+    await expect(client.verifyOtp(id, "123456")).rejects.toBeInstanceOf(UnknownOutcomeError);
+  });
+
+  it("validates the authenticated actor and owned address responses", async () => {
+    const calls: Call[] = [];
+    const client = createV2Client({ fetchImpl: stub(calls, () => json({})) });
+    await expect(client.me()).rejects.toBeTruthy();
+    await expect(client.createAddress({
+      label: "Home", line1: "Synthetic address", city: "Bengaluru",
+      postalCode: "560038", coordinates: { lat: 12.97, lng: 77.64 },
+    })).rejects.toBeInstanceOf(UnknownOutcomeError);
+  });
+
+  it("does not send an invalid phone number", async () => {
+    const calls: Call[] = [];
+    const client = createV2Client({ fetchImpl: stub(calls, () => json(challenge)) });
+    await expect(async () => client.requestOtp("123")).rejects.toBeTruthy();
+    expect(calls).toHaveLength(0);
+  });
+});
+
+describe("v2 canonical endpoints", () => {
+  const cases: Array<{
+    name: string;
+    method: string;
+    path: string;
+    invoke: (client: ReturnType<typeof createV2Client>) => Promise<unknown>;
+  }> = [
+    { name: "logout", method: "POST", path: "/identity/logout", invoke: c => c.logout() },
+    { name: "ops queue", method: "GET", path: "/ops/orders/queue", invoke: c => c.listOpsOrders() },
+    { name: "finalize", method: "POST", path: `/media/${id}/finalize`, invoke: c => c.finalizeUpload(id) },
+    { name: "download", method: "POST", path: `/media/${id}/download`, invoke: c => c.getDownloadUrl(id) },
+    { name: "handover", method: "POST", path: "/rider/handovers", invoke: c => c.recordHandover(id, {}) },
+    { name: "location", method: "POST", path: "/rider/location", invoke: c => c.reportLocation(id, {}) },
+    { name: "manual payment", method: "POST", path: `/ops/billing/obligations/${id}/confirm-manual`, invoke: c => c.confirmManualPayment(id, {}) },
+    { name: "reconciliation", method: "POST", path: "/ops/billing/reconciliation", invoke: c => c.reconciliation("2026-10") },
+    { name: "moderation", method: "POST", path: `/ops/reviews/${id}/moderation`, invoke: c => c.moderateReview(id, {}) },
+    { name: "dead letters", method: "GET", path: "/ops/jobs/dead-letter", invoke: c => c.listDeadLetters() },
+    { name: "exception", method: "POST", path: `/ops/orders/${id}/exceptions/resolve`, invoke: c => c.resolveException(id, {}, 1) },
+    { name: "rewash", method: "POST", path: `/incidents/${id}/rewash-requests`, invoke: c => c.requestRewash(id, {}) },
+    { name: "incident", method: "POST", path: `/orders/${id}/incidents`, invoke: c => c.createIncident({ orderId: id }) },
+    { name: "public reviews", method: "GET", path: `/reviews?serviceId=${id}`, invoke: c => c.listPublicReviews(id) },
+  ];
+
+  it.each(cases)("uses the canonical $name endpoint", async ({ method, path, invoke }) => {
+    const calls: Call[] = [];
+    const client = createV2Client({
+      baseUrl: "https://api.test/v2/",
+      fetchImpl: stub(calls, () => json(errorEnvelope, 409)),
+    });
+    await expect(invoke(client)).rejects.toBeInstanceOf(V2ApiError);
+    expect(calls).toHaveLength(1);
+    expect(calls[0].url).toBe(`https://api.test/v2${path}`);
+    expect(calls[0].init.method).toBe(method);
+  });
+});
+
+describe("v2 request and response boundaries", () => {
+  const actor = { id, role: "CUSTOMER", facilityIds: [], scope: { facilityIds: [] } };
+  const session = {
+    sessionId: id, accessToken: "test-access", refreshToken: "test-refresh",
+    expiresAt: "2026-10-22T09:00:00.000Z", actor,
+  };
+
+  it("returns validated sessions and sends the refresh credential explicitly", async () => {
+    const calls: Call[] = [];
+    const client = createV2Client({ fetchImpl: stub(calls, () => json(session)) });
+    expect(await client.verifyOtp(id, "123456")).toMatchObject(session);
+    expect(await client.refreshSession("test-refresh")).toMatchObject(session);
+    expect(JSON.parse(String(calls[1].init.body))).toEqual({ refreshToken: "test-refresh" });
+    expect(calls[1].url.endsWith("/identity/session/refresh")).toBe(true);
+  });
+
+  it("sends the expected address version on deletion", async () => {
+    const calls: Call[] = [];
+    const client = createV2Client({ fetchImpl: stub(calls, () => json({ id, deleted: true })) });
+    expect(await client.deleteAddress(id, 3)).toEqual({ id, deleted: true });
+    expect(calls[0].init.method).toBe("DELETE");
+    expect(JSON.parse(String(calls[0].init.body))).toEqual({ expectedVersion: 3 });
+  });
+
+  it("sends one flat adjustment decision", async () => {
+    const calls: Call[] = [];
+    const client = createV2Client({ fetchImpl: stub(calls, () => json(errorEnvelope, 409)) });
+    await expect(client.decideAdjustment(id, id, 2, "ACCEPT")).rejects.toBeInstanceOf(V2ApiError);
+    expect(calls[0].url.endsWith(`/orders/${id}/adjustments/decision`)).toBe(true);
+    expect(JSON.parse(String(calls[0].init.body))).toEqual({
+      adjustmentId: id, adjustmentVersion: 2, decision: "ACCEPT",
+    });
+  });
+
+  it("sends a review intent without requiring server-owned fields", async () => {
+    const calls: Call[] = [];
+    const client = createV2Client({ fetchImpl: stub(calls, () => json(errorEnvelope, 409)) });
+    const input = { orderId: id, expectedVersion: 4, overall: 5, mediaIds: [], publishConsent: true };
+    await expect(client.createReview(input)).rejects.toBeInstanceOf(V2ApiError);
+    expect(calls[0].url.endsWith(`/orders/${id}/reviews`)).toBe(true);
+    expect(JSON.parse(String(calls[0].init.body))).toEqual(input);
+    const forgedInput = { ...input, publication: "PUBLISHED" };
+    await expect(async () => client.createReview(forgedInput))
+      .rejects.toBeTruthy();
+    expect(calls).toHaveLength(1);
+  });
+
+  it("keeps rider job IDs in commands whose paths no longer contain them", async () => {
+    const calls: Call[] = [];
+    const client = createV2Client({ fetchImpl: stub(calls, () => json(errorEnvelope, 409)) });
+    await expect(client.recordHandover(id, { jobId: "wrong", proofId: "test" })).rejects.toBeInstanceOf(V2ApiError);
+    await expect(client.reportLocation(id, { jobId: "wrong", lat: 12, lng: 77 })).rejects.toBeInstanceOf(V2ApiError);
+    expect(JSON.parse(String(calls[0].init.body))).toEqual({ jobId: id, proofId: "test" });
+    expect(JSON.parse(String(calls[1].init.body))).toEqual({ jobId: id, lat: 12, lng: 77 });
+  });
+
+  it("sends reconciliation as an explicit keyed command", async () => {
+    const calls: Call[] = [];
+    const client = createV2Client({ fetchImpl: stub(calls, () => json(errorEnvelope, 409)) });
+    await expect(client.reconciliation("2026-10", { idempotencyKey: "reconcile-oct" })).rejects.toBeInstanceOf(V2ApiError);
+    expect(JSON.parse(String(calls[0].init.body))).toEqual({ period: "2026-10" });
+    expect(calls[0].init.headers).toMatchObject({ "Idempotency-Key": "reconcile-oct" });
+  });
+
+  it("preserves cursor metadata on paginated lists", async () => {
+    const calls: Call[] = [];
+    const page = { items: [], pageInfo: { hasMore: true, nextCursor: "next-test-page" } };
+    const client = createV2Client({ fetchImpl: stub(calls, () => json(page)) });
+    for (const read of [
+      () => client.listOrders(), () => client.listObligations(),
+      () => client.listReceipts(id), () => client.listRefunds(),
+      () => client.listIncidents(), () => client.listIncidentMessages(id),
+      () => client.listPublicReviews(id), () => client.listOpsOrders(),
+    ]) {
+      expect(await read()).toEqual(page);
+    }
+  });
+
+  it("reads a billing summary instead of parsing it as an obligation", async () => {
+    const calls: Call[] = [];
+    const summary = {
+      orderId: id, obligationStatus: "OPEN", amountDueMinor: 15000,
+      amountSettledMinor: 0, currency: "INR", receipts: [], refunds: [],
+      dueAt: "2026-10-22T09:00:00.000Z",
+    };
+    const client = createV2Client({ fetchImpl: stub(calls, () => json(summary)) });
+    expect(await client.getObligation(id)).toMatchObject(summary);
   });
 });

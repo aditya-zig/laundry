@@ -34,6 +34,7 @@ export const routeRegistrySchema = z
   .array(routeEntrySchema)
   .superRefine((routes: z.infer<typeof routeEntrySchema>[], ctx) => {
     const seen = new Set<string>();
+    const ids = new Set<string>();
     routes.forEach((route, index) => {
       const key = `${route.method} ${route.path}`;
       if (seen.has(key)) {
@@ -44,6 +45,10 @@ export const routeRegistrySchema = z
         });
       }
       seen.add(key);
+      if (ids.has(route.id)) {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, path: [index, "id"], message: "Route IDs must be unique." });
+      }
+      ids.add(route.id);
     });
   });
 export type RouteRegistry = z.infer<typeof routeRegistrySchema>;
@@ -69,15 +74,16 @@ type RouteDefinition = {
   status: "PUBLISHED" | "DRAFT";
 };
 
-function route(definition: RouteDefinition): RouteEntry {
-  return routeEntrySchema.parse({
+function route<Id extends string>(definition: RouteDefinition & { id: Id }): RouteEntry & { id: Id } {
+  const parsed = routeEntrySchema.parse({
     ...definition,
     roles: [...definition.roles],
     errorCodes: [...definition.errorCodes],
   });
+  return { ...parsed, id: definition.id };
 }
 
-export const ROUTE_REGISTRY: RouteRegistry = [
+export const ROUTE_REGISTRY = [
   route({ id: "identity.otp.request", method: "POST", path: "/v2/identity/otp", summary: "Request a sign-in OTP", requestSchema: "OtpRequest", responseSchema: "OtpChallenge", roles: publicRoles, idempotency: "REQUIRED", errorCodes: ["INVALID_INPUT", "RATE_LIMITED"], ownerTask: "B01", status: "PUBLISHED" }),
   route({ id: "identity.otp.verify", method: "POST", path: "/v2/identity/otp/verify", summary: "Verify a sign-in OTP", requestSchema: "OtpVerify", responseSchema: "Session", roles: publicRoles, idempotency: "REQUIRED", errorCodes: ["INVALID_INPUT", "UNAUTHENTICATED"], ownerTask: "B01", status: "PUBLISHED" }),
   route({ id: "identity.session.refresh", method: "POST", path: "/v2/identity/session/refresh", summary: "Refresh a session", requestSchema: "SessionRefresh", responseSchema: "Session", roles: publicRoles, idempotency: "REQUIRED", errorCodes: ["UNAUTHENTICATED"], ownerTask: "B01", status: "PUBLISHED" }),
@@ -89,7 +95,7 @@ export const ROUTE_REGISTRY: RouteRegistry = [
   route({ id: "identity.address.create", method: "POST", path: "/v2/identity/addresses", summary: "Create a customer address", requestSchema: "AddressInput", responseSchema: "Address", roles: customer, idempotency: "REQUIRED", errorCodes: ["INVALID_INPUT"], ownerTask: "B01", status: "PUBLISHED" }),
   route({ id: "identity.address.list", method: "GET", path: "/v2/identity/addresses", summary: "List owned addresses", responseSchema: "AddressList", roles: customer, idempotency: "NOT_APPLICABLE", errorCodes: ["UNAUTHENTICATED"], ownerTask: "B01", status: "PUBLISHED" }),
   route({ id: "identity.address.update", method: "PATCH", path: "/v2/identity/addresses/{addressId}", summary: "Update an owned address", requestSchema: "AddressUpdate", responseSchema: "Address", roles: customer, idempotency: "REQUIRED", errorCodes: ["NOT_FOUND", "VERSION_CONFLICT"], ownerTask: "B01", status: "PUBLISHED" }),
-  route({ id: "identity.address.delete", method: "DELETE", path: "/v2/identity/addresses/{addressId}", summary: "Delete an owned address", responseSchema: "DeleteResult", roles: customer, idempotency: "REQUIRED", errorCodes: ["NOT_FOUND", "VERSION_CONFLICT"], ownerTask: "B01", status: "PUBLISHED" }),
+  route({ id: "identity.address.delete", method: "DELETE", path: "/v2/identity/addresses/{addressId}", summary: "Delete an owned address", requestSchema: "AddressDelete", responseSchema: "DeleteResult", roles: customer, idempotency: "REQUIRED", errorCodes: ["NOT_FOUND", "VERSION_CONFLICT"], ownerTask: "B01", status: "PUBLISHED" }),
   route({ id: "identity.whatsapp.link", method: "POST", path: "/v2/identity/whatsapp/link", summary: "Link a verified WhatsApp number", requestSchema: "WhatsAppLink", responseSchema: "WhatsAppLinkResult", roles: customer, idempotency: "REQUIRED", errorCodes: ["UNAUTHENTICATED", "VERSION_CONFLICT"], ownerTask: "B01", status: "PUBLISHED" }),
 
 route({ id: "catalog.services.list", method: "GET", path: "/v2/catalog/services", summary: "List public services", responseSchema: "ServiceList", roles: publicRoles, idempotency: "NOT_APPLICABLE", errorCodes: ["INVALID_INPUT"], ownerTask: "B02", status: "PUBLISHED" }),
@@ -171,6 +177,29 @@ route({ id: "jobs.dead-letter.list", method: "GET", path: "/v2/ops/jobs/dead-let
   route({ id: "billing.receipts.list", method: "GET", path: "/v2/billing/obligations/{obligationId}/receipts", summary: "List the receipts of one obligation", responseSchema: "ReceiptPage", roles: customer, idempotency: "NOT_APPLICABLE", errorCodes: ["UNAUTHENTICATED", "NOT_FOUND"], ownerTask: "B05", status: "PUBLISHED" }),
   route({ id: "billing.refunds.list", method: "GET", path: "/v2/billing/refunds", summary: "List the refunds of the signed in customer", responseSchema: "RefundPage", roles: customer, idempotency: "NOT_APPLICABLE", errorCodes: ["UNAUTHENTICATED", "INVALID_INPUT"], ownerTask: "B05", status: "PUBLISHED" }),
   route({ id: "logistics.tracking.read", method: "GET", path: "/v2/logistics/tracking/{orderId}", summary: "Read the customer tracking view of one order", responseSchema: "CustomerTracking", roles: customer, idempotency: "NOT_APPLICABLE", errorCodes: ["UNAUTHENTICATED", "NOT_FOUND"], ownerTask: "B06", status: "PUBLISHED" }),
-];
+  route({ id: "orders.custody-receipt", method: "GET", path: "/v2/orders/{orderId}/custody-receipt", summary: "Read the owned order custody receipt", responseSchema: "CustodyReceipt", roles: customer, idempotency: "NOT_APPLICABLE", errorCodes: ["NOT_FOUND", "FORBIDDEN"], ownerTask: "B06", status: "PUBLISHED" }),
+  route({ id: "support.incidents.messages.list", method: "GET", path: "/v2/incidents/{incidentId}/messages", summary: "Read authorized incident messages", responseSchema: "IncidentMessagePage", roles: [...customer, ...staff], idempotency: "NOT_APPLICABLE", errorCodes: ["NOT_FOUND", "FORBIDDEN"], ownerTask: "B08", status: "PUBLISHED" }),
+  route({ id: "reviews.eligibility", method: "GET", path: "/v2/reviews/eligibility/{orderId}", summary: "Read review eligibility for an owned order", responseSchema: "ReviewEligibility", roles: customer, idempotency: "NOT_APPLICABLE", errorCodes: ["NOT_FOUND", "FORBIDDEN"], ownerTask: "B08", status: "PUBLISHED" }),
+] satisfies RouteRegistry;
+
+export type RouteOperationId = typeof ROUTE_REGISTRY[number]["id"];
 
 routeRegistrySchema.parse(ROUTE_REGISTRY);
+
+/** Resolve a registry operation without allowing unresolved or unused path parameters. */
+export function resolveRoute(id: string, params: Record<string, string> = {}): RouteEntry {
+  const entry = ROUTE_REGISTRY.find(route => route.id === id);
+  if (!entry) throw new Error(`Unknown route ID: ${id}`);
+  const used = new Set<string>();
+  const path = entry.path.replace(/\{([^}]+)\}/g, (_, key: string) => {
+    if (!Object.hasOwn(params, key)) throw new Error(`Missing route parameter: ${key}`);
+    const value = params[key];
+    if (!value || value === "." || value === "..") throw new Error(`Invalid route parameter: ${key}`);
+    used.add(key);
+    return encodeURIComponent(value);
+  });
+  for (const key of Object.keys(params)) {
+    if (!used.has(key)) throw new Error(`Unused route parameter: ${key}`);
+  }
+  return { ...entry, path };
+}

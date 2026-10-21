@@ -1,5 +1,17 @@
 import { z } from "zod";
-import { idSchema, instantSchema } from "./common.js";
+import { expectedVersionSchema, idSchema, instantSchema } from "./common.js";
+
+export const reviewInputSchema = z.object({
+  orderId: idSchema,
+  expectedVersion: expectedVersionSchema,
+  overall: z.number().int().min(1).max(5),
+  serviceScore: z.number().int().min(1).max(5).optional(),
+  deliveryScore: z.number().int().min(1).max(5).optional(),
+  comment: z.string().trim().max(5000).optional(),
+  mediaIds: z.array(idSchema),
+  publishConsent: z.boolean(),
+}).strict();
+export type ReviewInput = z.infer<typeof reviewInputSchema>;
 
 export const reviewPublicationSchema = z.enum([
   "PENDING",

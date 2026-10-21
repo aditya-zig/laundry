@@ -1,9 +1,8 @@
 #!/usr/bin/env python3
-"""Generate the C01 contract inventory from the frozen route registry.
+"""Generate the C01 contract inventory from the current route registry.
 
-The inventory maps every published operation to its schema, its SDK method,
-its owning task, its permission rule and its idempotency rule. It is written
-from the registry so it cannot drift from the code.
+The inventory records declared schema names, ownership and request rules.
+It does not prove executable schema coverage or backend implementation.
 """
 import json
 import os
@@ -44,7 +43,7 @@ lines.append("# C01 contract inventory")
 lines.append("")
 lines.append("Contract target: `laundry-wire-v2.0.0`.")
 lines.append("")
-lines.append("This inventory is generated from the frozen route registry in `packages/contracts/src/v2/routes.ts`, so it cannot drift from the code. Every published operation below has a request schema, a response schema, a permission rule, an idempotency rule, a set of error codes and an owning task.")
+lines.append("C01 is not frozen. This file records declarations generated from `packages/contracts/src/v2/routes.ts`. A schema name does not prove that the schema exists or that a backend implements it. Permission and transaction behavior below are requirements, not acceptance evidence. See `IDENTITY-AND-ROUTING.md` for the latest SDK checks and remaining gaps.")
 lines.append("")
 lines.append(f"Published operations: {len(data['routes'])}.")
 lines.append(f"Event types: {len(data['events'])}.")
@@ -157,5 +156,5 @@ lines.append("")
 dest = sys.argv[1] if len(sys.argv) > 1 else f"{REPO}/docs/implementation/contracts/INVENTORY.md"
 import os
 os.makedirs(os.path.dirname(dest), exist_ok=True)
-open(dest, "w", encoding="utf-8").write("\n".join(lines) + "\n")
+open(dest, "w", encoding="utf-8").write("\n".join(lines).rstrip() + "\n")
 print(f"wrote {dest} with {len(data['routes'])} operations")

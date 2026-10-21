@@ -64,11 +64,6 @@ export class V2ApiError extends Error {
 
 const DEFAULT_BASE = "http://localhost:4100/v2";
 const emptyObjectSchema = z.object({}).passthrough();
-const unknownResponseSchema = z.unknown();
-const stringResponseSchema = z.string();
-const stringArraySchema = z.array(z.string());
-const objectArraySchema = z.array(emptyObjectSchema);
-const booleanResponseSchema = z.boolean();
 
 type Schema<T> = z.ZodType<T>;
 type Query = Record<string, string | number | boolean | undefined>;
@@ -82,10 +77,6 @@ function queryString(query?: Query): string {
   }
   const result = params.toString();
   return result ? `?${result}` : "";
-}
-
-function encodeId(id: string): string {
-  return encodeURIComponent(id);
 }
 
 export function createV2Client(options: V2ClientOptions = {}) {
@@ -184,46 +175,22 @@ export function createV2Client(options: V2ClientOptions = {}) {
     }
   }
 
-function get<T>(path: string, schema: Schema<T>): Promise<T> {
-    return request("GET", path, schema);
-  }
-
-function post<T>(
-    path: string,
-    body: unknown,
+  function call<T>(
+    routeId: v2.RouteOperationId,
     schema: Schema<T>,
-    opts?: V2MutatingOpts,
+    config: {
+      params?: Record<string, string>;
+      query?: Query;
+      body?: unknown;
+      opts?: V2MutatingOpts;
+    } = {},
   ): Promise<T> {
-    return request("POST", path, schema, body, opts);
+    const route = v2.resolveRoute(routeId, config.params);
+    return request(route.method, route.path.slice("/v2".length) + queryString(config.query),
+      schema, config.body, config.opts);
   }
 
-function patch<T>(
-    path: string,
-    body: unknown,
-    schema: Schema<T>,
-    opts?: V2MutatingOpts,
-  ): Promise<T> {
-    return request("PATCH", path, schema, body, opts);
-  }
-
-function put<T>(
-    path: string,
-    body: unknown,
-    schema: Schema<T>,
-    opts?: V2MutatingOpts,
-  ): Promise<T> {
-    return request("PUT", path, schema, body, opts);
-  }
-
-function del<T>(
-    path: string,
-    schema: Schema<T>,
-    opts?: V2MutatingOpts,
-  ): Promise<T> {
-    return request("DELETE", path, schema, undefined, opts);
-  }
-
-const order = v2.orderSchema;
+  const order = v2.orderSchema;
   const quote = v2.quoteSchema;
   const service = v2.serviceSchema;
   const obligation = v2.obligationSchema;
@@ -233,301 +200,298 @@ const order = v2.orderSchema;
   const tracking = v2.customerTrackingSchema;
   const incident = v2.incidentSchema;
   const review = v2.reviewSchema;
-  const addressSchema = emptyObjectSchema;
-  const sessionSchema = emptyObjectSchema;
-  const otpRequestSchema = emptyObjectSchema;
   const uploadIntentResult = v2.uploadIntentResultSchema;
   const mediaDownload = v2.mediaDownloadSchema;
   const custodyReceipt = v2.custodyReceiptSchema;
   const timeline = z.array(v2.orderTimelineEventSchema);
   const serviceList = z.array(service);
-  const orderList = z.array(order);
-  const obligationList = z.array(obligation);
-  const receiptList = z.array(receipt);
-  const refundList = z.array(refund);
-  const incidentList = z.array(incident);
-  const reviewList = z.array(v2.publicReviewSchema);
+  const orderList = v2.pageSchema(order);
+  const obligationList = v2.pageSchema(obligation);
+  const receiptList = v2.pageSchema(receipt);
+  const refundList = v2.pageSchema(refund);
+  const incidentList = v2.pageSchema(incident);
+  const reviewList = v2.pageSchema(v2.publicReviewSchema);
   const jobList = z.array(riderJob);
   const genericObject = emptyObjectSchema;
 
-return {
+  return {
     requestOtp: (phone: string, opts?: V2MutatingOpts) =>
-      post("/identity/otp", { phone }, otpRequestSchema, opts),
+      call("identity.otp.request", v2.otpChallengeSchema, { body: v2.otpRequestSchema.parse({ phone }), opts }),
 
-verifyOtp: (challengeId: string, code: string, opts?: V2MutatingOpts) =>
-      post("/identity/otp/verify", { challengeId, code }, sessionSchema, opts),
+    verifyOtp: (challengeId: string, code: string, opts?: V2MutatingOpts) =>
+      call("identity.otp.verify", v2.sessionSchema, { body: v2.otpVerifySchema.parse({ challengeId, code }), opts }),
 
-refreshSession: (opts?: V2MutatingOpts) =>
-      post("/identity/session/refresh", {}, sessionSchema, opts),
+    refreshSession: (refreshToken: string, opts?: V2MutatingOpts) =>
+      call("identity.session.refresh", v2.sessionSchema, { body: v2.sessionRefreshSchema.parse({ refreshToken }), opts }),
 
-logout: (opts?: V2MutatingOpts) =>
-      post("/identity/session/logout", {}, genericObject, opts),
+    logout: (opts?: V2MutatingOpts) =>
+      call("identity.logout", v2.logoutResultSchema, { opts }),
 
-me: () => get("/identity/me", genericObject),
+    revokeSession: (sessionId: string, opts?: V2MutatingOpts) =>
+      call("identity.revoke", v2.sessionRevocationSchema, { params: { sessionId }, opts }),
 
-listAddresses: () => get("/identity/addresses", z.array(addressSchema)),
+    me: () => call("identity.me", v2.actorSchema),
 
-createAddress: (input: Input, opts?: V2MutatingOpts) =>
-      post("/identity/addresses", input, addressSchema, opts),
+    listAddresses: () => call("identity.address.list", z.array(v2.addressSchema)),
 
-updateAddress: (
+    createAddress: (input: v2.AddressInput, opts?: V2MutatingOpts) =>
+      call("identity.address.create", v2.addressSchema, { body: v2.addressInputSchema.parse(input), opts }),
+
+    updateAddress: (
       id: string,
-      input: Input,
+      input: v2.AddressInput,
       expectedVersion: number,
       opts?: V2MutatingOpts,
     ) =>
-      patch(`/identity/addresses/${encodeId(id)}`, {
+      call("identity.address.update", v2.addressSchema, { params: { addressId: id }, body: v2.addressUpdateSchema.parse({
         ...input,
         expectedVersion,
-      }, addressSchema, opts),
+      }), opts }),
 
-deleteAddress: (id: string, opts?: V2MutatingOpts) =>
-      del(`/identity/addresses/${encodeId(id)}`, genericObject, opts),
+    deleteAddress: (id: string, expectedVersion: number, opts?: V2MutatingOpts) =>
+      call("identity.address.delete", v2.deleteResultSchema, { params: { addressId: id }, body: v2.addressDeleteSchema.parse({ expectedVersion }), opts }),
 
-listServices: () => get("/catalog/services", serviceList),
+    listServices: () => call("catalog.services.list", serviceList),
 
-getService: (id: string) =>
-      get(`/catalog/services/${encodeId(id)}`, service),
+    getService: (id: string) =>
+      call("catalog.services.detail", service, { params: { serviceId: id } }),
 
-checkServiceArea: () =>
-      get("/availability/area", genericObject),
+    checkServiceArea: (postalCode: string) =>
+      call("availability.area", v2.serviceAreaSchema, { params: { postalCode } }),
 
-listSlots: (input: Query) =>
-      get(`/availability/slots${queryString(input)}`, genericObject),
+    listSlots: (input: Query) =>
+      call("availability.slots", genericObject, { query: input }),
 
-createQuote: (input: v2.QuoteInput, opts?: V2MutatingOpts) =>
-      post("/orders/quote", v2.quoteInputSchema.parse(input), quote, opts),
+    createQuote: (input: v2.QuoteInput, opts?: V2MutatingOpts) =>
+      call("orders.quote", quote, { body: v2.quoteInputSchema.parse(input), opts }),
 
-bookOrder: (input: v2.BookingInput, opts?: V2MutatingOpts) =>
-      post("/orders", v2.bookingInputSchema.parse(input), order, opts),
+    bookOrder: (input: v2.BookingInput, opts?: V2MutatingOpts) =>
+      call("orders.book", order, { body: v2.bookingInputSchema.parse(input), opts }),
 
-listOrders: (query?: Query) =>
-      get(`/orders${queryString(query)}`, orderList),
+    listOrders: (query?: Query) => call("orders.list", orderList, { query }),
 
-getOrder: (id: string) =>
-      get(`/orders/${encodeId(id)}`, order),
+    getOrder: (id: string) => call("orders.detail", order, { params: { orderId: id } }),
 
-getOrderTimeline: (id: string) =>
-      get(`/orders/${encodeId(id)}/timeline`, timeline),
+    getOrderTimeline: (id: string) => call("orders.timeline", timeline, { params: { orderId: id } }),
 
-cancelOrder: (
+    cancelOrder: (
       id: string,
       reason: string,
       expectedVersion: number,
       opts?: V2MutatingOpts,
     ) =>
-      post(`/orders/${encodeId(id)}/cancel`, {
+      call("orders.cancel", order, { params: { orderId: id }, body: {
         reason,
         expectedVersion,
-      }, order, opts),
+      }, opts }),
 
-rescheduleOrder: (
+    rescheduleOrder: (
       id: string,
       window: v2.ScheduleWindow,
       expectedVersion: number,
       opts?: V2MutatingOpts,
     ) =>
-      post(`/orders/${encodeId(id)}/reschedule`, {
+      call("orders.reschedule", order, { params: { orderId: id }, body: {
         window,
         expectedVersion,
-      }, order, opts),
+      }, opts }),
 
-decideAdjustment: (
+    decideAdjustment: (
       id: string,
       adjustmentId: string,
       adjustmentVersion: number,
-      decision: v2.AdjustmentDecision,
+      decision: v2.AdjustmentDecision["decision"],
       opts?: V2MutatingOpts,
     ) =>
-      post(`/orders/${encodeId(id)}/adjustment-decision`, {
+      call("orders.adjustment.decide", order, { params: { orderId: id }, body: v2.adjustmentDecisionSchema.parse({
         adjustmentId,
         adjustmentVersion,
         decision,
-      }, order, opts),
+      }), opts }),
 
-getCustodyReceipt: (id: string) =>
-      get(`/orders/${encodeId(id)}/custody-receipt`, custodyReceipt),
+    getCustodyReceipt: (id: string) =>
+      call("orders.custody-receipt", custodyReceipt, { params: { orderId: id } }),
 
-listObligations: (query?: Query) =>
-      get(`/billing/obligations${queryString(query)}`, obligationList),
+    listObligations: (query?: Query) =>
+      call("billing.obligations.list", obligationList, { query }),
 
-getObligation: (id: string) =>
-      get(`/billing/obligations/${encodeId(id)}`, obligation),
+    getObligation: (id: string) =>
+      call("billing.obligation.read", v2.billingSummarySchema, { params: { obligationId: id } }),
 
-listReceipts: (obligationId: string) =>
-      get(`/billing/obligations/${encodeId(obligationId)}/receipts`, receiptList),
+    listReceipts: (obligationId: string) =>
+      call("billing.receipts.list", receiptList, { params: { obligationId } }),
 
-listRefunds: (query?: Query) =>
-      get(`/billing/refunds${queryString(query)}`, refundList),
+    listRefunds: (query?: Query) =>
+      call("billing.refunds.list", refundList, { query }),
 
-getTracking: (orderId: string) =>
-      get(`/logistics/tracking/${encodeId(orderId)}`, tracking),
+    getTracking: (orderId: string) =>
+      call("logistics.tracking.read", tracking, { params: { orderId } }),
 
-createUploadIntent: (input: v2.UploadIntent, opts?: V2MutatingOpts) =>
-      post("/media/upload-intents", v2.uploadIntentSchema.parse(input), uploadIntentResult, opts),
+    createUploadIntent: (input: v2.UploadIntent, opts?: V2MutatingOpts) =>
+      call("media.upload.intent", uploadIntentResult, { body: v2.uploadIntentSchema.parse(input), opts }),
 
-finalizeUpload: (uploadId: string, opts?: V2MutatingOpts) =>
-      post(`/media/uploads/${encodeId(uploadId)}/finalize`, {}, genericObject, opts),
+    finalizeUpload: (uploadId: string, opts?: V2MutatingOpts) =>
+      call("media.upload.finalize", v2.mediaReferenceSchema, { params: { mediaId: uploadId }, opts }),
 
-getDownloadUrl: (mediaId: string) =>
-      get(`/media/${encodeId(mediaId)}/download`, mediaDownload),
+    getDownloadUrl: (mediaId: string, opts?: V2MutatingOpts) =>
+      call("media.download", mediaDownload, { params: { mediaId }, opts }),
 
-listIncidents: () =>
-      get("/incidents", incidentList),
+    listIncidents: () =>
+      call("support.incidents.list", incidentList),
 
-createIncident: (input: Input, opts?: V2MutatingOpts) =>
-      post("/incidents", input, incident, opts),
+    createIncident: (input: Input, opts?: V2MutatingOpts) =>
+      call("support.incidents.create", incident, { params: { orderId: v2.idSchema.parse(input.orderId) }, body: input, opts }),
 
-listIncidentMessages: (incidentId: string) =>
-      get(`/incidents/${encodeId(incidentId)}/messages`, z.array(v2.incidentMessageSchema)),
+    listIncidentMessages: (incidentId: string) =>
+      call("support.incidents.messages.list", v2.pageSchema(v2.incidentMessageSchema), { params: { incidentId } }),
 
-postIncidentMessage: (
+    postIncidentMessage: (
       incidentId: string,
       input: Input,
       opts?: V2MutatingOpts,
     ) =>
-      post(`/incidents/${encodeId(incidentId)}/messages`, input, v2.incidentMessageSchema, opts),
+      call("support.incidents.messages", v2.incidentMessageSchema, { params: { incidentId }, body: input, opts }),
 
-requestRewash: (
+    requestRewash: (
       incidentId: string,
       input: Input,
       opts?: V2MutatingOpts,
     ) =>
-      post(`/incidents/${encodeId(incidentId)}/rewash`, input, v2.rewashRequestSchema, opts),
+      call("support.rewash.create", v2.rewashRequestSchema, { params: { incidentId }, body: input, opts }),
 
-createReview: (input: v2.Review, opts?: V2MutatingOpts) =>
-      post("/reviews", v2.reviewSchema.parse(input), review, opts),
+    createReview: (input: v2.ReviewInput, opts?: V2MutatingOpts) =>
+      call("reviews.create", review, { params: { orderId: input.orderId }, body: v2.reviewInputSchema.parse(input), opts }),
 
-getReviewEligibility: (orderId: string) =>
-      get(`/reviews/eligibility/${encodeId(orderId)}`, v2.reviewEligibilitySchema),
+    getReviewEligibility: (orderId: string) =>
+      call("reviews.eligibility", v2.reviewEligibilitySchema, { params: { orderId } }),
 
-listPublicReviews: (serviceId: string, query?: Query) =>
-      get(`/reviews/services/${encodeId(serviceId)}${queryString(query)}`, reviewList),
+    listPublicReviews: (serviceId: string, query?: Query) =>
+      call("reviews.public", reviewList, { query: { ...query, serviceId } }),
 
-listJobs: () =>
-      get("/rider/jobs", jobList),
+    listJobs: () =>
+      call("logistics.rider.jobs", jobList),
 
-getJob: (id: string) =>
-      get(`/rider/jobs/${encodeId(id)}`, riderJob),
+    getJob: (id: string) =>
+      call("logistics.rider.job", riderJob, { params: { jobId: id } }),
 
-acceptJob: (id: string, opts?: V2MutatingOpts) =>
-      post(`/rider/jobs/${encodeId(id)}/accept`, {}, riderJob, opts),
+    acceptJob: (id: string, opts?: V2MutatingOpts) =>
+      call("logistics.rider.accept", v2.assignmentSchema, { params: { jobId: id }, opts }),
 
-recordHandover: (
+    recordHandover: (
       jobId: string,
       input: Input,
       opts?: V2MutatingOpts,
     ) =>
-      post(`/rider/jobs/${encodeId(jobId)}/handover`, input, v2.handoverResultSchema, opts),
+      call("logistics.rider.handover", v2.handoverResultSchema, { body: { ...input, jobId }, opts }),
 
-reportJobException: (
+    reportJobException: (
       id: string,
       input: Input,
       opts?: V2MutatingOpts,
     ) =>
-      post(`/rider/jobs/${encodeId(id)}/exception`, input, riderJob, opts),
+      call("logistics.rider.exception", v2.legAttemptSchema, { params: { jobId: id }, body: input, opts }),
 
-reportLocation: (
+    reportLocation: (
       id: string,
       input: Input,
       opts?: V2MutatingOpts,
     ) =>
-      post(`/rider/jobs/${encodeId(id)}/location`, input, v2.locationReportSchema, opts),
+      call("logistics.rider.location", v2.locationSchema, { body: { ...input, jobId: id }, opts }),
 
-listOpsOrders: (query?: Query) =>
-      get(`/ops/orders${queryString(query)}`, orderList),
+    listOpsOrders: (query?: Query) =>
+      call("orders.ops.queue", orderList, { query }),
 
-recordIntake: (
+    recordIntake: (
       id: string,
       input: Input,
       expectedVersion: number,
       opts?: V2MutatingOpts,
     ) =>
-      post(`/ops/orders/${encodeId(id)}/intake`, {
+      call("orders.ops.intake", order, { params: { orderId: id }, body: {
         ...input,
         expectedVersion,
-      }, order, opts),
+      }, opts }),
 
-advanceCare: (
+    advanceCare: (
       id: string,
       target: v2.OrderStatus,
       expectedVersion: number,
       opts?: V2MutatingOpts,
     ) =>
-      post(`/ops/orders/${encodeId(id)}/care`, {
+      call("orders.ops.care", order, { params: { orderId: id }, body: {
         target,
         expectedVersion,
-      }, order, opts),
+      }, opts }),
 
-recordQualityCheck: (
+    recordQualityCheck: (
       id: string,
       input: Input,
       expectedVersion: number,
       opts?: V2MutatingOpts,
     ) =>
-      post(`/ops/orders/${encodeId(id)}/quality-check`, {
+      call("orders.ops.qc", order, { params: { orderId: id }, body: {
         ...input,
         expectedVersion,
-      }, order, opts),
+      }, opts }),
 
-holdOrder: (
+    holdOrder: (
       id: string,
       reason: string,
       expectedVersion: number,
       opts?: V2MutatingOpts,
     ) =>
-      post(`/ops/orders/${encodeId(id)}/hold`, {
+      call("orders.ops.hold", order, { params: { orderId: id }, body: {
         reason,
         expectedVersion,
-      }, order, opts),
+      }, opts }),
 
-resolveException: (
+    resolveException: (
       id: string,
       input: Input,
       expectedVersion: number,
       opts?: V2MutatingOpts,
     ) =>
-      post(`/ops/orders/${encodeId(id)}/resolve-exception`, {
+      call("orders.ops.exception", order, { params: { orderId: id }, body: {
         ...input,
         expectedVersion,
-      }, order, opts),
+      }, opts }),
 
-confirmManualPayment: (
+    confirmManualPayment: (
       obligationId: string,
       input: Input,
       opts?: V2MutatingOpts,
     ) =>
-      post(`/ops/billing/obligations/${encodeId(obligationId)}/confirm-manual-payment`, input, obligation, opts),
+      call("billing.manual.confirm", receipt, { params: { obligationId }, body: input, opts }),
 
-createRefund: (input: Input, opts?: V2MutatingOpts) =>
-      post("/ops/billing/refunds", input, refund, opts),
+    createRefund: (input: Input, opts?: V2MutatingOpts) =>
+      call("billing.refund.create", refund, { body: input, opts }),
 
-reconciliation: (period: string) =>
-      get(`/ops/billing/reconciliation${queryString({ period })}`, v2.reconciliationSchema),
+    reconciliation: (period: string, opts?: V2MutatingOpts) =>
+      call("billing.reconcile", v2.reconciliationSchema, { body: { period }, opts }),
 
-assignDelivery: (input: Input, opts?: V2MutatingOpts) =>
-      post("/ops/logistics/assignments", input, v2.assignmentSchema, opts),
+    assignDelivery: (input: Input, opts?: V2MutatingOpts) =>
+      call("logistics.ops.assign", v2.assignmentSchema, { body: input, opts }),
 
-reassignDelivery: (id: string, input: Input, opts?: V2MutatingOpts) =>
-      post(`/ops/logistics/assignments/${encodeId(id)}/reassign`, input, v2.assignmentSchema, opts),
+    reassignDelivery: (id: string, input: Input, opts?: V2MutatingOpts) =>
+      call("logistics.ops.reassign", v2.assignmentSchema, { params: { assignmentId: id }, body: input, opts }),
 
-cancelLeg: (id: string, input: Input, opts?: V2MutatingOpts) =>
-      post(`/ops/logistics/legs/${encodeId(id)}/cancel`, input, v2.legSchema, opts),
+    cancelLeg: (id: string, input: Input, opts?: V2MutatingOpts) =>
+      call("logistics.ops.cancel", v2.legAttemptSchema, { params: { legAttemptId: id }, body: input, opts }),
 
-resolveIncident: (id: string, input: Input, opts?: V2MutatingOpts) =>
-      post(`/ops/incidents/${encodeId(id)}/resolve`, input, v2.incidentResolutionSchema, opts),
+    resolveIncident: (id: string, input: Input, opts?: V2MutatingOpts) =>
+      call("support.incidents.resolve", incident, { params: { incidentId: id }, body: input, opts }),
 
-moderateReview: (id: string, input: Input, opts?: V2MutatingOpts) =>
-      post(`/ops/reviews/${encodeId(id)}/moderate`, input, v2.reviewModerationSchema, opts),
+    moderateReview: (id: string, input: Input, opts?: V2MutatingOpts) =>
+      call("reviews.moderate", review, { params: { reviewId: id }, body: input, opts }),
 
-listDeadLetters: (query?: Query) =>
-      get(`/ops/jobs/dead-letters${queryString(query)}`, objectArraySchema),
+    listDeadLetters: (query?: Query) =>
+      call("jobs.dead-letter.list", v2.pageSchema(emptyObjectSchema), { query }),
 
-replayJob: (id: string, opts?: V2MutatingOpts) =>
-      post(`/ops/jobs/${encodeId(id)}/replay`, {}, genericObject, opts),
+    replayJob: (id: string, opts?: V2MutatingOpts) =>
+      call("jobs.replay", genericObject, { params: { jobId: id }, opts }),
 
-jobHealth: () =>
-      get("/ops/jobs/health", genericObject),
+    jobHealth: () =>
+      call("jobs.health", genericObject),
   };
 }
 

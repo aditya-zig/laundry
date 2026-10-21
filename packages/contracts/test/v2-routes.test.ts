@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { errorCodeSchema, errorHttpStatus } from "../src/v2/common.js";
-import { ROUTE_REGISTRY, routeRegistrySchema } from "../src/v2/routes.js";
+import { ROUTE_REGISTRY, resolveRoute, routeRegistrySchema } from "../src/v2/routes.js";
 import { eventTypeSchema } from "../src/v2/events.js";
 import { serviceCodeSchema } from "../src/v2/catalog.js";
 
@@ -14,6 +14,33 @@ describe("v2 route registry", () => {
   it("has no duplicate method and path pair", () => {
     const keys = ROUTE_REGISTRY.map((r) => `${r.method} ${r.path}`);
     expect(new Set(keys).size).toBe(keys.length);
+  });
+
+  it("rejects duplicate operation IDs even on different paths", () => {
+    expect(routeRegistrySchema.safeParse([
+      ROUTE_REGISTRY[0], { ...ROUTE_REGISTRY[1], id: ROUTE_REGISTRY[0].id },
+    ]).success).toBe(false);
+  });
+
+  it("resolves each operation with encoded parameters", () => {
+    for (const route of ROUTE_REGISTRY) {
+      const names = [...route.path.matchAll(/\{([^}]+)\}/g)].map(match => match[1]);
+      const params = Object.fromEntries(names.map(name => [name, "id/with ?#"]));
+      const resolved = resolveRoute(route.id, params);
+      expect(resolved.method).toBe(route.method);
+      expect(resolved.path).toBe(route.path.replace(/\{[^}]+\}/g, "id%2Fwith%20%3F%23"));
+      expect(route.path).not.toContain("%2F");
+    }
+  });
+
+  it("rejects unknown operations and missing, extra or traversal parameters", () => {
+    expect(() => resolveRoute("does.not.exist")).toThrow("Unknown route ID");
+    expect(() => resolveRoute("orders.detail")).toThrow("Missing route parameter");
+    expect(() => resolveRoute("orders.detail", { orderId: "x", other: "y" })).toThrow("Unused route parameter");
+    for (const orderId of ["", ".", ".."]) {
+      expect(() => resolveRoute("orders.detail", { orderId })).toThrow("Invalid route parameter");
+    }
+    expect(() => resolveRoute("orders.detail", Object.create({ orderId: "x" }))).toThrow("Missing route parameter");
   });
 
   it("gives every route a response schema, a role and an error code", () => {

@@ -2,9 +2,9 @@
 
 Contract target: `laundry-wire-v2.0.0`.
 
-This inventory is generated from the frozen route registry in `packages/contracts/src/v2/routes.ts`, so it cannot drift from the code. Every published operation below has a request schema, a response schema, a permission rule, an idempotency rule, a set of error codes and an owning task.
+C01 is not frozen. This file records declarations generated from `packages/contracts/src/v2/routes.ts`. A schema name does not prove that the schema exists or that a backend implements it. Permission and transaction behavior below are requirements, not acceptance evidence. See `IDENTITY-AND-ROUTING.md` for the latest SDK checks and remaining gaps.
 
-Published operations: 81.
+Published operations: 84.
 Event types: 10.
 Error codes: 17.
 Service codes: 4.
@@ -41,7 +41,7 @@ Billing units: 2.
 | `POST` | `/v2/identity/addresses` | `AddressInput` | `Address` | CUSTOMER | REQUIRED | INVALID_INPUT |
 | `GET` | `/v2/identity/addresses` | - | `AddressList` | CUSTOMER | NOT_APPLICABLE | UNAUTHENTICATED |
 | `PATCH` | `/v2/identity/addresses/{addressId}` | `AddressUpdate` | `Address` | CUSTOMER | REQUIRED | NOT_FOUND, VERSION_CONFLICT |
-| `DELETE` | `/v2/identity/addresses/{addressId}` | - | `DeleteResult` | CUSTOMER | REQUIRED | NOT_FOUND, VERSION_CONFLICT |
+| `DELETE` | `/v2/identity/addresses/{addressId}` | `AddressDelete` | `DeleteResult` | CUSTOMER | REQUIRED | NOT_FOUND, VERSION_CONFLICT |
 | `POST` | `/v2/identity/whatsapp/link` | `WhatsAppLink` | `WhatsAppLinkResult` | CUSTOMER | REQUIRED | UNAUTHENTICATED, VERSION_CONFLICT |
 
 ### B02
@@ -120,6 +120,7 @@ Billing units: 2.
 | `POST` | `/v2/ops/logistics/legs/{legAttemptId}/cancel` | `LegCancellation` | `LegAttempt` | OPERATOR, ADMIN | REQUIRED | VERSION_CONFLICT, FORBIDDEN |
 | `POST` | `/v2/webhooks/logistics/{provider}` | `LogisticsWebhook` | `WebhookResult` | ADMIN | REQUIRED | UNAUTHENTICATED, INVALID_INPUT |
 | `GET` | `/v2/logistics/tracking/{orderId}` | - | `CustomerTracking` | CUSTOMER | NOT_APPLICABLE | UNAUTHENTICATED, NOT_FOUND |
+| `GET` | `/v2/orders/{orderId}/custody-receipt` | - | `CustodyReceipt` | CUSTOMER | NOT_APPLICABLE | NOT_FOUND, FORBIDDEN |
 
 ### B07
 
@@ -139,6 +140,8 @@ Billing units: 2.
 | `POST` | `/v2/incidents/{incidentId}/rewash-requests` | `RewashRequestInput` | `RewashRequest` | CUSTOMER | REQUIRED | NOT_FOUND, VERSION_CONFLICT |
 | `POST` | `/v2/ops/reviews/{reviewId}/moderation` | `ReviewModeration` | `Review` | OPERATOR, SUPPORT, ADMIN | REQUIRED | NOT_FOUND, FORBIDDEN, VERSION_CONFLICT |
 | `GET` | `/v2/reviews` | - | `PublicReviewPage` | PUBLIC | NOT_APPLICABLE | INVALID_INPUT |
+| `GET` | `/v2/incidents/{incidentId}/messages` | - | `IncidentMessagePage` | CUSTOMER, OPERATOR, SUPPORT, ADMIN | NOT_APPLICABLE | NOT_FOUND, FORBIDDEN |
+| `GET` | `/v2/reviews/eligibility/{orderId}` | - | `ReviewEligibility` | CUSTOMER | NOT_APPLICABLE | NOT_FOUND, FORBIDDEN |
 
 ### B09
 
