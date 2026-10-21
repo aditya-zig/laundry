@@ -8,29 +8,29 @@ Delivery is cloud task branches plus pushed SHAs, without PRs. One coordinator o
 
 ## Task queue
 
-- [ ] P00: Consolidate source branches and publish a safe cloud integration baseline
-- [ ] R01: Investigate LaundryMate with REA and publish an evidence-backed feature matrix
-- [ ] P01: Prove a reproducible cloud PostgreSQL/browser/evidence environment
-- [ ] C01: Freeze v2 wire contracts, SDK, module ports and migration integration rules
-- [ ] D01: Create the taste-led design system and reference screens for all three apps
-- [ ] B01: Implement production identity, sessions, scoped staff access and owned addresses
-- [ ] B02: Implement all four services, approved rate cards and unified KG/PIECE pricing
-- [ ] B03: Implement service areas, scheduling calendars and atomic capacity reservations
-- [ ] B04: Implement unified booking, intake, adjustments, care and cancellation
-- [ ] B05: Implement due-at-return billing, manual receipts, gateway reconciliation and refunds
-- [ ] B06: Implement assignments, pickup/return custody, handover proof and tracking
-- [ ] B07: Implement private evidence uploads, media access and retention boundaries
-- [ ] B08: Implement incidents, rewash resolution and verified consented reviews
-- [ ] B09: Implement WhatsApp text/voice drafts, exact confirmation and human escalation
-- [ ] B10: Implement durable worker retries, dead letters, privacy jobs and observability
-- [ ] F00: Build shared app foundations, sessions, navigation and frozen route ownership
-- [ ] F01: Redesign customer browse, service selection, bag and booking end to end
-- [ ] F02: Redesign customer order tracking, account, help and verified reviews
-- [ ] F03: Redesign delivery app with real assignments, custody and offline recovery
-- [ ] F04: Redesign operations console for full fulfillment and audited configuration
-- [ ] E01: Verify the integrated product in PostgreSQL and browsers with readable recordings
-- [ ] E02: Build and verify customer and rider Android apps on a cloud runner
-- [ ] E03: Complete production readiness, migration/restore rehearsal and launch handoff
+- [ ] #6 · P00: Consolidate source branches and publish a safe cloud integration baseline
+- [ ] #7 · R01: Investigate LaundryMate with REA and publish an evidence-backed feature matrix
+- [ ] #8 · P01: Prove a reproducible cloud PostgreSQL/browser/evidence environment
+- [ ] #9 · C01: Freeze v2 wire contracts, SDK, module ports and migration integration rules
+- [ ] #10 · D01: Create the taste-led design system and reference screens for all three apps
+- [ ] #11 · B01: Implement production identity, sessions, scoped staff access and owned addresses
+- [ ] #12 · B02: Implement all four services, approved rate cards and unified KG/PIECE pricing
+- [ ] #13 · B03: Implement service areas, scheduling calendars and atomic capacity reservations
+- [ ] #14 · B04: Implement unified booking, intake, adjustments, care and cancellation
+- [ ] #15 · B05: Implement due-at-return billing, manual receipts, gateway reconciliation and refunds
+- [ ] #16 · B06: Implement assignments, pickup/return custody, handover proof and tracking
+- [ ] #17 · B07: Implement private evidence uploads, media access and retention boundaries
+- [ ] #18 · B08: Implement incidents, rewash resolution and verified consented reviews
+- [ ] #19 · B09: Implement WhatsApp text/voice drafts, exact confirmation and human escalation
+- [ ] #20 · B10: Implement durable worker retries, dead letters, privacy jobs and observability
+- [ ] #21 · F00: Build shared app foundations, sessions, navigation and frozen route ownership
+- [ ] #22 · F01: Redesign customer browse, service selection, bag and booking end to end
+- [ ] #23 · F02: Redesign customer order tracking, account, help and verified reviews
+- [ ] #24 · F03: Redesign delivery app with real assignments, custody and offline recovery
+- [ ] #25 · F04: Redesign operations console for full fulfillment and audited configuration
+- [ ] #26 · E01: Verify the integrated product in PostgreSQL and browsers with readable recordings
+- [ ] #27 · E02: Build and verify customer and rider Android apps on a cloud runner
+- [ ] #28 · E03: Complete production readiness, migration/restore rehearsal and launch handoff
 
 ## Milestone acceptance
 

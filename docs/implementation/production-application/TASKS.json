@@ -37,7 +37,11 @@
         "Publish safe integration branch, route map, source receipts and known baseline failures"
       ],
       "legacyPacket": "a0-foundation-and-coordinator.md",
-      "initialState": "READY"
+      "initialState": "READY",
+      "github": {
+        "number": 6,
+        "url": "https://github.com/aditya-zig/laundry/issues/6"
+      }
     },
     {
       "id": "R01",
@@ -67,7 +71,11 @@
         "Deliver original feature matrix, screen/state sketches, uncertainties and prioritized Laundry requirements"
       ],
       "legacyPacket": "a0-foundation-and-coordinator.md",
-      "initialState": "READY"
+      "initialState": "READY",
+      "github": {
+        "number": 7,
+        "url": "https://github.com/aditya-zig/laundry/issues/7"
+      }
     },
     {
       "id": "P01",
@@ -101,7 +109,11 @@
         "Publish exact commands consumed by each later issue; separately identify native runner capability"
       ],
       "legacyPacket": "a0-foundation-and-coordinator.md",
-      "initialState": "BLOCKED_DEPENDENCY"
+      "initialState": "BLOCKED_DEPENDENCY",
+      "github": {
+        "number": 8,
+        "url": "https://github.com/aditya-zig/laundry/issues/8"
+      }
     },
     {
       "id": "C01",
@@ -141,7 +153,11 @@
         "Publish pinned freeze/digest and consumer compile evidence; serialize root changes with P01"
       ],
       "legacyPacket": "a0-foundation-and-coordinator.md",
-      "initialState": "BLOCKED_DEPENDENCY"
+      "initialState": "BLOCKED_DEPENDENCY",
+      "github": {
+        "number": 9,
+        "url": "https://github.com/aditya-zig/laundry/issues/9"
+      }
     },
     {
       "id": "D01",
@@ -177,7 +193,11 @@
         "Publish design version and concrete screen acceptance guidance for F00\u2013F04"
       ],
       "legacyPacket": "a5-customer-mobile-app.md",
-      "initialState": "BLOCKED_DEPENDENCY"
+      "initialState": "BLOCKED_DEPENDENCY",
+      "github": {
+        "number": 10,
+        "url": "https://github.com/aditya-zig/laundry/issues/10"
+      }
     },
     {
       "id": "B01",
@@ -208,7 +228,11 @@
         "Exercise revocation and stale-session recovery through real SDK"
       ],
       "legacyPacket": "a0-foundation-and-coordinator.md",
-      "initialState": "BLOCKED_DEPENDENCY"
+      "initialState": "BLOCKED_DEPENDENCY",
+      "github": {
+        "number": 11,
+        "url": "https://github.com/aditya-zig/laundry/issues/11"
+      }
     },
     {
       "id": "B02",
@@ -240,7 +264,11 @@
         "Seed explicitly synthetic settings and keep missing commercial settings disabled"
       ],
       "legacyPacket": "a1-catalog-and-reviews.md",
-      "initialState": "BLOCKED_DEPENDENCY"
+      "initialState": "BLOCKED_DEPENDENCY",
+      "github": {
+        "number": 12,
+        "url": "https://github.com/aditya-zig/laundry/issues/12"
+      }
     },
     {
       "id": "B03",
@@ -273,7 +301,11 @@
         "Keep real area/turnaround/capacity activation gated on approved settings"
       ],
       "legacyPacket": "a2-orders-and-fulfillment.md",
-      "initialState": "BLOCKED_DEPENDENCY"
+      "initialState": "BLOCKED_DEPENDENCY",
+      "github": {
+        "number": 13,
+        "url": "https://github.com/aditya-zig/laundry/issues/13"
+      }
     },
     {
       "id": "B04",
@@ -311,7 +343,11 @@
         "Expose current permitted actions so UI cannot invent generic status changes"
       ],
       "legacyPacket": "a2-orders-and-fulfillment.md",
-      "initialState": "BLOCKED_DEPENDENCY"
+      "initialState": "BLOCKED_DEPENDENCY",
+      "github": {
+        "number": 14,
+        "url": "https://github.com/aditya-zig/laundry/issues/14"
+      }
     },
     {
       "id": "B05",
@@ -347,7 +383,11 @@
         "Keep unavailable live provider checks blocked; use labeled fake/sandbox evidence"
       ],
       "legacyPacket": "a3-billing-and-reconciliation.md",
-      "initialState": "BLOCKED_DEPENDENCY"
+      "initialState": "BLOCKED_DEPENDENCY",
+      "github": {
+        "number": 15,
+        "url": "https://github.com/aditya-zig/laundry/issues/15"
+      }
     },
     {
       "id": "B06",
@@ -385,7 +425,11 @@
         "Publish offline action deduplication/reassignment behavior and founder exception process"
       ],
       "legacyPacket": "a4-logistics-and-custody.md",
-      "initialState": "BLOCKED_DEPENDENCY"
+      "initialState": "BLOCKED_DEPENDENCY",
+      "github": {
+        "number": 16,
+        "url": "https://github.com/aditya-zig/laundry/issues/16"
+      }
     },
     {
       "id": "B07",
@@ -419,7 +463,11 @@
         "Publish retention/deletion hooks for B10 and deterministic storage-provider tests"
       ],
       "legacyPacket": "a0-foundation-and-coordinator.md",
-      "initialState": "BLOCKED_DEPENDENCY"
+      "initialState": "BLOCKED_DEPENDENCY",
+      "github": {
+        "number": 17,
+        "url": "https://github.com/aditya-zig/laundry/issues/17"
+      }
     },
     {
       "id": "B08",
@@ -456,7 +504,11 @@
         "Publish public empty-review behavior and customer/ops integration examples"
       ],
       "legacyPacket": "a1-catalog-and-reviews.md",
-      "initialState": "BLOCKED_DEPENDENCY"
+      "initialState": "BLOCKED_DEPENDENCY",
+      "github": {
+        "number": 18,
+        "url": "https://github.com/aditya-zig/laundry/issues/18"
+      }
     },
     {
       "id": "B09",
@@ -495,7 +547,11 @@
         "Implement consent, readable summaries, human handoff and retention integration"
       ],
       "legacyPacket": "a8-whatsapp-voice-and-text.md",
-      "initialState": "BLOCKED_DEPENDENCY"
+      "initialState": "BLOCKED_DEPENDENCY",
+      "github": {
+        "number": 19,
+        "url": "https://github.com/aditya-zig/laundry/issues/19"
+      }
     },
     {
       "id": "B10",
@@ -533,7 +589,11 @@
         "Publish operational health/alerts and clean shutdown/crash recovery evidence"
       ],
       "legacyPacket": "a0-foundation-and-coordinator.md",
-      "initialState": "BLOCKED_DEPENDENCY"
+      "initialState": "BLOCKED_DEPENDENCY",
+      "github": {
+        "number": 20,
+        "url": "https://github.com/aditya-zig/laundry/issues/20"
+      }
     },
     {
       "id": "F00",
@@ -573,7 +633,11 @@
         "Freeze layouts/root store APIs; publish examples and transition ownership to screen workers"
       ],
       "legacyPacket": "a5-customer-mobile-app.md",
-      "initialState": "BLOCKED_DEPENDENCY"
+      "initialState": "BLOCKED_DEPENDENCY",
+      "github": {
+        "number": 21,
+        "url": "https://github.com/aditya-zig/laundry/issues/21"
+      }
     },
     {
       "id": "F01",
@@ -614,7 +678,11 @@
         "Complete booking with immutable quote, current terms and SDK retry reconciliation"
       ],
       "legacyPacket": "a5-customer-mobile-app.md",
-      "initialState": "BLOCKED_DEPENDENCY"
+      "initialState": "BLOCKED_DEPENDENCY",
+      "github": {
+        "number": 22,
+        "url": "https://github.com/aditya-zig/laundry/issues/22"
+      }
     },
     {
       "id": "F02",
@@ -659,7 +727,11 @@
         "Implement eligible review consent/moderation states and keyboard/screen-reader checks"
       ],
       "legacyPacket": "a5-customer-mobile-app.md",
-      "initialState": "BLOCKED_DEPENDENCY"
+      "initialState": "BLOCKED_DEPENDENCY",
+      "github": {
+        "number": 23,
+        "url": "https://github.com/aditya-zig/laundry/issues/23"
+      }
     },
     {
       "id": "F03",
@@ -700,7 +772,11 @@
         "Add exceptions/history/profile and native permission recovery paths"
       ],
       "legacyPacket": "a6-partner-mobile-app.md",
-      "initialState": "BLOCKED_DEPENDENCY"
+      "initialState": "BLOCKED_DEPENDENCY",
+      "github": {
+        "number": 24,
+        "url": "https://github.com/aditya-zig/laundry/issues/24"
+      }
     },
     {
       "id": "F04",
@@ -744,7 +820,11 @@
         "Build approved catalog/areas/capacity and restricted jobs/access views; avoid fake dashboards"
       ],
       "legacyPacket": "a7-operations-console.md",
-      "initialState": "BLOCKED_DEPENDENCY"
+      "initialState": "BLOCKED_DEPENDENCY",
+      "github": {
+        "number": 25,
+        "url": "https://github.com/aditya-zig/laundry/issues/25"
+      }
     },
     {
       "id": "E01",
@@ -790,7 +870,11 @@
         "Report defects to owning tasks and reverify repaired candidate; do not mask failures or call simulator live"
       ],
       "legacyPacket": "a9-cross-system-acceptance.md",
-      "initialState": "BLOCKED_DEPENDENCY"
+      "initialState": "BLOCKED_DEPENDENCY",
+      "github": {
+        "number": 26,
+        "url": "https://github.com/aditya-zig/laundry/issues/26"
+      }
     },
     {
       "id": "E02",
@@ -831,7 +915,11 @@
         "Publish accessible build/video/log evidence and unsupported capabilities honestly"
       ],
       "legacyPacket": "a6-partner-mobile-app.md",
-      "initialState": "BLOCKED_DEPENDENCY"
+      "initialState": "BLOCKED_DEPENDENCY",
+      "github": {
+        "number": 27,
+        "url": "https://github.com/aditya-zig/laundry/issues/27"
+      }
     },
     {
       "id": "E03",
@@ -866,7 +954,15 @@
         "Publish launch checklist with green/blocked gates and exact evidence; do not claim launch while inputs are missing"
       ],
       "legacyPacket": "a9-cross-system-acceptance.md",
-      "initialState": "BLOCKED_DEPENDENCY"
+      "initialState": "BLOCKED_DEPENDENCY",
+      "github": {
+        "number": 28,
+        "url": "https://github.com/aditya-zig/laundry/issues/28"
+      }
     }
-  ]
+  ],
+  "epic": {
+    "number": 5,
+    "url": "https://github.com/aditya-zig/laundry/issues/5"
+  }
 }
