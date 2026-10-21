@@ -22,3 +22,6 @@ __pycache__/
 
 # Local skill clones are install caches, not product code.
 .taste-skill-tmp/
+
+# Linked worktrees of this repo, checked out as sibling dirs of the main checkout.
+.worktrees/
