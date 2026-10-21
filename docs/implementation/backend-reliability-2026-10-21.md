@@ -67,8 +67,21 @@ preparation, not an actual merge or a connected customer UI.
 
 Full workspace `pnpm test`: 118 tests passed, including 62 API tests.
 `pnpm check` and `pnpm build`: passed. Logs and exit-code files are in ignored
-`.verification/backend-handoff/`. Further browser evidence and follow-up checks
-are recorded below after execution.
+`.verification/backend-handoff/`. Convex check, 23 voice tests and 7 tooling tests also passed.
+
+Recorded browser run `20261021102045` passed at tested revision `9737cd2`,
+including API restart persistence. Paid order
+`d0dbdfe1-2997-4c26-9b2a-d9c5cc598a1c` finished DELIVERED/PAID/36000 minor INR;
+held order `63fd80d8-e766-4e3d-a8cc-a3d8a25d629c` finished
+DELIVERED/UNPAID/0 after an agreed unprocessed return. Tracking was closed;
+no unexpected JavaScript console errors were reported. The manifest, video,
+trace and screenshots are in ignored `.verification/pilot/`. Previous evidence
+was preserved under `.verification/backend-handoff/previous-pilot/`.
+The shared T3 browser also opened the current backend console on port 5176.
+
+Latest UI composition check used `69f56cf` and backend `9737cd2`, produced
+a conflict-free trial tree, and passed offline frozen-lock validation. No
+branch was merged; this documentation follow-up changes no application code.
 
 Two local reviews examined Standards/security and Spec/consumer coverage.
 No blocking findings remained; the reviewer independently ran all 18 transport

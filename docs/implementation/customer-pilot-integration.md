@@ -20,6 +20,9 @@ CI=true pnpm install --frozen-lockfile --ignore-scripts --lockfile-only --offlin
 ```
 
 The export lives in ignored `.verification/integration-prep/composition`.
+A second trial combined backend `9737cd2` with the UI agent's newer `69f56cf`:
+conflict-free tree `3a9c612fa48b40aa93e288bd891e8ca30b7f7f6b` also passed
+the same offline frozen-lock check. The UI branch itself was left untouched.
 This proves dependency-manifest consistency at those two revisions; it does
 not prove the apps use the same order flow. Recheck composition against the
 UI agent's final commit. No branch merge was performed.
