@@ -1,0 +1,872 @@
+{
+  "planVersion": "1.0",
+  "contractTarget": "laundry-wire-v2.0.0",
+  "contractFreezeSha": null,
+  "contractDigest": null,
+  "integrationBaselineSha": null,
+  "cloudEnvironment": null,
+  "designFreeze": null,
+  "note": "Planning queue only. Null fields must be populated and verified by coordinator before feature dispatch. Runtime integration dependency cycles permit parallel work; hard start blockers are acyclic.",
+  "tasks": [
+    {
+      "id": "P00",
+      "title": "Consolidate source branches and publish a safe cloud integration baseline",
+      "role": "coordinator",
+      "startBlockers": [],
+      "integrationDependencies": [],
+      "writeAllowlist": [
+        "Root manifests/lockfile and integration configuration",
+        "Existing source files needed to reconcile the three pinned refs",
+        "docs/implementation/baseline/**"
+      ],
+      "interfaces": [
+        "Published integration SHA and per-path ownership map",
+        "Preserved v1 garment + kilogram behavior, canonical @laundry namespace",
+        "CI path that never deploys production on task pushes"
+      ],
+      "acceptance": [
+        "Fetch and compare all three published source SHAs listed in IMPLEMENTATION.md",
+        "Frozen install/build/check and existing PostgreSQL baseline suites report actual exits",
+        "Existing garment and kilogram flows remain distinguishable and migration-safe",
+        "A cloud task branch push cannot trigger production deployment"
+      ],
+      "steps": [
+        "Inventory each branch and capture merge/namespace decisions with behavior provenance",
+        "Integrate compatible changes without deleting existing functionality; resolve duplicate module/route ownership",
+        "Document Convex vs PostgreSQL authority and preserve historical data/adapters; no silent second source of truth",
+        "Publish safe integration branch, route map, source receipts and known baseline failures"
+      ],
+      "legacyPacket": "a0-foundation-and-coordinator.md",
+      "initialState": "READY"
+    },
+    {
+      "id": "R01",
+      "title": "Investigate LaundryMate with REA and publish an evidence-backed feature matrix",
+      "role": "research",
+      "startBlockers": [],
+      "integrationDependencies": [],
+      "writeAllowlist": [
+        "docs/research/laundrymate/**",
+        "tools/research/laundrymate/**"
+      ],
+      "interfaces": [
+        "Public screen/route/state inventory with provenance",
+        "Reference-to-Laundry requirements and original design recommendations",
+        "Pinned REA cloud setup and reproducible static-analysis recipe"
+      ],
+      "acceptance": [
+        "REA setup/doctor plus direct MCP initialization and tool listing succeed in a fresh cloud task",
+        "Every feature claim has observed UI/static evidence/inference/unknown classification",
+        "Four-service navigation, pricing, sign-in, membership and offer claims link to dated sources",
+        "Native/authenticated/backend unknowns remain explicitly unknown; no competitor account actions"
+      ],
+      "steps": [
+        "Read installed REA skill; pin version and inspect setup effects before installing in the cloud",
+        "Capture official public pages and shipped artifacts with timestamps and hashes; keep raw artifacts outside git",
+        "Use REA static tools on downloaded client bundles; inspect native artifact only if legitimately supplied and tooling works",
+        "Deliver original feature matrix, screen/state sketches, uncertainties and prioritized Laundry requirements"
+      ],
+      "legacyPacket": "a0-foundation-and-coordinator.md",
+      "initialState": "READY"
+    },
+    {
+      "id": "P01",
+      "title": "Prove a reproducible cloud PostgreSQL/browser/evidence environment",
+      "role": "coordinator",
+      "startBlockers": [
+        "P00"
+      ],
+      "integrationDependencies": [],
+      "writeAllowlist": [
+        "Root scripts/manifests/lockfile/CI/environment infrastructure",
+        "tools/cloud/**",
+        "docs/implementation/cloud/**",
+        "Coordinator-owned test harness infrastructure"
+      ],
+      "interfaces": [
+        "Published cloud environment/version and fresh-task preflight",
+        "Canonical module, acceptance, browser, artifact and shutdown commands",
+        "Isolated PostgreSQL test context compatible with C01 ports"
+      ],
+      "acceptance": [
+        "A brand-new cloud job installs from frozen lockfile and starts real PostgreSQL without assuming Docker nesting",
+        "Migrations/seed/API boot/browser interaction run with recorded process exits",
+        "Artifact upload/download and ffprobe checks work; another authorized reviewer can open the original",
+        "Task databases/ports are isolated and process cleanup leaves peers running"
+      ],
+      "steps": [
+        "Publish environment setup and allowlisted network/runtime dependencies without credentials in git",
+        "Implement job-local PostgreSQL fallback and task-scoped lifecycle scripts; fail on missing required suites",
+        "Prove one real browser action plus high-quality video export in fresh task; record metadata",
+        "Publish exact commands consumed by each later issue; separately identify native runner capability"
+      ],
+      "legacyPacket": "a0-foundation-and-coordinator.md",
+      "initialState": "BLOCKED_DEPENDENCY"
+    },
+    {
+      "id": "C01",
+      "title": "Freeze v2 wire contracts, SDK, module ports and migration integration rules",
+      "role": "coordinator",
+      "startBlockers": [
+        "P00"
+      ],
+      "integrationDependencies": [
+        "P01",
+        "R01"
+      ],
+      "writeAllowlist": [
+        "packages/contracts/**",
+        "packages/api-client/**",
+        "packages/test-fixtures/**",
+        "Coordinator-owned API composition/shared infrastructure/legacy bridges",
+        "modules/schema/migrations/**",
+        "docs/implementation/contracts/**"
+      ],
+      "interfaces": [
+        "CONTRACTS-V2.md executable inventory, version/digest and v1 compatibility adapters",
+        "Typed registries, transaction/audit/idempotency/outbox ports and PostgreSQL test context",
+        "SDK methods for every customer/rider/ops workflow"
+      ],
+      "acceptance": [
+        "Offset +05:30 quote input round-trips and midnight preserves intended local date",
+        "All four service codes, KG/PIECE/mixed quantities and INR integers validate correctly",
+        "Every route/event has permission/error/idempotency schemas and fixtures",
+        "Existing v1 client scenarios retain historical order/payment semantics",
+        "All three app foundations and backend skeletons compile against frozen interfaces"
+      ],
+      "steps": [
+        "Encode the entire CONTRACTS-V2.md inventory and complete transition tables",
+        "Publish SDK typed errors and retry/unknown-outcome handling; prevent new-key retries",
+        "Implement shared transaction and registration boundaries; establish ordered migration/proposal handling",
+        "Publish pinned freeze/digest and consumer compile evidence; serialize root changes with P01"
+      ],
+      "legacyPacket": "a0-foundation-and-coordinator.md",
+      "initialState": "BLOCKED_DEPENDENCY"
+    },
+    {
+      "id": "D01",
+      "title": "Create the taste-led design system and reference screens for all three apps",
+      "role": "design",
+      "startBlockers": [
+        "P00"
+      ],
+      "integrationDependencies": [
+        "R01",
+        "C01"
+      ],
+      "writeAllowlist": [
+        "packages/design-tokens/**",
+        "packages/ui/**",
+        "docs/design/production/**"
+      ],
+      "interfaces": [
+        "Versioned design freeze, licensed typography/assets and shared web/native controls",
+        "Reference customer booking/tracking, rider handover and ops intake/queue screens",
+        "State/copy/accessibility specifications and custody receipt pattern"
+      ],
+      "acceptance": [
+        "Run committed taste skill and preserve direction/seed rationale against actual product context",
+        "Reference screens cover loading/empty/error/offline/permission/approval/payment states",
+        "390/768/1440 layouts, 44px targets, contrast, focus and font scaling are inspected",
+        "Real fonts load in web/native; asset licenses are recorded and no competitor artwork is copied"
+      ],
+      "steps": [
+        "Use Framed sheet direction and navy/teal tokens as starting evidence; refine with R01 findings",
+        "Build reusable semantic controls and custody receipt with consistent quantities/money",
+        "Render screen references using frozen SDK fixture shapes; document app-specific density and navigation",
+        "Publish design version and concrete screen acceptance guidance for F00\u2013F04"
+      ],
+      "legacyPacket": "a5-customer-mobile-app.md",
+      "initialState": "BLOCKED_DEPENDENCY"
+    },
+    {
+      "id": "B01",
+      "title": "Implement production identity, sessions, scoped staff access and owned addresses",
+      "role": "backend",
+      "startBlockers": [
+        "P01",
+        "C01"
+      ],
+      "integrationDependencies": [],
+      "writeAllowlist": [
+        "modules/identity/**",
+        "apps/api/src/features/identity/**"
+      ],
+      "interfaces": [
+        "Identity/Access port; OTP and MFA provider ports; session/address APIs"
+      ],
+      "acceptance": [
+        "OTP attempts/expiry/rate limits reject replay and brute-force cases",
+        "Refresh rotation detects replay; logout/revocation invalidates stale app sessions",
+        "Customer cannot access another address/order; rider/facility cannot choose scopes",
+        "Production boot refuses demo login and missing identity-provider configuration"
+      ],
+      "steps": [
+        "Add hashed challenge/session persistence and provider interfaces",
+        "Implement invitations, staff roles/facility membership and MFA lifecycle",
+        "Enforce ownership and secure verified WhatsApp account linking",
+        "Exercise revocation and stale-session recovery through real SDK"
+      ],
+      "legacyPacket": "a0-foundation-and-coordinator.md",
+      "initialState": "BLOCKED_DEPENDENCY"
+    },
+    {
+      "id": "B02",
+      "title": "Implement all four services, approved rate cards and unified KG/PIECE pricing",
+      "role": "backend",
+      "startBlockers": [
+        "P01",
+        "C01"
+      ],
+      "integrationDependencies": [],
+      "writeAllowlist": [
+        "modules/catalog/**",
+        "modules/pricing/**",
+        "apps/api/src/features/catalog/**"
+      ],
+      "interfaces": [
+        "Catalog/Pricing ports; versioned rate snapshots; public and scoped ops catalog APIs"
+      ],
+      "acceptance": [
+        "Unapproved/inactive service cannot quote in production",
+        "KG increments/minimums and PIECE totals use integer arithmetic with explicit rounding",
+        "Mixed basket preserves per-line units and immutable rate/tax/fee snapshots",
+        "Unsupported care/garment combinations fail clearly; catalog edits do not rewrite existing quotes"
+      ],
+      "steps": [
+        "Implement four service codes, garment eligibility, licensed asset metadata and tiers",
+        "Implement immutable rate publication/approval/activation with audit",
+        "Calculate authoritative component totals and provisional designation",
+        "Seed explicitly synthetic settings and keep missing commercial settings disabled"
+      ],
+      "legacyPacket": "a1-catalog-and-reviews.md",
+      "initialState": "BLOCKED_DEPENDENCY"
+    },
+    {
+      "id": "B03",
+      "title": "Implement service areas, scheduling calendars and atomic capacity reservations",
+      "role": "backend",
+      "startBlockers": [
+        "P01",
+        "C01"
+      ],
+      "integrationDependencies": [
+        "B02"
+      ],
+      "writeAllowlist": [
+        "modules/availability/**",
+        "apps/api/src/features/availability/**"
+      ],
+      "interfaces": [
+        "Availability port; area check/slot APIs; atomic hold/reserve/release"
+      ],
+      "acceptance": [
+        "Two concurrent final-slot bookings produce exactly one reservation",
+        "Expired/released hold returns capacity once across worker restart",
+        "IST midnight, cutoff/weekend/overnight and invalid-window cases use correct date",
+        "Mixed-service return honors slowest care time; unavailable requested deadline offers explicit alternative"
+      ],
+      "steps": [
+        "Implement configured polygons/calendars/cutoffs and facility resource buckets",
+        "Publish server-generated pickup/return pairs and expiring holds",
+        "Implement transaction-aware reservation, reschedule and cancellation release",
+        "Keep real area/turnaround/capacity activation gated on approved settings"
+      ],
+      "legacyPacket": "a2-orders-and-fulfillment.md",
+      "initialState": "BLOCKED_DEPENDENCY"
+    },
+    {
+      "id": "B04",
+      "title": "Implement unified booking, intake, adjustments, care and cancellation",
+      "role": "backend",
+      "startBlockers": [
+        "P01",
+        "C01"
+      ],
+      "integrationDependencies": [
+        "B01",
+        "B02",
+        "B03",
+        "B05",
+        "B06"
+      ],
+      "writeAllowlist": [
+        "modules/orders/**",
+        "apps/api/src/features/orders/**"
+      ],
+      "interfaces": [
+        "Orders port; quotes/bookings/timelines; ops intake/care/QC commands"
+      ],
+      "acceptance": [
+        "Duplicate booking intent creates one order/obligation/reservation after timeout retry",
+        "Expired quote/stale order version cannot mutate current state",
+        "Higher measured amount blocks care until exact adjustment acceptance",
+        "Decline/no response enters hold and agreed return; lower-weight policy never invents a charge",
+        "Pickup cannot deliver order; cancellation/reschedule reconciles logistics/capacity and preserves history"
+      ],
+      "steps": [
+        "Unify garment/kg quote snapshots and preserve legacy IDs/receipts through migration",
+        "Implement guarded order commands with atomic audit/idempotency/outbox",
+        "Add measured inventory, price-consent, care/QC and exception workflows",
+        "Expose current permitted actions so UI cannot invent generic status changes"
+      ],
+      "legacyPacket": "a2-orders-and-fulfillment.md",
+      "initialState": "BLOCKED_DEPENDENCY"
+    },
+    {
+      "id": "B05",
+      "title": "Implement due-at-return billing, manual receipts, gateway reconciliation and refunds",
+      "role": "backend",
+      "startBlockers": [
+        "P01",
+        "C01"
+      ],
+      "integrationDependencies": [
+        "B01",
+        "B04",
+        "B10"
+      ],
+      "writeAllowlist": [
+        "modules/billing/**",
+        "apps/api/src/features/billing/**"
+      ],
+      "interfaces": [
+        "Billing port; obligation/attempt/receipt/refund APIs; signed payment webhook adapter"
+      ],
+      "acceptance": [
+        "Duplicate webhook/event/key changes money ledger once, including replay after cache expiry",
+        "Late capture after timeout/failed view reconciles received funds",
+        "Manual cash/UPI confirmation is scoped/audited and never mislabeled gateway capture",
+        "Refund retry cannot exceed captured balance; concurrent attempts/overpayments reconcile",
+        "Unpaid attempted return stays unresolved; agreed zero-due return does not fabricate payment"
+      ],
+      "steps": [
+        "Persist obligations, immutable receipts/captures and independent provider attempts",
+        "Implement founder-authorized manual payment and cash reconciliation workflow",
+        "Add gateway/refund ports and raw-body signed callbacks with stable external references",
+        "Keep unavailable live provider checks blocked; use labeled fake/sandbox evidence"
+      ],
+      "legacyPacket": "a3-billing-and-reconciliation.md",
+      "initialState": "BLOCKED_DEPENDENCY"
+    },
+    {
+      "id": "B06",
+      "title": "Implement assignments, pickup/return custody, handover proof and tracking",
+      "role": "backend",
+      "startBlockers": [
+        "P01",
+        "C01"
+      ],
+      "integrationDependencies": [
+        "B01",
+        "B04",
+        "B05",
+        "B07",
+        "B10"
+      ],
+      "writeAllowlist": [
+        "modules/logistics/**",
+        "apps/api/src/features/logistics/**"
+      ],
+      "interfaces": [
+        "Logistics port; assigned job APIs; scoped dispatch and provider callbacks"
+      ],
+      "acceptance": [
+        "List/detail visibility agrees for unassigned vs assigned jobs",
+        "Reassigned rider cannot read/write old job or sync queued handover",
+        "Wrong/expired/reissued code fails without leaking expected code",
+        "Pickup and return custody preserve bag/count/condition history; one active leg attempt",
+        "Provider timeout reconciles before rebooking; stale location never appears live"
+      ],
+      "steps": [
+        "Implement separate leg/attempt/assignment and container custody persistence",
+        "Implement scoped list/detail/handover/exception commands with code hashing and limits",
+        "Add source/time-qualified location and provider tracking capabilities",
+        "Publish offline action deduplication/reassignment behavior and founder exception process"
+      ],
+      "legacyPacket": "a4-logistics-and-custody.md",
+      "initialState": "BLOCKED_DEPENDENCY"
+    },
+    {
+      "id": "B07",
+      "title": "Implement private evidence uploads, media access and retention boundaries",
+      "role": "backend",
+      "startBlockers": [
+        "P01",
+        "C01"
+      ],
+      "integrationDependencies": [
+        "B01",
+        "B10"
+      ],
+      "writeAllowlist": [
+        "modules/media/**",
+        "apps/api/src/features/media/**"
+      ],
+      "interfaces": [
+        "Media port; upload/finalize/download APIs; retention/delete hooks"
+      ],
+      "acceptance": [
+        "Cross-owner/rider/facility proof reads return no private data",
+        "Oversized/MIME-mismatched/unfinished uploads cannot become accepted evidence",
+        "Signed URL expiration and object ownership checks work with private storage",
+        "Deletion is idempotent and covers orphaned/failed uploads; public catalog assets remain separate"
+      ],
+      "steps": [
+        "Implement metadata and storage adapter with Laundry-owned environment configuration",
+        "Validate upload intent, stored object MIME/size and authorized finalization",
+        "Implement private short-lived reads and scoped proof/audio ownership",
+        "Publish retention/deletion hooks for B10 and deterministic storage-provider tests"
+      ],
+      "legacyPacket": "a0-foundation-and-coordinator.md",
+      "initialState": "BLOCKED_DEPENDENCY"
+    },
+    {
+      "id": "B08",
+      "title": "Implement incidents, rewash resolution and verified consented reviews",
+      "role": "backend",
+      "startBlockers": [
+        "P01",
+        "C01"
+      ],
+      "integrationDependencies": [
+        "B01",
+        "B04",
+        "B07",
+        "B10"
+      ],
+      "writeAllowlist": [
+        "modules/support/**",
+        "modules/reviews/**",
+        "apps/api/src/features/support/**"
+      ],
+      "interfaces": [
+        "Support/Reviews ports; incidents/messages/rewash and moderation APIs"
+      ],
+      "acceptance": [
+        "Only owner of delivered order can submit one verified review",
+        "Unconsented/unapproved media and moderated content stay unpublished",
+        "Incident requires explicit audited resolution; rewash never silently completes original order",
+        "Customer/staff cross-scope reads fail; duplicate incident/review mutation replays once"
+      ],
+      "steps": [
+        "Implement incident messages/evidence, assignment and explicit resolution/rewash commands",
+        "Project review eligibility from canonical delivery events idempotently",
+        "Implement score/comment/media validation, consent and audited moderation",
+        "Publish public empty-review behavior and customer/ops integration examples"
+      ],
+      "legacyPacket": "a1-catalog-and-reviews.md",
+      "initialState": "BLOCKED_DEPENDENCY"
+    },
+    {
+      "id": "B09",
+      "title": "Implement WhatsApp text/voice drafts, exact confirmation and human escalation",
+      "role": "backend",
+      "startBlockers": [
+        "P01",
+        "C01"
+      ],
+      "integrationDependencies": [
+        "B01",
+        "B02",
+        "B03",
+        "B04",
+        "B07",
+        "B10"
+      ],
+      "writeAllowlist": [
+        "modules/conversations/**",
+        "apps/api/src/features/conversations/**"
+      ],
+      "interfaces": [
+        "Conversation/Speech/NotificationTransport ports; verified inbound webhooks and current-draft confirmation"
+      ],
+      "acceptance": [
+        "Repeated signed inbound event or confirm produces one booking",
+        "Old draft revision/quote/expiry cannot confirm changed terms",
+        "Ambiguous quantity/date/service prompts clarification and never invents price/availability",
+        "Claimed phone identity cannot disclose saved addresses; opt-out/template rules hold",
+        "Failed transcription and queued audio obey retention; untrusted text cannot execute arbitrary tools"
+      ],
+      "steps": [
+        "Implement provider-neutral signed inbound adapter and durable message/draft revisions",
+        "Extract strict draft fields using deterministic fixtures; vendor speech/model calls remain disabled without authorization",
+        "Bind exact confirmation to quote/revision and booking idempotency",
+        "Implement consent, readable summaries, human handoff and retention integration"
+      ],
+      "legacyPacket": "a8-whatsapp-voice-and-text.md",
+      "initialState": "BLOCKED_DEPENDENCY"
+    },
+    {
+      "id": "B10",
+      "title": "Implement durable worker retries, dead letters, privacy jobs and observability",
+      "role": "backend",
+      "startBlockers": [
+        "P01",
+        "C01"
+      ],
+      "integrationDependencies": [
+        "B03",
+        "B05",
+        "B07",
+        "B09"
+      ],
+      "writeAllowlist": [
+        "modules/jobs/**",
+        "apps/worker/**",
+        "apps/api/src/features/jobs/**"
+      ],
+      "interfaces": [
+        "Jobs infrastructure ports; handler descriptors; scoped health/dead-letter/replay views"
+      ],
+      "acceptance": [
+        "Crash before/after delivery and inbox replay never duplicates business/money effects",
+        "Lease expiry allows recovery without concurrent duplicate job execution",
+        "Backoff exhausts to visible dead letter; authorized replay retains original identity",
+        "Notification outage does not rollback booking; expired holds and media deletion recover after restart",
+        "Logs/metrics redact personal data and distinguish provider unknown outcome from failure"
+      ],
+      "steps": [
+        "Implement worker leases and idempotent dispatch against shared outbox/inbox ports",
+        "Add retry budget, jitter, dead-letter reasons and audited replay",
+        "Register capacity expiry, media/audio cleanup and provider reconciliation jobs through owned descriptors",
+        "Publish operational health/alerts and clean shutdown/crash recovery evidence"
+      ],
+      "legacyPacket": "a0-foundation-and-coordinator.md",
+      "initialState": "BLOCKED_DEPENDENCY"
+    },
+    {
+      "id": "F00",
+      "title": "Build shared app foundations, sessions, navigation and frozen route ownership",
+      "role": "frontend-foundation",
+      "startBlockers": [
+        "P01",
+        "C01",
+        "D01"
+      ],
+      "integrationDependencies": [
+        "B01"
+      ],
+      "writeAllowlist": [
+        "apps/customer/app/_layout.tsx",
+        "apps/partner/app/_layout.tsx",
+        "apps/ops/src/App.tsx",
+        "apps/{customer,partner,ops}/src/foundation/**",
+        "apps/{customer,partner,ops}/src/api.ts",
+        "docs/design/production/route-ownership.md"
+      ],
+      "interfaces": [
+        "SDK/session/accessibility/providers and shell components for all apps",
+        "Versioned route ownership map and feature mount points",
+        "Owned store interfaces separating booking/order/rider/ops state"
+      ],
+      "acceptance": [
+        "Fresh/revoked/expired session restores correct public vs authenticated screen",
+        "Every app uses @laundry/api-client and no private raw-fetch endpoints",
+        "All routes mount with real fonts/tokens; accessible navigation works at target widths",
+        "Logout clears private caches and stale role/facility state"
+      ],
+      "steps": [
+        "Map P00 source routes to exact F01\u2013F04 allowlists before handing off",
+        "Create shared SDK/session/error/unknown-outcome foundation with private-cache invalidation",
+        "Implement D01 app shells and mount points without writing future screen files",
+        "Freeze layouts/root store APIs; publish examples and transition ownership to screen workers"
+      ],
+      "legacyPacket": "a5-customer-mobile-app.md",
+      "initialState": "BLOCKED_DEPENDENCY"
+    },
+    {
+      "id": "F01",
+      "title": "Redesign customer browse, service selection, bag and booking end to end",
+      "role": "frontend-customer-booking",
+      "startBlockers": [
+        "F00"
+      ],
+      "integrationDependencies": [
+        "B01",
+        "B02",
+        "B03",
+        "B04",
+        "B05"
+      ],
+      "writeAllowlist": [
+        "apps/customer/app/index.tsx",
+        "apps/customer/app/services/**",
+        "apps/customer/app/basket.tsx",
+        "apps/customer/app/checkout.tsx",
+        "apps/customer/src/features/booking/**"
+      ],
+      "interfaces": [
+        "Customer browse-to-booking using frozen SDK and design system",
+        "Owned persistent bag/draft and slot-picker behavior"
+      ],
+      "acceptance": [
+        "All four service types support correct kg/piece selection and honest price units",
+        "Bag survives reload/sign-in and reconciles changed/disabled catalog",
+        "IST picker submits valid offsets; expired quote/full slot gives explicit recovery",
+        "Double tap/timeout retry produces one booking with due-at-return summary",
+        "390/768/1440 screens cover real loading/error/empty/unserviceable states"
+      ],
+      "steps": [
+        "Implement photographic service home/details with licensed assets and care rules",
+        "Build typed bag selectors and quantity/custody distinction",
+        "Build owned address and server-driven date/slot selection; no typed ISO input",
+        "Complete booking with immutable quote, current terms and SDK retry reconciliation"
+      ],
+      "legacyPacket": "a5-customer-mobile-app.md",
+      "initialState": "BLOCKED_DEPENDENCY"
+    },
+    {
+      "id": "F02",
+      "title": "Redesign customer order tracking, account, help and verified reviews",
+      "role": "frontend-customer-orders",
+      "startBlockers": [
+        "F00"
+      ],
+      "integrationDependencies": [
+        "B01",
+        "B04",
+        "B05",
+        "B06",
+        "B07",
+        "B08",
+        "B09"
+      ],
+      "writeAllowlist": [
+        "apps/customer/app/orders.tsx",
+        "apps/customer/app/orders/**",
+        "apps/customer/app/account.tsx",
+        "apps/customer/app/help.tsx",
+        "apps/customer/src/features/orders/**",
+        "apps/customer/src/features/account/**",
+        "apps/customer/src/features/support/**"
+      ],
+      "interfaces": [
+        "Order/custody receipt, approval, payment/receipt and support views",
+        "Owned profile/addresses/sessions/reviews flows"
+      ],
+      "acceptance": [
+        "Delivered order never shows pending RETURNING or fabricated live location",
+        "Current adjustment decision and stale-version recovery keep exact quoted terms visible",
+        "Payment pending/failed/manual receipt and zero-due return stay distinct",
+        "Owner-only delivered review succeeds once; no-review state has no fake rating",
+        "Offline/reload/revocation preserves honest last-known state and clears private cache"
+      ],
+      "steps": [
+        "Implement real SDK order list/detail/timeline and custody receipt",
+        "Add adjustment accept/decline, cancel/reschedule and payment/receipt status",
+        "Implement account addresses/session management and incident/rewash help",
+        "Implement eligible review consent/moderation states and keyboard/screen-reader checks"
+      ],
+      "legacyPacket": "a5-customer-mobile-app.md",
+      "initialState": "BLOCKED_DEPENDENCY"
+    },
+    {
+      "id": "F03",
+      "title": "Redesign delivery app with real assignments, custody and offline recovery",
+      "role": "frontend-rider",
+      "startBlockers": [
+        "F00"
+      ],
+      "integrationDependencies": [
+        "B01",
+        "B04",
+        "B05",
+        "B06",
+        "B07"
+      ],
+      "writeAllowlist": [
+        "apps/partner/app/index.tsx",
+        "apps/partner/app/jobs/**",
+        "apps/partner/app/history.tsx",
+        "apps/partner/app/account.tsx",
+        "apps/partner/src/features/**"
+      ],
+      "interfaces": [
+        "Assigned task-first delivery flow through SDK",
+        "Durable offline evidence queue with pending-sync semantics"
+      ],
+      "acceptance": [
+        "List/detail agree; unassigned/revoked tasks expose no private data",
+        "Pickup and return require correct custody and online proof validation",
+        "Offline restart retains queued action identity; reassignment rejects stale sync",
+        "Payment exception escalates without false completion or invented receipt",
+        "Permission-denied camera/location and large fonts remain usable on Android"
+      ],
+      "steps": [
+        "Implement assigned jobs/detail with one next action and navigation handoff",
+        "Implement seals/counts/condition media and code entry without code disclosure",
+        "Persist/retry offline evidence with original action/key and explicit pending state",
+        "Add exceptions/history/profile and native permission recovery paths"
+      ],
+      "legacyPacket": "a6-partner-mobile-app.md",
+      "initialState": "BLOCKED_DEPENDENCY"
+    },
+    {
+      "id": "F04",
+      "title": "Redesign operations console for full fulfillment and audited configuration",
+      "role": "frontend-ops",
+      "startBlockers": [
+        "F00"
+      ],
+      "integrationDependencies": [
+        "B01",
+        "B02",
+        "B03",
+        "B04",
+        "B05",
+        "B06",
+        "B07",
+        "B08",
+        "B09",
+        "B10"
+      ],
+      "writeAllowlist": [
+        "apps/ops/src/features/**",
+        "apps/ops/src/pages/**",
+        "apps/ops/src/styles/**"
+      ],
+      "interfaces": [
+        "Facility-scoped queue/detail workflows and permitted actions through SDK",
+        "Catalog/capacity/access/reconciliation/moderation/replay controls"
+      ],
+      "acceptance": [
+        "Operator/facility/support roles see only allowed orders/actions",
+        "Intake increase cannot start care before customer approval",
+        "Dispatch and failed return payment/custody paths remain unresolved until valid action",
+        "Manual receipt/refund/override records actor/reason/before-after facts",
+        "Empty/error/conflict states work at 768/1440 with keyboard navigation"
+      ],
+      "steps": [
+        "Implement framed-sheet queue with next action and selected-order detail pane",
+        "Build intake/care/QC/dispatch/custody tools with stale-version recovery",
+        "Build payment/refund/cash reconciliation, incidents/reviews and conversations handoff",
+        "Build approved catalog/areas/capacity and restricted jobs/access views; avoid fake dashboards"
+      ],
+      "legacyPacket": "a7-operations-console.md",
+      "initialState": "BLOCKED_DEPENDENCY"
+    },
+    {
+      "id": "E01",
+      "title": "Verify the integrated product in PostgreSQL and browsers with readable recordings",
+      "role": "verification",
+      "startBlockers": [
+        "B01",
+        "B02",
+        "B03",
+        "B04",
+        "B05",
+        "B06",
+        "B07",
+        "B08",
+        "B09",
+        "B10",
+        "F01",
+        "F02",
+        "F03",
+        "F04"
+      ],
+      "integrationDependencies": [],
+      "writeAllowlist": [
+        "integration/**",
+        "tools/verification/**",
+        "docs/implementation/acceptance/**"
+      ],
+      "interfaces": [
+        "Traceable whole-product scenario matrix and evidence manifest on one integrated SHA",
+        "Readable customer/rider/ops videos with underlying API/DB assertions"
+      ],
+      "acceptance": [
+        "All four services and mixed basket complete booking/pickup/intake/consent/care/QC/return/payment/review",
+        "Duplicate webhook/booking, stale versions, final-slot race and cross-role ownership pass",
+        "Code expiry/reissue, reassignment/offline sync, crash/restart and provider unknown outcomes pass",
+        "Conversation revision/confirmation, private media, support and retention paths pass",
+        "ffprobe confirms actual 1080p 30fps original, sampled frames readable and artifact links accessible"
+      ],
+      "steps": [
+        "Build deterministic synthetic scenarios using real SDK/API/PostgreSQL and actual app screens",
+        "Run failure/race/permission suites with persisted money/custody/count assertions",
+        "Record short role-specific runs plus one end-to-end walkthrough; retain original traces",
+        "Report defects to owning tasks and reverify repaired candidate; do not mask failures or call simulator live"
+      ],
+      "legacyPacket": "a9-cross-system-acceptance.md",
+      "initialState": "BLOCKED_DEPENDENCY"
+    },
+    {
+      "id": "E02",
+      "title": "Build and verify customer and rider Android apps on a cloud runner",
+      "role": "native-verification",
+      "startBlockers": [
+        "F01",
+        "F02",
+        "F03"
+      ],
+      "integrationDependencies": [
+        "B01",
+        "B04",
+        "B05",
+        "B06",
+        "B07",
+        "E01"
+      ],
+      "writeAllowlist": [
+        "tools/android/**",
+        "docs/implementation/android/**"
+      ],
+      "interfaces": [
+        "SHA-bound Android build artifacts and cloud emulator/device evidence",
+        "Native permission/offline/accessibility/background behavior report"
+      ],
+      "acceptance": [
+        "Cloud runner proves SDK/JDK/emulator acceleration or reports explicit blocked environment",
+        "Both apps install/start with real fonts/navigation and SDK API configuration",
+        "Camera/location denial and recovery, network loss/process death and secure session storage pass",
+        "Large-font/screen-reader and queued custody restart/reassignment paths pass",
+        "Signing secrets remain private; build artifacts record package/version/digest/tested SHA"
+      ],
+      "steps": [
+        "Prove authorized cloud Android runner before claiming native coverage; no paid device jobs without authorization",
+        "Request coordinator-owned app config/dependency amendments instead of writing roots",
+        "Build/install both apps and run native behavioral scenarios against integrated staging fixtures",
+        "Publish accessible build/video/log evidence and unsupported capabilities honestly"
+      ],
+      "legacyPacket": "a6-partner-mobile-app.md",
+      "initialState": "BLOCKED_DEPENDENCY"
+    },
+    {
+      "id": "E03",
+      "title": "Complete production readiness, migration/restore rehearsal and launch handoff",
+      "role": "coordinator-release",
+      "startBlockers": [
+        "E01",
+        "E02"
+      ],
+      "integrationDependencies": [],
+      "writeAllowlist": [
+        "docs/implementation/readiness/**",
+        "Coordinator-owned infrastructure/security/deployment configuration",
+        "Coordinator-owned canonical migration/backfill integration"
+      ],
+      "interfaces": [
+        "Release candidate manifest with business/provider/security/operations gates",
+        "Rehearsed migration, backup restore, rollback/forward-fix and incident runbooks",
+        "Named approval owners and physical-pilot evidence or explicit launch blockers"
+      ],
+      "acceptance": [
+        "Restore/backfill rehearsal preserves IDs, money, custody and rate snapshots with reconciliation report",
+        "Production config rejects demo auth/capture, unapproved rates and unavailable required providers",
+        "Secrets/TLS/private storage/scopes/log redaction/monitoring/recovery meet documented configuration",
+        "E01/E02 evidence matches release candidate; real fulfillment pilot remains distinct from fixtures",
+        "No deploy occurs merely from branch push; production promotion needs explicit authorization"
+      ],
+      "steps": [
+        "Rehearse migrations on a synthetic representative dataset and independently restore backup",
+        "Run local security/engineering/design reviews; external Claude review unavailable is stated",
+        "Collect provider/business settings, reconciliation/support ownership and failure-recovery drills",
+        "Publish launch checklist with green/blocked gates and exact evidence; do not claim launch while inputs are missing"
+      ],
+      "legacyPacket": "a9-cross-system-acceptance.md",
+      "initialState": "BLOCKED_DEPENDENCY"
+    }
+  ]
+}
