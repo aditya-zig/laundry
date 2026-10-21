@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Authorization regression verifier for Wandary Convex engine.
+// Authorization regression verifier for Laundry Convex engine.
 // Real HTTP against the dev deployment only. Synthetic demo fixtures only.
 // Never prints tokens, OTPs, addresses, or phone numbers. Exit 0 = all
 // wrong-role accesses rejected and state unchanged; exit 1 otherwise.

@@ -3,8 +3,8 @@
 Laundry pickup and delivery: customer storefront, delivery partner app, WhatsApp
 voice-note ordering, and an internal operations console sharing one order engine.
 
-The displayed product name is **Laundry**. Existing `@wandary` package names,
-deep-link schemes, repository name and hosted URLs remain unchanged for compatibility.
+The product and technical namespace are **Laundry** (`@laundry/*`).
+Repository: https://github.com/aditya-zig/laundry. Production branch: `build/laundry`.
 
 This repo holds the working implementation: `apps/api` (NestJS + PostgreSQL),
 `apps/customer` and `apps/partner` (Expo + React Native Web), `apps/ops`
@@ -23,7 +23,7 @@ The PostgreSQL implementation remains available for local development.
 
 - [Customer demo](https://laundry-customer-five.vercel.app)
 - [Delivery partner demo](https://laundry-partner.vercel.app)
-- [Operations demo](https://wandary.vercel.app)
+- [Operations demo](https://laundry-ops.vercel.app)
 
 These sites use the development Convex deployment and synthetic demo data.
 The separate production deployment has `DEMO_MODE=false`; live authentication,
@@ -48,8 +48,8 @@ pnpm check
 
 Postgres runs on host port **5448** (not 5432) via `docker-compose.yml`.
 API base URL defaults to `http://localhost:4100/v1`. Start the API with
-`pnpm dev:api` (or `pnpm --filter @wandary/api start` after
-`pnpm --filter @wandary/api build`); customer/partner web previews with
+`pnpm dev:api` (or `pnpm --filter @laundry/api start` after
+`pnpm --filter @laundry/api build`); customer/partner web previews with
 `pnpm dev:customer` / `pnpm dev:partner`; ops console with `pnpm dev:ops`.
 Web previews default to the local API when `EXPO_PUBLIC_API_URL` /
 `VITE_API_URL` are unset.
@@ -82,8 +82,8 @@ Errors return `{code,message,traceId,retryable}`. Key flows:
   returns `{draft,reply,missingFields}`. Confirmation posts to
   `POST /conversation-drafts/:id/confirm` with the current revision.
 
-Types and zod schemas live in `@wandary/contracts`. The typed fetch client is
-`@wandary/api-client`. Full route list is in `packages/contracts/openapi.yaml`.
+Types and zod schemas live in `@laundry/contracts`. The typed fetch client is
+`@laundry/api-client`. Full route list is in `packages/contracts/openapi.yaml`.
 
 ## Scripts
 
@@ -96,8 +96,8 @@ Types and zod schemas live in `@wandary/contracts`. The typed fetch client is
 | `db:start` | Starts local Postgres (port 5448). |
 | `check` | Typechecks every package. |
 | `test` | Runs every package suite. |
-| `test:contracts` | Runs the `@wandary/contracts` behavior suite. |
-| `test:integration` | Runs the `@wandary/api` acceptance suite against real local Postgres (no mocks; refuses non-local databases). |
+| `test:contracts` | Runs the `@laundry/contracts` behavior suite. |
+| `test:integration` | Runs the `@laundry/api` acceptance suite against real local Postgres (no mocks; refuses non-local databases). |
 | `test:e2e` | Alias of the API acceptance suite. |
 | `test:voice` | Runs the local voice-transcriber Python tests. |
 | `build` | Emits `dist` for every package. |
@@ -109,4 +109,4 @@ No script uses `--passWithNoTests`. Suites must exist and pass.
 Node 24. Customer and partner apps will use Expo 52 with Expo Router on React
 18.3.1 and React Native 0.76.5 (plus React Native Web). Ops will use React
 18.3.1 with Vite 6. The API will use NestJS 11 with `pg` 8. Exact pins live in
-the `wandary.pinnedVersions` field of the root `package.json`.
+the `laundry.pinnedVersions` field of the root `package.json`.

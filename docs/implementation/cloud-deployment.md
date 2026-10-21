@@ -1,8 +1,8 @@
 # Laundry cloud deployment runbook
 
-Updated 2026-10-12. Repository: https://github.com/aditya-zig/wandary.
-Workspace: `/home/batman/Projects/code/Landary`. The technical package namespace
-remains `@wandary`; the Convex project name is correctly spelled **Laundry**.
+Updated 2026-10-12. Repository: https://github.com/aditya-zig/laundry.
+Workspace: `/home/batman/Projects/code/Laundry`. The technical package namespace
+is `@laundry`; the Convex project name is **Laundry**.
 
 ## Environments
 
@@ -10,7 +10,7 @@ remains `@wandary`; the Convex project name is correctly spelled **Laundry**.
 |---|---|---|
 | Customer | https://laundry-customer-five.vercel.app | Explicit demo, synthetic data |
 | Partner | https://laundry-partner.vercel.app | Explicit demo, manual custody workflow |
-| Operations | https://wandary.vercel.app | Explicit demo operator console |
+| Operations | https://laundry-ops.vercel.app | Explicit demo operator console |
 | Convex development | hidden-trout-436, Sydney | DEMO_MODE=true, seeded synthetic catalog/users |
 | Convex production | dutiful-kangaroo-719, Sydney | DEMO_MODE=false, demo and unconfigured live providers rejected |
 
@@ -39,16 +39,16 @@ node tools/verify-convex.mjs
 pnpm exec convex deploy --yes --typecheck enable
 npx vercel deploy --prod --yes --project laundry-customer
 npx vercel deploy --prod --yes --project laundry-partner
-npx vercel deploy --prod --yes --project wandary
+npx vercel deploy --prod --yes --project laundry-ops
 ```
 
 GitHub CI runs PostgreSQL acceptance, contracts/app tests, voice unit tests,
-builds, and both type checks. Only a successful push to `build/wandary` deploys
+builds, and both type checks. Only a successful push to `build/laundry` deploys
 the production Convex backend. Its deploy key is a GitHub repository secret,
 never a browser variable or committed file. Frontend sites still intentionally
 point to the demo backend until the live launch prerequisites below are satisfied.
 All three Vercel Git connections were verified to use production branch
-`build/wandary`. Public API URLs and app selectors are currently production-only;
+`build/laundry`. Public API URLs and app selectors are currently production-only;
 configure preview API URLs/app selectors and matching CORS separately before use.
 The expanded cloud verifier passes 57 checks and the authorization regression
 passes 23 checks. See `deployed-ui-verification.md` for the actual synthetic
@@ -88,5 +88,6 @@ approved service area, prices, taxes, facility capacity and refund policy.
 Never enable demo mode on production to bypass these prerequisites. Do not reuse
 other projects' merchant or messaging credentials.
 
-The completion WhatsApp message is pending: recipient has not been confirmed,
-and the user's condition of a fully verified production service is not met.
+The user received a demo recording and links in their confirmed WhatsApp self-chat.
+The separate production-completion notification remains pending because the
+fully verified production-service condition is not met.

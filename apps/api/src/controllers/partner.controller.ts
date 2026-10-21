@@ -2,7 +2,7 @@ import { Controller, Get, Post, Param, Body, Req, UseGuards, Headers } from "@ne
 import { z } from "zod";
 import { getPool } from "../../../../modules/shared/src/db";
 import { listPartnerJobs, acceptJob, recordHandover, reportException, opsDispatch, opsCancelDelivery } from "../../../../modules/logistics/src/logistics";
-import { handoverInputSchema } from "@wandary/contracts";
+import { handoverInputSchema } from "@laundry/contracts";
 import { AuthGuard } from "../guards/auth.guard";
 import { ApiError } from "../../../../modules/shared/src/errors";
 

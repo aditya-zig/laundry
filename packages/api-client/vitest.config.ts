@@ -4,8 +4,8 @@ export default defineConfig({
   test: { include: ["test/**/*.test.ts"] },
   resolve: {
     alias: {
-      "@wandary/contracts": path.resolve(__dirname, "../contracts/src/index.ts"),
-      "@wandary/test-fixtures": path.resolve(__dirname, "../test-fixtures/src/index.ts"),
+      "@laundry/contracts": path.resolve(__dirname, "../contracts/src/index.ts"),
+      "@laundry/test-fixtures": path.resolve(__dirname, "../test-fixtures/src/index.ts"),
     },
   },
 });

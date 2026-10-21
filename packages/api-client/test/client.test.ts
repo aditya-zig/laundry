@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { ApiError, createClient } from "../src/index.js";
-import { demoOrder, demoQuote, demoQuoteInput, demoServices } from "@wandary/test-fixtures";
+import { demoOrder, demoQuote, demoQuoteInput, demoServices } from "@laundry/test-fixtures";
 
 type FetchMock = (url: string, init?: RequestInit) => Promise<Response>;
 

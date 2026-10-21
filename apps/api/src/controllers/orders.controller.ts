@@ -5,7 +5,7 @@ import { createQuote } from "../../../../modules/orders/src/quotes";
 import { createCheckout, capturePayment, getOrder, listOrders, cancelOrder } from "../../../../modules/orders/src/orders";
 import { decideAdjustment, rescheduleOrder } from "../../../../modules/orders/src/fulfillment";
 import { createSupportIncident, getSupportIncident, postSupportMessage } from "../../../../modules/orders/src/support";
-import { quoteInputSchema, cancelOrderSchema } from "@wandary/contracts";
+import { quoteInputSchema, cancelOrderSchema } from "@laundry/contracts";
 import { AuthGuard } from "../guards/auth.guard";
 
 function keyOf(headers: Record<string, unknown>): string | undefined {

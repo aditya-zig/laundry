@@ -2,7 +2,7 @@
 
 **Goal:** Verify complete success and recovery journeys, privacy boundaries, performance targets and deletion/reconciliation jobs. Record simulator vs sandbox vs physical-pilot evidence separately. A0 owns final composition and deployment configuration.
 
-**Read first:** [Product spec](../specs/product-spec.md), [shared contracts](../specs/contracts.md), [main plan](../superpowers/plans/2026-10-11-wandary.md).
+**Read first:** [Product spec](../specs/product-spec.md), [shared contracts](../specs/contracts.md), [main plan](../superpowers/plans/2026-10-11-laundry.md).
 
 **Depends on:** A0 for test authoring; A1–A8 merged for complete execution. Fixtures permit independent development after the A0 gate; they do not prove cross-module integration.
 

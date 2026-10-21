@@ -2,7 +2,7 @@ import { getPool, initializeDb, closePool } from "../../../modules/shared/src/db
 import { sendWhatsappText } from "../../../modules/conversations/src/whatsapp";
 
 /**
- * Wandary worker: durable outbox dispatcher + scheduled job reconciler.
+ * Laundry worker: durable outbox dispatcher + scheduled job reconciler.
  * Notification failure never rolls back an order: dispatch errors only bump
  * the outbox attempt counter and dead-letter after 5 tries. One owner claims
  * each row inside a transaction with FOR UPDATE SKIP LOCKED; side effects run
@@ -121,7 +121,7 @@ async function handleEvent(type: string, payload: Record<string, unknown>): Prom
 async function main(): Promise<void> {
   await initializeDb();
   // eslint-disable-next-line no-console
-  console.log("[wandary-worker] started");
+  console.log("[laundry-worker] started");
   for (;;) {
     await tick();
     await new Promise((r) => setTimeout(r, 2000));
@@ -131,6 +131,6 @@ async function main(): Promise<void> {
 process.on("SIGTERM", () => closePool().finally(() => process.exit(0)));
 main().catch((e) => {
   // eslint-disable-next-line no-console
-  console.error("[wandary-worker] fatal", e);
+  console.error("[laundry-worker] fatal", e);
   process.exit(1);
 });

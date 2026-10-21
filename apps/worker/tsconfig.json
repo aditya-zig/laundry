@@ -13,7 +13,7 @@
     "sourceMap": true,
     "baseUrl": "../..",
     "paths": {
-      "@wandary/contracts": ["packages/contracts/dist/index.d.ts"]
+      "@laundry/contracts": ["packages/contracts/dist/index.d.ts"]
     },
     "types": ["node"]
   },

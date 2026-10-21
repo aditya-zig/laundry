@@ -6,7 +6,7 @@ import { postMessage, confirmDraft } from "../../../../modules/conversations/src
 import { transcribeAudio } from "../../../../modules/conversations/src/speech";
 import { verifyWhatsappSignature, whatsappChallenge, retrieveWhatsappMedia } from "../../../../modules/conversations/src/whatsapp";
 import { emitOutbox } from "../../../../modules/shared/src/idempotency";
-import { conversationMessageSchema, draftConfirmSchema } from "@wandary/contracts";
+import { conversationMessageSchema, draftConfirmSchema } from "@laundry/contracts";
 import { AuthGuard, Public } from "../guards/auth.guard";
 
 type WaMessage = {

@@ -1,5 +1,5 @@
-// Ops API wiring over @wandary/api-client. Pages import this, never fetch.
-import { createClient, type WandaryClient } from "@wandary/api-client";
+// Ops API wiring over @laundry/api-client. Pages import this, never fetch.
+import { createClient, type LaundryClient } from "@laundry/api-client";
 
 function resolveBaseUrl(): string {
   const fromEnv = import.meta.env?.VITE_API_URL as string | undefined;
@@ -12,7 +12,7 @@ export function getApiBaseUrl(): string {
 
 // DEMO-only token persistence: keeps the demo operator session across refreshes.
 // Production staff access needs SSO/MFA and must never persist tokens here.
-const TOKEN_KEY = "wandary.demo.ops.token";
+const TOKEN_KEY = "laundry.demo.ops.token";
 
 function readStoredToken(): string | undefined {
   try {
@@ -23,9 +23,9 @@ function readStoredToken(): string | undefined {
 }
 
 let token: string | undefined = readStoredToken();
-let client: WandaryClient | undefined;
+let client: LaundryClient | undefined;
 
-export function getClient(): WandaryClient {
+export function getClient(): LaundryClient {
   if (!client) {
     client = createClient({ baseUrl: resolveBaseUrl(), getToken: () => token });
   }

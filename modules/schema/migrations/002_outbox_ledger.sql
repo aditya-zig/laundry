@@ -1,4 +1,4 @@
--- Wandary migration 002: durable outbox lease + honest notification ledger.
+-- Laundry migration 002: durable outbox lease + honest notification ledger.
 -- Idempotent: safe to run on existing dev databases.
 ALTER TABLE outbox ADD COLUMN IF NOT EXISTS leased_until TIMESTAMPTZ;
 ALTER TABLE outbox ADD COLUMN IF NOT EXISTS last_error TEXT;

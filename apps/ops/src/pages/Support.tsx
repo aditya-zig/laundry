@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import type { Order } from "@wandary/contracts";
+import type { Order } from "@laundry/contracts";
 import { getClient } from "../api";
 import { formatINR, overrideRequiresReason, refundStatusLabel } from "../guards";
 import { Link } from "../components";

@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { ActivityIndicator, Pressable, ScrollView, Text, TextInput, View } from "react-native";
 import { useLocalSearchParams } from "expo-router";
-import type { Order } from "@wandary/contracts";
+import type { Order } from "@laundry/contracts";
 import { getClient } from "../../src/api";
 import { formatINR, paymentStatusLabel } from "../../src/guards";
 import { colors, spacing, minTouchTarget } from "../../src/theme";

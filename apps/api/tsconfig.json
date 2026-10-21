@@ -18,7 +18,7 @@
     "strict": true,
     "baseUrl": "../..",
     "paths": {
-      "@wandary/contracts": ["packages/contracts/dist/index.d.ts"],
+      "@laundry/contracts": ["packages/contracts/dist/index.d.ts"],
       "@/*": ["apps/api/src/*"]
     },
     "types": ["node"]

@@ -1,7 +1,7 @@
 import { defineSchema, defineTable } from "convex/server";
 import { v } from "convex/values";
 
-// Wandary Convex schema. SDK logical IDs are UUID strings stored in a
+// Laundry Convex schema. SDK logical IDs are UUID strings stored in a
 // separate `lid` field and looked up through indexes. Convex document IDs
 // are never exposed on the wire.
 

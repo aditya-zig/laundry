@@ -1,4 +1,4 @@
-import type { DeliveryJob } from "@wandary/contracts";
+import type { DeliveryJob } from "@laundry/contracts";
 
 export type PartnerAction =
   | "ACCEPT"

@@ -10,8 +10,8 @@ import {
   View,
 } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import type { DeliveryJob } from "@wandary/contracts";
-import { ApiError } from "@wandary/api-client";
+import type { DeliveryJob } from "@laundry/contracts";
+import { ApiError } from "@laundry/api-client";
 import {
   getCachedJob,
   getClient,
@@ -508,7 +508,7 @@ export default function JobDetailScreen() {
         <View style={styles.supportCard}>
           <Text style={styles.supportTitle}>Dispatch Support Note</Text>
           <Text style={styles.supportText}>
-            For route escalations or gate entry verification, contact Partner Operations at +91-800-WANDARY.
+            For route escalations or gate entry verification, contact your assigned operations team. No live support phone number is configured in this demo.
           </Text>
           <Text style={styles.supportMeta}>
             Order ID: {job.orderId} • Task ID: {job.id}

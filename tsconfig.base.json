@@ -14,16 +14,16 @@
     "isolatedModules": true,
     "baseUrl": ".",
     "paths": {
-      "@wandary/contracts": [
+      "@laundry/contracts": [
         "packages/contracts/src/index.ts"
       ],
-      "@wandary/api-client": [
+      "@laundry/api-client": [
         "packages/api-client/src/index.ts"
       ],
-      "@wandary/design-tokens": [
+      "@laundry/design-tokens": [
         "packages/design-tokens/src/index.ts"
       ],
-      "@wandary/test-fixtures": [
+      "@laundry/test-fixtures": [
         "packages/test-fixtures/src/index.ts"
       ]
     }

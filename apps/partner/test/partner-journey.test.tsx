@@ -1,7 +1,7 @@
 // Partner journey behavior tests (A6).
 // Tests exercise observable state, API results and pure helpers from src/.
 import { describe, expect, it } from "vitest";
-import type { DeliveryJob, HandoverInput } from "@wandary/contracts";
+import type { DeliveryJob, HandoverInput } from "@laundry/contracts";
 import {
   canAccept,
   checkJobAccess,

@@ -1,4 +1,4 @@
-"""Local voice transcription core module for Wandary.
+"""Local voice transcription core module for Laundry.
 
 Runs fully locally using faster-whisper on CPU with small/int8 quantization.
 Enforces file format, size, duration, and symlink safety limits.
@@ -14,7 +14,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Protocol
 
-logger = logging.getLogger("wandary.transcriber")
+logger = logging.getLogger("laundry.transcriber")
 
 # Sane limits
 MAX_AUDIO_SIZE_BYTES = 10 * 1024 * 1024  # 10 MB
@@ -71,7 +71,7 @@ class DependencyMissingError(Exception):
 
 @dataclass
 class TranscriptionResult:
-    """Transcription outcome compatible with Wandary contracts."""
+    """Transcription outcome compatible with Laundry contracts."""
 
     text: str
     language: str
@@ -273,7 +273,7 @@ class FasterWhisperTranscriber:
         self.cache_dir = Path(
             cache_dir
             or os.environ.get("WHISPER_CACHE_DIR")
-            or Path.home() / ".cache" / "wandary" / "whisper"
+            or Path.home() / ".cache" / "laundry" / "whisper"
         )
         self._model: Any = None
 

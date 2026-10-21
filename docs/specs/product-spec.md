@@ -1,6 +1,6 @@
-# Wandary product specification
+# Laundry product specification
 
-Status: implementation proposal v1, 11 October 2026. “Wandary” is a working project name taken from the local folder, not a settled brand. Source: the founder’s conversation and [idea notebook](https://app.notion.com/p/3f6074fda55681ee8b3cdc20db4090a2).
+Status: implementation proposal v1, 11 October 2026. The product name is **Laundry**, confirmed by the founder on 12 October 2026. Source: the founder’s conversation and [idea notebook](https://app.notion.com/p/3f6074fda55681ee8b3cdc20db4090a2).
 
 ## Outcome and scope
 

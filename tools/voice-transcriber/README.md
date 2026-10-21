@@ -1,13 +1,13 @@
-# Wandary Local Voice Transcriber
+# Laundry Local Voice Transcriber
 
-Fully local speech-to-text tool for Wandary customer voice messages. Runs inference on CPU with `faster-whisper` using int8 quantization and the `small` model architecture. Zero paid APIs, zero cloud egress, and complete privacy preservation.
+Fully local speech-to-text tool for Laundry customer voice messages. Runs inference on CPU with `faster-whisper` using int8 quantization and the `small` model architecture. Zero paid APIs, zero cloud egress, and complete privacy preservation.
 
 ---
 
 ## Features
 
 - **100% Free & Local**: Powered by `faster-whisper` running locally on CPU with `int8` quantization. Never calls external speech APIs or incurs third-party costs.
-- **Contract Compatible**: Emits structured JSON matching Wandary's `SpeechPort` contract:
+- **Contract Compatible**: Emits structured JSON matching Laundry's `SpeechPort` contract:
   ```json
   {
     "text": "Please wash and iron 2 dress shirts",
@@ -93,7 +93,7 @@ Or using the `--input-file` argument:
 | `--language` | `None` (auto) | Language code hint (`en`, `es`, `hi`, etc.) |
 | `--compute-type` | `int8` | Quantization type (`int8`, `float32`) |
 | `--device` | `cpu` | Inference device (`cpu`) |
-| `--cache-dir` | `~/.cache/wandary/whisper` | Directory for downloaded model weights |
+| `--cache-dir` | `~/.cache/laundry/whisper` | Directory for downloaded model weights |
 | `--max-duration` | `120.0` | Max allowed audio duration in seconds |
 | `--max-size-mb` | `10.0` | Max allowed audio file size in megabytes |
 | `--verbose` | `False` | Enable diagnostic logging to stderr |
@@ -102,12 +102,12 @@ Or using the `--input-file` argument:
 
 ## Backend Integration (`WHISPER_COMMAND`)
 
-Wandary backend services invoke the transcriber via the `WHISPER_COMMAND` environment variable.
+Laundry backend services invoke the transcriber via the `WHISPER_COMMAND` environment variable.
 
 The included wrapper script `whisper_wrapper.sh` automatically detects virtual environments and runs `cli.py`:
 
 ```bash
-export WHISPER_COMMAND="/home/batman/Projects/code/wandary/tools/voice-transcriber/whisper_wrapper.sh"
+export WHISPER_COMMAND="/home/batman/Projects/code/Laundry/tools/voice-transcriber/whisper_wrapper.sh"
 ```
 
 The wrapper supports both calling conventions:
@@ -164,7 +164,7 @@ Customer WhatsApp Audio (WAV / OGG / M4A)
                    │
                    ▼ Validated Path
    [FasterWhisperTranscriber] (Lazy Import)
-       ├── Local Weights Cache (~/.cache/wandary/whisper)
+       ├── Local Weights Cache (~/.cache/laundry/whisper)
        ├── CPU int8 Inference (CTranslate2)
        └── Confidence Extraction (uncertainSpans)
                    │
@@ -179,7 +179,7 @@ Customer WhatsApp Audio (WAV / OGG / M4A)
 
 1. **Local Data Processing**: Audio content never leaves the host machine. No external API calls are made during transcription.
 2. **No Audio Logging**: Raw audio streams and decoded waveform bytes are never written to stdout, stderr, or application log files.
-3. **Caller Lifecycle Ownership**: The transcriber does not delete input audio files upon completion. The calling application controls retention and deletion according to Wandary compliance policies.
+3. **Caller Lifecycle Ownership**: The transcriber does not delete input audio files upon completion. The calling application controls retention and deletion according to Laundry compliance policies.
 4. **Symlink Sandboxing**: The tool detects and rejects broken symlinks, links pointing to special device nodes (`/dev/*`), and symlinks resolving to system administrative directories (`/etc`, `/proc`, `/sys`).
 
 ---

@@ -1,6 +1,6 @@
 # Shared contracts v1 — implementation boundary specification
 
-Status: normative proposal for A0 to encode as executable schemas before parallel work. Import types only from `@wandary/contracts`, SDK only from `@wandary/api-client`. No independent copies. Implementation must not start concurrent API consumers until A0 produces all request/response/event schemas, fixtures and contract tests. Product behavior: [spec](product-spec.md). Values below are engineering defaults, not advertised service promises.
+Status: normative proposal for A0 to encode as executable schemas before parallel work. Import types only from `@laundry/contracts`, SDK only from `@laundry/api-client`. No independent copies. Implementation must not start concurrent API consumers until A0 produces all request/response/event schemas, fixtures and contract tests. Product behavior: [spec](product-spec.md). Values below are engineering defaults, not advertised service promises.
 
 ## Common types and request rules
 

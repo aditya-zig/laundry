@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { ActivityIndicator, Image, Platform, Pressable, ScrollView, Text, TextInput, View } from "react-native";
 import { Link } from "expo-router";
-import type { Service } from "@wandary/contracts";
+import type { Service } from "@laundry/contracts";
 import { getClient, demoSignIn, getToken } from "../src/api";
 import { colors, spacing, minTouchTarget } from "../src/theme";
 import { reviewEmptyLabel } from "../src/guards";

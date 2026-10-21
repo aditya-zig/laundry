@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""CLI entry point for Wandary Local Voice Transcriber.
+"""CLI entry point for Laundry Local Voice Transcriber.
 
 Accepts audio files without shell interpolation and outputs JSON:
   {"text": str, "language": str, "uncertainSpans": list[str]}
@@ -28,12 +28,12 @@ from transcriber import (
     transcribe_file,
 )
 
-logger = logging.getLogger("wandary.cli")
+logger = logging.getLogger("laundry.cli")
 
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        description="Wandary Local Speech Transcriber (faster-whisper CPU int8)",
+        description="Laundry Local Speech Transcriber (faster-whisper CPU int8)",
         allow_abbrev=False,
     )
     parser.add_argument(
@@ -72,7 +72,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--cache-dir",
         default=None,
-        help="Local cache directory for downloaded models (default: ~/.cache/wandary/whisper).",
+        help="Local cache directory for downloaded models (default: ~/.cache/laundry/whisper).",
     )
     parser.add_argument(
         "--max-duration",

@@ -239,7 +239,7 @@ class TestVoiceTranscriberExecution(unittest.TestCase):
 
         log_stream = io.StringIO()
         handler = logging.StreamHandler(log_stream)
-        logger = logging.getLogger("wandary.transcriber")
+        logger = logging.getLogger("laundry.transcriber")
         logger.addHandler(handler)
         logger.setLevel(logging.DEBUG)
 

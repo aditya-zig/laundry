@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
-import type { Order } from "@wandary/contracts";
+import type { Order } from "@laundry/contracts";
 import { getClient } from "../api";
-import type { CareTarget } from "@wandary/api-client";
+import type { CareTarget } from "@laundry/api-client";
 import { careBlockedReason, formatINR, intakeDiscrepancy, overrideRequiresReason } from "../guards";
 
 const CARE_TARGETS = ["IN_CARE", "QUALITY_CHECK", "READY_FOR_RETURN"] as const;

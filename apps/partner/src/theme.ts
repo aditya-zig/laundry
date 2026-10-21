@@ -1,5 +1,5 @@
 // Partner app design tokens. Navy/teal palette with 44px minimum touch targets.
-// Values mirror @wandary/design-tokens.
+// Values mirror @laundry/design-tokens.
 
 export const colors = {
   surface: "#FFFFFF",

@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import type { Service } from "@wandary/contracts";
+import type { Service } from "@laundry/contracts";
 import { getClient } from "../api";
 import { catalogPublishBlocked, formatINR } from "../guards";
 

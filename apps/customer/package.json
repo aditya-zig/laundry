@@ -1,5 +1,5 @@
 {
-  "name": "@wandary/customer",
+  "name": "@laundry/customer",
   "version": "0.1.0",
   "private": true,
   "main": "expo-router/entry",
@@ -13,9 +13,9 @@
   "dependencies": {
     "@babel/runtime": "7.26.10",
     "@expo/metro-runtime": "4.0.1",
-    "@wandary/api-client": "workspace:*",
-    "@wandary/contracts": "workspace:*",
-    "@wandary/design-tokens": "workspace:*",
+    "@laundry/api-client": "workspace:*",
+    "@laundry/contracts": "workspace:*",
+    "@laundry/design-tokens": "workspace:*",
     "expo": "52.0.0",
     "expo-constants": "17.0.8",
     "expo-linking": "7.0.5",

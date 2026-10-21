@@ -1,5 +1,5 @@
 {
-  "name": "wandary-service-assets",
+  "name": "laundry-service-assets",
   "version": "1.0.0",
   "palette": {
     "cream": "#F6EFE3",
@@ -10,10 +10,10 @@
     "tealMist": "#BFDEE0"
   },
   "authorship": {
-    "author": "Wandary",
-    "credits": "Original SVG code created by Freebuff for Wandary",
+    "author": "Laundry",
+    "credits": "Original SVG code created by Freebuff for Laundry",
     "license": "Project assets; no third-party media included",
-    "provenanceNote": "Original vector artwork drawn for Wandary; no third-party assets, fonts, scripts or trackers.",
+    "provenanceNote": "Original vector artwork drawn for Laundry; no third-party assets, fonts, scripts or trackers.",
     "generatedWith": "Freebuff coding agent; vector SVG paths, no raster sources",
     "pngDerivation": "PNG siblings derived locally from the original SVGs with rsvg-convert (librsvg), no third-party sources. SVGs stay the web originals; PNGs are the native-safe variants (React Native Image has no reliable SVG support on Android/iOS)."
   },

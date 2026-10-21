@@ -1,5 +1,5 @@
-// Thin API wiring over @wandary/api-client. Screens import this, never fetch.
-import { createClient, type WandaryClient } from "@wandary/api-client";
+// Thin API wiring over @laundry/api-client. Screens import this, never fetch.
+import { createClient, type LaundryClient } from "@laundry/api-client";
 
 function envBaseUrl(): string | undefined {
   // Static access so Metro inlines EXPO_PUBLIC_API_URL at build time.
@@ -12,7 +12,7 @@ export function getApiBaseUrl(): string {
 
 // DEMO-only token persistence: keeps the demo session across web refreshes.
 // Production must use secure platform storage and never persist real credentials here.
-const TOKEN_KEY = "wandary.demo.customer.token";
+const TOKEN_KEY = "laundry.demo.customer.token";
 
 function readStoredToken(): string | undefined {
   try {
@@ -24,9 +24,9 @@ function readStoredToken(): string | undefined {
 }
 
 let token: string | undefined = readStoredToken();
-let client: WandaryClient | undefined;
+let client: LaundryClient | undefined;
 
-export function getClient(): WandaryClient {
+export function getClient(): LaundryClient {
   if (!client) {
     client = createClient({ baseUrl: getApiBaseUrl(), getToken: () => token });
   }

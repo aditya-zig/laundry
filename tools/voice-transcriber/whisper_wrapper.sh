@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -e
 
-# Wandary Local Speech Transcriber Wrapper
+# Laundry Local Speech Transcriber Wrapper
 # Compatible with WHISPER_COMMAND configuration in backend.
 # Accepts arguments:
 #   <audio_file>

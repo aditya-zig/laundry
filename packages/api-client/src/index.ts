@@ -33,7 +33,7 @@ import {
   type ReviewInput,
   type Service,
   type Session,
-} from "@wandary/contracts";
+} from "@laundry/contracts";
 
 export class ApiError extends Error {
   readonly code: ErrorEnvelope["code"];
@@ -218,4 +218,4 @@ export function createClient(options: ClientOptions = {}) {
   };
 }
 
-export type WandaryClient = ReturnType<typeof createClient>;
+export type LaundryClient = ReturnType<typeof createClient>;

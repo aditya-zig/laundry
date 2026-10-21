@@ -1,6 +1,6 @@
 // Ops journey behavior tests (A7). Pure helpers only, no DOM.
 import { describe, expect, it } from "vitest";
-import type { Order } from "@wandary/contracts";
+import type { Order } from "@laundry/contracts";
 import {
   careBlockedReason,
   catalogPublishBlocked,

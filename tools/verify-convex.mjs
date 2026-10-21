@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Independent Convex API verification for Wandary.
+// Independent Convex API verification for Laundry.
 // Real HTTP against deployed Convex endpoints only. Synthetic demo data only.
 // Validates wire responses with the real Zod contracts from
 // packages/contracts (dist) and exercises custody + idempotency flows.
@@ -44,7 +44,7 @@ let contracts;
 try {
   contracts = await import(join(ROOT, "packages/contracts/dist/index.js"));
 } catch {
-  contracts = await import("@wandary/contracts");
+  contracts = await import("@laundry/contracts");
 }
 const {
   serviceSchema,

@@ -66,7 +66,7 @@ export async function transcribeAudio(input: { bytes: Buffer; mime: string; lang
   if (!command) {
     return { ok: false, reason: "Speech transcription is not configured on this server", fallback: "Type the order as text: service, garment count, pickup time, address." };
   }
-  const dir = await mkdtemp(join(tmpdir(), "wandary-audio-"));
+  const dir = await mkdtemp(join(tmpdir(), "laundry-audio-"));
   const file = join(dir, `note${suffixForMime(mimeBase)}`);
   try {
     await writeFile(file, input.bytes);

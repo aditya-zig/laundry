@@ -1,4 +1,4 @@
-/** Wandary backend behavior tests. Real PostgreSQL, no mocks. */
+/** Laundry backend behavior tests. Real PostgreSQL, no mocks. */
 import { beforeAll, afterAll, test, expect } from "vitest";
 import { createHmac, randomUUID } from "node:crypto";
 import { NestFactory } from "@nestjs/core";
@@ -421,7 +421,7 @@ test("speech adapter rejects bad MIME, empty and oversize audio without a false 
 test("voice-notes endpoint returns a real transcript and draft when the local model is available", async () => {
   const candidates = [
     "/tmp/opencode/laundry_request.wav",
-    "/home/batman/Projects/code/wandary/.data/whisper",
+    "/home/batman/Projects/code/Laundry/.data/whisper",
   ];
   let sample: Buffer | null = null;
   try {
@@ -433,13 +433,13 @@ test("voice-notes endpoint returns a real transcript and draft when the local mo
   if (!sample) return; // portable skip: adapter unit test above still guards the seam.
   const wrapperCandidates = [
     process.env.WHISPER_COMMAND,
-    "/home/batman/Projects/code/wandary/tools/voice-transcriber/whisper_wrapper.sh",
+    "/home/batman/Projects/code/Laundry/tools/voice-transcriber/whisper_wrapper.sh",
   ].filter(Boolean) as string[];
   const { existsSync } = await import("node:fs");
   const wrapper = wrapperCandidates.find((p) => existsSync(p));
   if (!wrapper) return;
   process.env.WHISPER_COMMAND = wrapper;
-  process.env.WHISPER_CACHE_DIR ??= "/home/batman/Projects/code/wandary/.data/whisper";
+  process.env.WHISPER_CACHE_DIR ??= "/home/batman/Projects/code/Laundry/.data/whisper";
   const tc = await demo("customer");
   const res = await api("POST", "/v1/demo/conversations/voice-notes", tc, { mime: "audio/wav", base64: sample.toString("base64") });
   expect([200, 201]).toContain(res.status);

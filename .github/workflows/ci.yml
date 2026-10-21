@@ -1,4 +1,4 @@
-name: Wandary checks
+name: Laundry checks
 on:
   push:
   pull_request:
@@ -11,18 +11,18 @@ jobs:
       postgres:
         image: postgres:17-alpine
         env:
-          POSTGRES_USER: wandary
-          POSTGRES_PASSWORD: wandary_dev_only
-          POSTGRES_DB: wandary
+          POSTGRES_USER: laundry
+          POSTGRES_PASSWORD: laundry_dev_only
+          POSTGRES_DB: laundry
         ports:
           - 5448:5432
         options: >-
-          --health-cmd "pg_isready -U wandary"
+          --health-cmd "pg_isready -U laundry"
           --health-interval 5s
           --health-timeout 5s
           --health-retries 10
     env:
-      DATABASE_URL: postgres://wandary:wandary_dev_only@localhost:5448/wandary
+      DATABASE_URL: postgres://laundry:laundry_dev_only@localhost:5448/laundry
       DEMO_MODE: "true"
       CI: "true"
     steps:
@@ -46,7 +46,7 @@ jobs:
       - run: pnpm test:voice
   deploy-convex:
     needs: verify
-    if: github.event_name == 'push' && github.ref == 'refs/heads/build/wandary'
+    if: github.event_name == 'push' && github.ref == 'refs/heads/build/laundry'
     runs-on: ubuntu-latest
     concurrency:
       group: laundry-production-backend

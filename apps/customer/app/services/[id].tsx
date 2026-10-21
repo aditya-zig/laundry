@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { ActivityIndicator, Pressable, ScrollView, Text, TextInput, View } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import type { Service } from "@wandary/contracts";
+import type { Service } from "@laundry/contracts";
 import { getClient } from "../../src/api";
 import { addLine, type CartLine } from "../../src/cart";
 import { colors, spacing, minTouchTarget } from "../../src/theme";

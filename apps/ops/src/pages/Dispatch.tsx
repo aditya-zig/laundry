@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import type { DeliveryJob } from "@wandary/contracts";
+import type { DeliveryJob } from "@laundry/contracts";
 import { getClient } from "../api";
 import { dispatchFlag } from "../guards";
 

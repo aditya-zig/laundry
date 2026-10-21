@@ -5,7 +5,7 @@ const app = process.argv[2] ?? process.env.LAUNDRY_APP ?? 'ops';
 if (!['customer', 'partner', 'ops'].includes(app)) {
   throw new Error('Choose customer, partner, or ops');
 }
-const result = spawnSync('pnpm', ['--filter', `@wandary/${app}...`, 'build'], {
+const result = spawnSync('pnpm', ['--filter', `@laundry/${app}...`, 'build'], {
   stdio: 'inherit', env: process.env,
 });
 if (result.error) throw result.error;

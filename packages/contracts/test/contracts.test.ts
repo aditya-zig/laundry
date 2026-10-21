@@ -18,7 +18,7 @@ import {
 } from "../src/index.js";
 
 // Minimal inline shapes for behavior tests. Rich demo data lives in
-// @wandary/test-fixtures, which depends on this package, so the import
+// @laundry/test-fixtures, which depends on this package, so the import
 // direction stays one-way.
 const quoteInput: QuoteInput = {
   addressId: "66666666-6666-4666-8666-666666666666",

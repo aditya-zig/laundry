@@ -1,4 +1,4 @@
-// Wandary Convex engine. Real Convex functions, not a mock. All CRUD flows
+// Laundry Convex engine. Real Convex functions, not a mock. All CRUD flows
 // through one frozen internal mutation so the HTTP lane (owned by another
 // agent) cannot bypass auth. No public functions are exported.
 //

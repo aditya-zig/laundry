@@ -1,4 +1,4 @@
-import type { DeliveryJob, HandoverInput } from "@wandary/contracts";
+import type { DeliveryJob, HandoverInput } from "@laundry/contracts";
 import { buildHandoverInput, newActionId } from "./handover";
 
 export type OfflineSyncStatus = "Pending sync" | "Synced" | "Failed";

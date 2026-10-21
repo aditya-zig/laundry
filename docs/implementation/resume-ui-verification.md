@@ -127,3 +127,55 @@ Ops (:5173, vite hash router):
 
 ## Coordinator correction
 The worktree was moved to /home/batman/Projects/code/Landary, not deleted. The layout fix and screenshots are retained there. API/database/devservers need restart under that path; this report is partial and will be superseded by fresh connected verification.
+
+## Fresh verification pass — Landary tree, fixed dep set (12 Oct 2026, ~15:30 IST)
+
+Tree: `/home/batman/Projects/code/Landary`, branch `build/laundry`.
+Main's dep fix confirmed in both app manifests: expo-router 4.0.22,
+expo-constants 17.0.8, expo-linking 7.0.5, screens 4.4.0,
+safe-area-context 4.12.0, metro-runtime 4.0.1. Both apps resolve
+expo-router 4.0.22 at runtime. Display brand is now Laundry; demo token
+keys renamed (`laundry.demo.*.token`). No supervised dev servers are
+running (8081/8082/5173/4100 all refused), so this pass used my own
+export builds served on scratch ports 4191-4193 (stopped afterwards).
+
+Browser (headless `browse`, production static bundles):
+- Customer: home header reads Laundry. Basket Link push navigates to
+  `/basket` and renders (previously crashed). Depth-2 header back link
+  renders and navigates back to `/`. Zero uncaught/type errors.
+  Screenshot `lan-customer-basket.png` shows Basket title plus back
+  arrow. 390px mobile home screenshot `lan-customer-mobile.png`.
+- Partner: home reads Laundry Partner; failed demo sign-in shows honest
+  fetch error. Screenshot `lan-partner-home.png`. Push path shares the
+  identical fixed stack; service/job taps already proven on Vercel (see
+  deployed-ui-verification.md).
+- Ops: authed shell (placeholder token, removed after) renders Laundry
+  Ops with all hash routes navigating cleanly; pages show honest fetch
+  errors without API. Screenshot `lan-ops-orders.png`.
+- Plain file servers 404 on deep links (e.g. `/services/…`); standard
+  SPA-host behavior, needs rewrite rules. Not an app defect.
+
+Counts (exit codes preserved):
+- `check` (tsc --noEmit): customer, partner, ops — 3/3 pass.
+- `test`: customer 8/8, partner 6/6, ops journey 6/6 plus branding 5/5
+  (11/11) once workspace links resolve — see environment note below.
+- `build`: customer and partner `expo export` pass; ops `tsc + vite
+  build` passes once workspace links resolve. Customer/partner bundles
+  verified to contain api-client code.
+
+Environment note (main lane, not an app-source defect): the rename left
+`apps/*/node_modules` with stale `@wandary/*` links while source uses
+`@laundry/*`, and `pnpm-lock.yaml` is unmodified. So out of the box,
+`@laundry/ops test` fails on `branding.test.ts` collection and
+`@laundry/ops build` fails in vite, both `Cannot find package
+"@laundry/api-client"`. Proven environmental by temporarily symlinking
+the three workspace packages (removed afterwards, zero git trace):
+tests 11/11, build success. Do NOT work around this in app source.
+Needed: regenerate the lock for the renamed workspace and run a fresh
+`pnpm install` (also prunes orphaned expo-router 4.0.0 `.pnpm` trees
+per navigation-fix.md). Untouched by this lane; no lockfile edits made.
+
+Remaining for full local journeys: supervised `pnpm dev` + database
+under the Landary path (stale `resume-dev-running.md` references the old
+session/ports state), then API-backed flows. Deployed Vercel journeys
+are already covered by coordinator QA.

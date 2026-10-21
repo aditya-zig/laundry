@@ -1,8 +1,8 @@
 {
   "expo": {
     "name": "Laundry Partner (demo)",
-    "slug": "wandary-partner",
-    "scheme": "wandary-partner",
+    "slug": "laundry-partner",
+    "scheme": "laundry-partner",
     "web": {
       "bundler": "metro"
     },

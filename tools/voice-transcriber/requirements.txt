@@ -1,4 +1,4 @@
-# Wandary Local Voice Transcriber - Pinned Dependencies
+# Laundry Local Voice Transcriber - Pinned Dependencies
 # Compatible with CPU int8 inference via faster-whisper
 # NOTE: av pinned to 14.2.0 because faster-whisper 1.2.1 calls
 # av.open(..., metadata_errors=...) which was removed in PyAV 15+.

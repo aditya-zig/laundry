@@ -1,4 +1,4 @@
-// Customer theme. Values mirror @wandary/design-tokens without importing
+// Customer theme. Values mirror @laundry/design-tokens without importing
 // native code, so web preview and tests share one source of truth.
 export const colors = {
   surface: "#FFFFFF",

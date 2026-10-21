@@ -1,6 +1,6 @@
 # Agent execution index
 
-Read [product spec](../specs/product-spec.md), [contracts](../specs/contracts.md) and [main plan](../superpowers/plans/2026-10-11-wandary.md) before a packet. A0 freezes executable contracts first; A1–A8 then run concurrently in separate worktrees. A9 authors tests concurrently and executes after integration. All names/paths are proposed new files.
+Read [product spec](../specs/product-spec.md), [contracts](../specs/contracts.md) and [main plan](../superpowers/plans/2026-10-11-laundry.md) before a packet. A0 freezes executable contracts first; A1–A8 then run concurrently in separate worktrees. A9 authors tests concurrently and executes after integration. All names/paths are proposed new files.
 
 - [A0: Foundation and coordinator](a0-foundation-and-coordinator.md) — depends on None.
 - [A1: Catalog and reviews](a1-catalog-and-reviews.md) — depends on A0 contracts-v1.

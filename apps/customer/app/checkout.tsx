@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { ActivityIndicator, Pressable, ScrollView, Text, TextInput, View } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import type { Address, Quote } from "@wandary/contracts";
+import type { Address, Quote } from "@laundry/contracts";
 import { getClient } from "../src/api";
 import { getBasket } from "./services/[id]";
 import { getDraftAddressId, setDraftAddressId } from "../src/cart";

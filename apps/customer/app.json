@@ -1,8 +1,8 @@
 {
   "expo": {
     "name": "Laundry Customer (demo)",
-    "slug": "wandary-customer",
-    "scheme": "wandary-customer",
+    "slug": "laundry-customer",
+    "scheme": "laundry-customer",
     "web": {
       "bundler": "metro"
     },

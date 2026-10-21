@@ -8,7 +8,7 @@ import {
   View,
 } from "react-native";
 import { useRouter } from "expo-router";
-import type { DeliveryJob } from "@wandary/contracts";
+import type { DeliveryJob } from "@laundry/contracts";
 import { getClient, setCachedJobs } from "../src/api";
 import {
   colors,

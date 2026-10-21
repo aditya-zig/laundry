@@ -1,4 +1,4 @@
-import type { HandoverInput } from "@wandary/contracts";
+import type { HandoverInput } from "@laundry/contracts";
 
 /**
  * Generates a stable client action UUID.

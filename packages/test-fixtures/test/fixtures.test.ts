@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { orderSchema, quoteInputSchema, quoteSchema, serviceSchema } from "@wandary/contracts";
+import { orderSchema, quoteInputSchema, quoteSchema, serviceSchema } from "@laundry/contracts";
 import { DEMO_LABEL, demoOrder, demoQuote, demoQuoteInput, demoServices } from "../src/index.js";
 
 describe("demo fixtures stay contract-valid", () => {

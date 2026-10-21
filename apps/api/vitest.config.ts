@@ -4,7 +4,7 @@ import path from "node:path";
 export default defineConfig({
   resolve: {
     alias: {
-      "@wandary/contracts": path.resolve(__dirname, "../../packages/contracts/src/index.ts"),
+      "@laundry/contracts": path.resolve(__dirname, "../../packages/contracts/src/index.ts"),
       "@modules": path.resolve(__dirname, "../../modules"),
       "@": path.resolve(__dirname, "src"),
     },

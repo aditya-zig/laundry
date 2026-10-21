@@ -3,7 +3,7 @@ import { z } from "zod";
 import { getPool } from "../../../../modules/shared/src/db";
 import { listServices, getService } from "../../../../modules/catalog/src/catalog";
 import { submitReview, listServiceReviews, moderateReview } from "../../../../modules/orders/src/support";
-import { reviewInputSchema } from "@wandary/contracts";
+import { reviewInputSchema } from "@laundry/contracts";
 import { AuthGuard, Public } from "../guards/auth.guard";
 import { ApiError } from "../../../../modules/shared/src/errors";
 

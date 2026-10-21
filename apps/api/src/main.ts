@@ -17,7 +17,7 @@ function resolveCorsOrigins(): string[] {
     "http://localhost:5173",
     "http://localhost:19006",
   ];
-  // Production frontends (e.g. https://wandary-....vercel.app) are not known
+  // Production frontends (e.g. https://laundry-....vercel.app) are not known
   // at build time. Hosts set CORS_ORIGIN (comma-separated exact origins);
   // FRONTEND_URL is accepted as a single-origin alias.
   const extra = (process.env.CORS_ORIGIN ?? process.env.FRONTEND_URL ?? "")
@@ -50,7 +50,7 @@ function assertProductionConfig(): void {
   // Production must never run on implicit demo/default credentials.
   const problems: string[] = [];
   if ((process.env.DEMO_MODE ?? "true") !== "false") problems.push("DEMO_MODE must be 'false' in production");
-  if (!process.env.DATABASE_URL || /localhost|wandary_dev_only/.test(process.env.DATABASE_URL)) {
+  if (!process.env.DATABASE_URL || /localhost|laundry_dev_only/.test(process.env.DATABASE_URL)) {
     problems.push("DATABASE_URL must point at the production database");
   }
   for (const k of ["WHATSAPP_APP_SECRET", "WHATSAPP_VERIFY_TOKEN", "WHATSAPP_TOKEN", "WHATSAPP_PHONE_NUMBER_ID"]) {
@@ -86,11 +86,11 @@ async function bootstrap() {
   const port = Number(process.env.PORT ?? 4100);
   await app.listen(port);
   // eslint-disable-next-line no-console
-  console.log(`[wandary-api] listening on http://localhost:${port}`);
+  console.log(`[laundry-api] listening on http://localhost:${port}`);
 }
 
 bootstrap().catch((e) => {
   // eslint-disable-next-line no-console
-  console.error("[wandary-api] fatal", e);
+  console.error("[laundry-api] fatal", e);
   process.exit(1);
 });

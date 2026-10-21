@@ -1,6 +1,6 @@
 // Demo-only fixtures. Synthetic IDs, no real personal data. Every value is
 // labeled demo so app agents can build against stable shapes before live APIs.
-import type { Address, Order, Quote, QuoteInput, Review, Service, Session } from "@wandary/contracts";
+import type { Address, Order, Quote, QuoteInput, Review, Service, Session } from "@laundry/contracts";
 
 export const DEMO_LABEL = "demo-only fixture: synthetic data, not a real customer, price, or address";
 

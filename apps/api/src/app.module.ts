@@ -14,13 +14,13 @@ class MiscController {
   @Public()
   @Get("v1/health")
   health() {
-    return { ok: true, service: "wandary-api", demoMode: (process.env.DEMO_MODE ?? "true") !== "false" };
+    return { ok: true, service: "laundry-api", demoMode: (process.env.DEMO_MODE ?? "true") !== "false" };
   }
 
   @Public()
   @Get("health")
   rootHealth() {
-    return { ok: true, service: "wandary-api" };
+    return { ok: true, service: "laundry-api" };
   }
 
   @Post("v1/media/upload-intents")

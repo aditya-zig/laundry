@@ -2,11 +2,14 @@
 
 ## Overview
 
-Wandary processes inbound voice messages from customer communication channels (such as WhatsApp audio notes) using a **100% free, fully local** automatic speech recognition pipeline.
+Laundry's local backend supports processing voice messages from customer communication channels (such as WhatsApp audio notes) using a **100% free, fully local** automatic speech recognition pipeline.
 
 No cloud speech-to-text APIs (Google Cloud Speech, OpenAI Whisper API, AWS Transcribe) are used. Inference executes entirely on the host machine using `faster-whisper` on CPU with `int8` quantization and the `small` model architecture.
 
 ---
+
+Live WhatsApp/media transport and cloud-hosted voice execution are not enabled;
+this document describes the local transcriber, not a working live integration.
 
 ## Contract Alignment
 
@@ -44,7 +47,7 @@ When low-confidence words or segments occur (average log-probability below `-1.0
 
 ```
 ┌────────────────────────────────────────────────────────┐
-│               Wandary Backend Service                  │
+│               Laundry Backend Service                  │
 │                                                        │
 │  1. Receives audio webhook                             │
 │  2. Stores media in secure temporary storage           │
@@ -70,7 +73,7 @@ When low-confidence words or segments occur (average log-probability below `-1.0
 │  └── ffprobe duration inspection (<= 120s)             │
 │                                                        │
 │  [FasterWhisperTranscriber] (Lazy Import)              │
-│  ├── Checks local cache (~/.cache/wandary/whisper)     │
+│  ├── Checks local cache (~/.cache/laundry/whisper)     │
 │  ├── CPU int8 CTranslate2 inference                    │
 │  └── Formats result & identifies uncertainSpans        │
 └──────────────────────────┬─────────────────────────────┘
@@ -99,14 +102,14 @@ When low-confidence words or segments occur (average log-probability below `-1.0
 
 1. **Local-Only Execution**: Audio never traverses external networks.
 2. **Zero Audio Logging**: Decoded audio buffers, base64 strings, or raw binary payloads are never emitted to loggers, stdout, or stderr.
-3. **Caller Media Ownership**: The tool does not alter or delete the input media file. The caller retains sole responsibility for deleting temporary media according to Wandary data retention schedules.
+3. **Caller Media Ownership**: The tool does not alter or delete the input media file. The caller retains sole responsibility for deleting temporary media according to Laundry data retention schedules.
 4. **Shell Injection Prevention**: The tool is invoked via `exec` argument lists rather than shell string interpolation. File names containing spaces, quotes, or punctuation are processed safely.
 
 ---
 
 ## Model Caching
 
-Model checkpoints are downloaded on the first run directly to the designated cache directory (defaults to `~/.cache/wandary/whisper` or overridden by `WHISPER_CACHE_DIR`).
+Model checkpoints are downloaded on the first run directly to the designated cache directory (defaults to `~/.cache/laundry/whisper` or overridden by `WHISPER_CACHE_DIR`).
 
 All subsequent executions load weights directly from disk without network access.
 

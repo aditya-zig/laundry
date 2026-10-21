@@ -1,1 +1,1 @@
-"""Tests for Wandary voice transcriber."""
+"""Tests for Laundry voice transcriber."""

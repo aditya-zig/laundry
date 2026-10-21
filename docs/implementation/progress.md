@@ -1,6 +1,6 @@
 # Wandary implementation ledger
 
-Plan: docs/superpowers/plans/2026-10-11-wandary.md
+Plan: docs/superpowers/plans/2026-10-11-laundry.md
 
 User authorized implementation, free external agents, OpenCode Muse Spark Free verification, computer use, GitHub repository creation and commits/push without confirmation.
 

@@ -1,6 +1,6 @@
 // Pure ops rules. Every override needs a reason; refund pending differs from
 // refunded; intake discrepancies stay visible until resolved.
-import type { DeliveryJob, Order } from "@wandary/contracts";
+import type { DeliveryJob, Order } from "@laundry/contracts";
 
 export function formatINR(amountMinor: number): string {
   return `INR ${(amountMinor / 100).toFixed(2)}`;

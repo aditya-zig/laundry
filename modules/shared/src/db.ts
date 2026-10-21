@@ -9,7 +9,7 @@ let pool: Pool | null = null;
 export function getPool(): Pool {
   if (pool) return pool;
   const connectionString =
-    process.env.DATABASE_URL ?? "postgres://wandary:wandary_dev_only@localhost:5448/wandary";
+    process.env.DATABASE_URL ?? "postgres://laundry:laundry_dev_only@localhost:5448/laundry";
   pool = new PoolImpl({ connectionString, max: 10 });
   return pool;
 }

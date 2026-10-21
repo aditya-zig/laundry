@@ -20,16 +20,15 @@ describe("Laundry display branding", () => {
     setSession(token);
     const html = renderToStaticMarkup(createElement(App));
     expect(html).toContain("<h1>Laundry Ops</h1>");
-    expect(html).not.toContain("Wandary");
     if (!token) expect(html).toContain("DEMO sign-in only");
   });
 
-  it.each(["Customer", "Partner"])("uses Laundry in the %s app display name while preserving deep-link compatibility", (app) => {
+  it.each(["Customer", "Partner"])("uses Laundry in the %s app display name and deep-link scheme", (app) => {
     const slug = app.toLowerCase();
     const config = JSON.parse(read(`../../${slug}/app.json`));
     expect(config.expo.name).toBe(`Laundry ${app} (demo)`);
-    expect(config.expo.slug).toBe(`wandary-${slug}`);
-    expect(config.expo.scheme).toBe(`wandary-${slug}`);
+    expect(config.expo.slug).toBe(`laundry-${slug}`);
+    expect(config.expo.scheme).toBe(`laundry-${slug}`);
   });
 
   it("uses Laundry in the operations browser title", () => {

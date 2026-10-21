@@ -2,7 +2,7 @@ import { Controller, Get, Post, Patch, Delete, Param, Body, Req, UseGuards } fro
 import { z } from "zod";
 import { getPool } from "../../../../modules/shared/src/db";
 import { requestOtp, verifyOtp, demoAuth, logout } from "../../../../modules/shared/src/auth";
-import { otpRequestSchema, otpVerifySchema, demoAuthSchema } from "@wandary/contracts";
+import { otpRequestSchema, otpVerifySchema, demoAuthSchema } from "@laundry/contracts";
 import { AuthGuard, Public } from "../guards/auth.guard";
 
 @Controller()

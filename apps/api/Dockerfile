@@ -1,4 +1,4 @@
-# Wandary API + worker image (production).
+# Laundry API + worker image (production).
 # Builds the NestJS API and background worker from this monorepo with pnpm,
 # then runs both under Node 24 with tsx against the compiled workspace.
 # Local demo/dev behavior is unchanged: `pnpm dev:api` still uses tsx watch.
@@ -12,9 +12,9 @@ COPY apps/api ./apps/api
 COPY apps/worker ./apps/worker
 COPY assets ./assets
 RUN pnpm install --frozen-lockfile
-RUN pnpm --filter @wandary/contracts build \
- && pnpm --filter @wandary/api build \
- && pnpm --filter @wandary/worker build
+RUN pnpm --filter @laundry/contracts build \
+ && pnpm --filter @laundry/api build \
+ && pnpm --filter @laundry/worker build
 
 FROM node:24-alpine AS runtime
 ENV NODE_ENV=production

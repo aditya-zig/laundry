@@ -1,10 +1,10 @@
-# Fly.io deploy for the Wandary production API.
+# Fly.io deploy for the Laundry production API.
 # Requires flyctl auth (your credentials): fly launch --dockerfile apps/api/Dockerfile
 # then fly secrets set DATABASE_URL=... DEMO_MODE=false API_ORIGIN=... CORS_ORIGIN=...
 # WHATSAPP_APP_SECRET=... WHATSAPP_VERIFY_TOKEN=... WHATSAPP_TOKEN=...
 # WHATSAPP_PHONE_NUMBER_ID=... RAZORPAY_KEY_ID=... RAZORPAY_KEY_SECRET=...
 # and fly pg attach for managed Postgres. Not runnable without your fly auth.
-app = "wandary-api"
+app = "laundry-api"
 primary_region = "bom"
 
 [build]

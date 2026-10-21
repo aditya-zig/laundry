@@ -2,7 +2,7 @@
 
 **Goal:** Build runnable empty apps, local services, authentication boundary, media rules, transactional outbox and versioned contracts. Set up coordinator-owned DB migrations and CI ownership checks. Include root pnpm check/test scripts; pin native-compatible dependencies once.
 
-**Read first:** [Product spec](../specs/product-spec.md), [shared contracts](../specs/contracts.md), [main plan](../superpowers/plans/2026-10-11-wandary.md).
+**Read first:** [Product spec](../specs/product-spec.md), [shared contracts](../specs/contracts.md), [main plan](../superpowers/plans/2026-10-11-laundry.md).
 
 **Depends on:** None. Fixtures permit independent development after the A0 gate; they do not prove cross-module integration.
 

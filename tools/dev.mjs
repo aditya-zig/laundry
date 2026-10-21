@@ -5,7 +5,7 @@ import { resolve } from "node:path";
 const root = resolve(import.meta.dirname, "..");
 if (existsSync(resolve(root, ".env"))) process.loadEnvFile(resolve(root, ".env"));
 if (!existsSync(resolve(root, "node_modules"))) {
-  console.error("Run pnpm install before starting Wandary.");
+  console.error("Run pnpm install before starting Laundry.");
   process.exit(1);
 }
 const children = new Set();
@@ -29,10 +29,10 @@ process.on("SIGINT", () => stop());
 process.on("SIGTERM", () => stop());
 const cloud = process.argv.includes('--cloud');
 const apps = [
-  ["API", "@wandary/api", "dev"],
-  ["Customer", "@wandary/customer", "web"],
-  ["Partner", "@wandary/partner", "web"],
-  ["Operations", "@wandary/ops", "dev"],
+  ["API", "@laundry/api", "dev"],
+  ["Customer", "@laundry/customer", "web"],
+  ["Partner", "@laundry/partner", "web"],
+  ["Operations", "@laundry/ops", "dev"],
 ].filter(([name]) => !cloud || name !== 'API');
 for (const [name, pkg, script] of apps) {
   const child = spawn("pnpm", ["--filter", pkg, script], {

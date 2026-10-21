@@ -1,4 +1,4 @@
-// Wandary Convex HTTP transport. Thin router only: every /v1 REST call is
+// Laundry Convex HTTP transport. Thin router only: every /v1 REST call is
 // forwarded to the frozen internal.engine.dispatch mutation with
 // { method, path, token, body, idempotencyKey }, and the engine's
 // { status, body } is returned verbatim. This file owns no business logic,
@@ -99,7 +99,7 @@ function healthBody() {
   const providers = providerReadiness();
   return {
     ok: true,
-    service: "wandary-convex-http",
+    service: "laundry-convex-http",
     demoMode: demo,
     providers: {
       razorpayConfigured: providers.razorpay,

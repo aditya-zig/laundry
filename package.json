@@ -1,5 +1,5 @@
 {
-  "name": "wandary",
+  "name": "laundry",
   "private": true,
   "version": "0.1.0",
   "type": "module",
@@ -8,16 +8,16 @@
     "node": ">=24"
   },
   "scripts": {
-    "dev:api": "pnpm --filter @wandary/api dev",
-    "dev:customer": "pnpm --filter @wandary/customer web",
-    "dev:partner": "pnpm --filter @wandary/partner web",
-    "dev:ops": "pnpm --filter @wandary/ops dev",
+    "dev:api": "pnpm --filter @laundry/api dev",
+    "dev:customer": "pnpm --filter @laundry/customer web",
+    "dev:partner": "pnpm --filter @laundry/partner web",
+    "dev:ops": "pnpm --filter @laundry/ops dev",
     "check": "tsc --noEmit -p tsconfig.json && pnpm --recursive --if-present check && pnpm --recursive --if-present typecheck",
     "test": "pnpm --recursive test",
-    "test:contracts": "pnpm --filter @wandary/contracts test",
-    "test:integration": "pnpm --filter @wandary/api test:integration",
+    "test:contracts": "pnpm --filter @laundry/contracts test",
+    "test:integration": "pnpm --filter @laundry/api test:integration",
     "build": "pnpm --recursive build",
-    "test:e2e": "pnpm --filter @wandary/api test:e2e",
+    "test:e2e": "pnpm --filter @laundry/api test:e2e",
     "dev": "node tools/dev.mjs",
     "dev:cloud": "node tools/dev.mjs --cloud",
     "check:convex": "tsc --noEmit -p convex/tsconfig.json",
@@ -33,7 +33,7 @@
     "typescript": "5.7.3",
     "vitest": "3.2.4"
   },
-  "wandary": {
+  "laundry": {
     "pinnedVersions": {
       "node": "24",
       "expo": "52.0.0",

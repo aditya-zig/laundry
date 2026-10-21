@@ -1,4 +1,4 @@
-# Wandary Convex engine
+# Laundry Convex engine
 
 Real Convex backend. One frozen internal mutation owns every state change.
 No public functions exist, so the HTTP lane cannot bypass auth.

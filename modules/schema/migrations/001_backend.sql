@@ -1,4 +1,4 @@
--- Wandary backend migration 001. Normalized Postgres tables with real
+-- Laundry backend migration 001. Normalized Postgres tables with real
 -- transactional guarantees. All money is integer minor INR.
 CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 
