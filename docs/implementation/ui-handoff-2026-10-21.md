@@ -73,3 +73,27 @@ integration need explicit coordinated work before combining these branches.
 Pushing `build/wandary` triggers its configured backend deployment job.
 This dedicated branch is used to publish source for the next UI agent without
 merging or intentionally deploying the backend.
+
+## Continued on 21 October: home screen Zepto pass
+
+Commit `78bc2ae` restyles only `apps/customer/app/(tabs)/index.tsx`:
+
+- ETA chip is a tinted pill (`actionSoft`, warning variant stays amber) instead
+  of bare text.
+- Category rail uses 56px circles with single-line 11px labels; selected circle
+  fills teal with a white glyph.
+- Product tiles are compact: 88px art, service label and garment name link the
+  whole tile top to `/services/[id]`, the separate "Service details" row is
+  gone, and `INR ... / garment` sits above a right-aligned ADD button that
+  becomes the bordered stepper in the same slot.
+- Floating bar is a white bordered card: `Estimate INR X` headline, chevron-up
+  to open the bag sheet, `N items · server quote at checkout` subline, and a
+  teal `Pay for N items` button to `/basket`.
+- Bag sheet rows carry per-line steppers (stepping to zero removes the line),
+  a unit price subline and a subtotal, replacing the Remove button.
+
+Verification: customer tsc pass; 10 tests pass; 390px browser pass for add,
+stepper up/down, line removal in the sheet, sheet subtotal and the bar copy.
+The demo mock in `/tmp/opencode/wandary-mock.mjs` now serves `GET /v1/me` with
+CORS (the persisted-token validation path hit a CORS-invisible 404) and its
+404s return CORS headers so missing routes fail visibly.
