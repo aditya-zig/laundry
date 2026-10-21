@@ -90,6 +90,21 @@ test("production cannot authorize a loopback provider override", async () => {
   expect(requested).toBe(false);
 });
 
+test("blank optional provider settings use the documented Graph defaults", async () => {
+  credentials();
+  vi.stubEnv("WHATSAPP_API_BASE_URL", "");
+  vi.stubEnv("WHATSAPP_API_VERSION", "");
+  const requested: string[] = [];
+  vi.stubGlobal("fetch", async (input: string) => {
+    requested.push(input);
+    return input.includes("/media123?")
+      ? Response.json({ url: "https://lookaside.fbsbx.com/audio", mime_type: "audio/wav", file_size: 4 })
+      : new Response("RIFF", { headers: { "Content-Type": "audio/wav" } });
+  });
+  expect((await retrieveWhatsappMedia("media123")).bytes.toString()).toBe("RIFF");
+  expect(requested[0]).toBe("https://graph.facebook.com/v26.0/media123?phone_number_id=synthetic-phone");
+});
+
 test("oversized chunked media is cancelled before the provider finishes its body", async () => {
   let base = "";
   let cancelledBeforeEnd = false;

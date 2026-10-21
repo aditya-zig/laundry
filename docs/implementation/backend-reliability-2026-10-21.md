@@ -15,6 +15,7 @@ wire contracts, root manifests and dependency versions were not changed.
 | Chunked media exceeds 10 MB without Content-Length | Whole body was consumed before rejection | Streaming byte counter cancels the reader before the fixture ends its response |
 | Server sends headers/audio prefix, then stalls | Timeout was cleared after headers; body stayed pending | Deadline spans headers and body; real socket abort observed at 20 seconds |
 | Successful HTTP acknowledgement has no message ID | Returned `sent` with no provider ID | Reject incomplete acknowledgements; worker retry/error path remains authoritative |
+| Optional API base/version settings are blank, as in `.env.example` | Invalid URL or missing version instead of defaults | Empty optional values use the trusted Graph origin and pinned version; regression exercised before/after |
 | A signature has 64 non-ASCII characters | Constant-time comparison threw because byte lengths differed | Validate a 64-hex-digit digest and compare decoded bytes; malformed signatures return false |
 
 JSON provider responses are also read with a 64 KB bound and the same active
@@ -30,7 +31,7 @@ These changes did not weaken the behavioral expectations.
 
 Native regressions:
 
-- `apps/api/test/whatsapp-media.regression-1.test.ts`: 13 cases, including real
+- `apps/api/test/whatsapp-media.regression-1.test.ts`: 14 cases, including real
   loopback HTTP streams/redirects/stalls and mocked external-host responses.
 - `apps/api/test/whatsapp-signature.regression-1.test.ts`: 5 cases using actual
   HMAC computation and exact raw bytes.
@@ -65,7 +66,7 @@ preparation, not an actual merge or a connected customer UI.
 
 ## Verification and limits
 
-Full workspace `pnpm test`: 118 tests passed, including 62 API tests.
+Full workspace `pnpm test`: 119 tests passed, including 63 API tests.
 `pnpm check` and `pnpm build`: passed. Logs and exit-code files are in ignored
 `.verification/backend-handoff/`. Convex check, 23 voice tests and 7 tooling tests also passed.
 
@@ -84,8 +85,9 @@ a conflict-free trial tree, and passed offline frozen-lock validation. No
 branch was merged; this documentation follow-up changes no application code.
 
 Two local reviews examined Standards/security and Spec/consumer coverage.
-No blocking findings remained; the reviewer independently ran all 18 transport
-regressions successfully. External Claude review was unavailable.
+No blocking findings remained; the reviewer independently ran the initial 18 transport
+regressions successfully. The final blank-settings regression and full 119-test
+suite were rerun after that review; workspace check and API/worker builds also passed. External Claude review was unavailable.
 
 The Graph lookup/download request shape was cross-checked against Meta's
 [Retrieve Media URL](https://www.postman.com/meta/whatsapp-business-platform/request/ptjyi84/retrieve-media-url)

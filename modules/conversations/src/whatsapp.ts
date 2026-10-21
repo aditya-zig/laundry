@@ -12,11 +12,11 @@ export function verifyWhatsappSignature(rawBody: Buffer, header: string | undefi
 
 export function whatsappApiVersion(): string {
   // Pinned to the currently documented Cloud API version; override only for tests.
-  return process.env.WHATSAPP_API_VERSION ?? "v26.0";
+  return process.env.WHATSAPP_API_VERSION || "v26.0";
 }
 
 export function whatsappBaseUrl(): string {
-  const url = new URL(process.env.WHATSAPP_API_BASE_URL ?? "https://graph.facebook.com");
+  const url = new URL(process.env.WHATSAPP_API_BASE_URL || "https://graph.facebook.com");
   const localFixture = process.env.NODE_ENV !== "production"
     && ["localhost", "127.0.0.1"].includes(url.hostname)
     && ["http:", "https:"].includes(url.protocol);
