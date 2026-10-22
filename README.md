@@ -94,7 +94,7 @@ Types and zod schemas live in `@laundry/contracts`. The typed fetch client is
 | `dev:ops` | Runs the ops console (Vite dev). |
 | `dev` | Supervises API + apps as one process group (`tools/dev.mjs`). |
 | `db:start` | Starts local Postgres (port 5448). |
-| `check` | Typechecks every package. |
+| `check` | Builds contract declarations first, then typechecks workspace source, package tests, and app/API/worker projects. |
 | `test` | Runs every package suite. |
 | `test:contracts` | Runs the `@laundry/contracts` behavior suite. |
 | `test:integration` | Runs the `@laundry/api` acceptance suite against real local Postgres (no mocks; refuses non-local databases). |
@@ -103,6 +103,8 @@ Types and zod schemas live in `@laundry/contracts`. The typed fetch client is
 | `build` | Emits `dist` for every package. |
 
 No script uses `--passWithNoTests`. Suites must exist and pass.
+`pnpm install --frozen-lockfile && pnpm check` works without pre-existing build output.
+The contract build is a prerequisite of `check`, not a substitute for typechecking package tests.
 
 ## Pinned toolchain
 

@@ -5,6 +5,6 @@
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": { ".": { "types": "./dist/index.d.ts", "default": "./dist/index.js" } },
-  "scripts": { "test": "vitest run", "build": "tsc -p tsconfig.build.json" },
+  "scripts": { "check": "tsc --noEmit -p tsconfig.json", "test": "vitest run", "build": "tsc -p tsconfig.build.json" },
   "devDependencies": { "typescript": "5.7.3", "vitest": "3.2.4" }
 }

@@ -12,7 +12,7 @@
     "dev:customer": "pnpm --filter @laundry/customer web",
     "dev:partner": "pnpm --filter @laundry/partner web",
     "dev:ops": "pnpm --filter @laundry/ops dev",
-    "check": "tsc --noEmit -p tsconfig.json && pnpm --recursive --if-present check && pnpm --recursive --if-present typecheck",
+    "check": "pnpm --filter @laundry/contracts build && tsc --noEmit -p tsconfig.json && pnpm --recursive --if-present check && pnpm --recursive --if-present typecheck",
     "test": "pnpm --recursive test",
     "test:contracts": "pnpm --filter @laundry/contracts test",
     "contracts:generate": "pnpm --filter @laundry/contracts build && node tools/contracts/openapi.mjs && python3 tools/contracts/generate-inventory.py",
