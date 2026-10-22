@@ -1,6 +1,7 @@
 import type { Pool } from "pg";
+import { randomUUID } from "node:crypto";
 import { ApiError, assertUuid } from "../../shared/src/errors";
-import { emitOutbox } from "../../shared/src/idempotency";
+import { checkIdempotency, storeIdempotency, emitOutbox } from "../../shared/src/idempotency";
 import type { Actor } from "../../shared/src/auth";
 import { toJob } from "../../orders/src/orders";
 
@@ -114,11 +115,53 @@ export async function reportException(db: Pool, actor: Actor, jobId: string, rea
   return toJob(updated);
 }
 
-export async function opsDispatch(db: Pool, actor: Actor, jobId: string) {
+export async function opsDispatch(
+  db: Pool, actor: Actor, jobId: string,
+  input: { assignedTo: string; expectedVersion: number; idempotencyKey?: string },
+) {
   if (actor.role !== "operator" && actor.role !== "admin") throw new ApiError("FORBIDDEN", "Ops only", { status: 403 });
-  const updated = (await db.query(`UPDATE delivery_jobs SET status = 'BOOKED', version = version + 1, updated_at = now() WHERE id = $1 RETURNING *`, [jobId])).rows[0];
-  if (!updated) throw new ApiError("NOT_FOUND", "Delivery job not found", { status: 404 });
-  return toJob(updated);
+  assertUuid(jobId, "jobId");
+  assertUuid(input.assignedTo, "assignedTo");
+  const tx = await db.connect();
+  try {
+    await tx.query("BEGIN");
+    if (input.idempotencyKey) {
+      await tx.query("SELECT pg_advisory_xact_lock(hashtextextended($1, 0))", [`delivery-dispatch:${input.idempotencyKey}`]);
+    }
+    const job = (await tx.query("SELECT * FROM delivery_jobs WHERE id = $1 FOR UPDATE", [jobId])).rows[0];
+    if (!job) throw new ApiError("NOT_FOUND", "Delivery job not found", { status: 404 });
+    const payload = { jobId, assignedTo: input.assignedTo, expectedVersion: input.expectedVersion };
+    const replay = await checkIdempotency(tx, "delivery-dispatch", input.idempotencyKey, actor.id, payload);
+    if (replay.replay) {
+      await tx.query("COMMIT");
+      return replay.response as ReturnType<typeof toJob>;
+    }
+    if (Number(job.version) !== input.expectedVersion) throw new ApiError("VERSION_CONFLICT", "Dispatch version is stale", { status: 409 });
+    if (!["REQUESTED", "BOOKED", "ASSIGNED"].includes(job.status) || job.dispatch_mode !== "MANUAL") {
+      throw new ApiError("INVALID_INPUT", "This delivery cannot be assigned by manual dispatch", { status: 409 });
+    }
+    const rider = (await tx.query("SELECT id FROM users WHERE id = $1 AND role = 'rider' FOR SHARE", [input.assignedTo])).rows[0];
+    if (!rider) throw new ApiError("INVALID_INPUT", "Assignment requires a provisioned rider", { status: 400 });
+    const updated = (await tx.query(
+      "UPDATE delivery_jobs SET assigned_to = $1, status = 'ASSIGNED', version = version + 1, updated_at = now() WHERE id = $2 RETURNING *",
+      [input.assignedTo, jobId],
+    )).rows[0];
+    const result = toJob(updated);
+    await tx.query(
+      `INSERT INTO v2_audit (actor_id, actor_role, aggregate_id, action, reason, before_value, after_value, trace_id)
+       VALUES ($1, $2, $3, 'delivery.assigned.v1', $4, $5, $6, $7)`,
+      [actor.id, actor.role, jobId, "Operator assigned a provisioned rider", JSON.stringify(toJob(job)), JSON.stringify(result), randomUUID()],
+    );
+    await emitOutbox(tx, job.order_id, "delivery.updated.v1", { jobId, orderId: job.order_id, leg: job.leg, status: "ASSIGNED" });
+    await storeIdempotency(tx, "delivery-dispatch", input.idempotencyKey, actor.id, payload, result);
+    await tx.query("COMMIT");
+    return result;
+  } catch (error) {
+    try { await tx.query("ROLLBACK"); } catch { /* Preserve the original failure. */ }
+    throw error;
+  } finally {
+    tx.release();
+  }
 }
 
 export async function opsCancelDelivery(db: Pool, actor: Actor, jobId: string, reason: string) {

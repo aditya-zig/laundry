@@ -52,8 +52,13 @@ export class PartnerController {
   }
 
   @Post("v1/ops/deliveries/:id/dispatch")
-  async dispatch(@Req() req: { actor: { id: string; role: string; scopes: string[] } }, @Param("id") id: string) {
-    return opsDispatch(getPool(), req.actor, id);
+  async dispatch(
+    @Req() req: { actor: { id: string; role: string; scopes: string[] } }, @Param("id") id: string,
+    @Body() body: unknown, @Headers() headers: Record<string, unknown>,
+  ) {
+    const parsed = z.object({ assignedTo: z.string().uuid(), expectedVersion: z.number().int().min(1) }).strict().parse(body);
+    const idempotencyKey = z.string().uuid().parse(headers["idempotency-key"]);
+    return opsDispatch(getPool(), req.actor, id, { ...parsed, idempotencyKey });
   }
 
   @Post("v1/ops/deliveries/:id/cancel")

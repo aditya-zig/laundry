@@ -13,7 +13,7 @@ export function toISTFields(value: string): ISTFields {
   return { date: local.slice(0, 10), time: local.slice(11, 16) };
 }
 
-/** Strict parsing: rejects missing timezone, impossible dates and invalid times. */
+/** Parse India-local fields strictly, then serialize UTC for the current quote API. */
 export function fromISTFields(date: string, time: string): string | null {
   const day = date.trim();
   const clock = time.trim();
@@ -21,5 +21,5 @@ export function fromISTFields(date: string, time: string): string | null {
   const candidate = day + "T" + clock + ":00+05:30";
   if (!Number.isFinite(Date.parse(candidate))) return null;
   const roundTrip = toISTFields(candidate);
-  return roundTrip.date === day && roundTrip.time === clock ? candidate : null;
+  return roundTrip.date === day && roundTrip.time === clock ? new Date(candidate).toISOString() : null;
 }

@@ -4,6 +4,8 @@ import { resolve, relative, isAbsolute } from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
+export const REQUIRED_WEB_SCENARIOS = Object.freeze(['SMOKE-CUSTOMER', 'SMOKE-RIDER', 'SMOKE-OPS', 'E2E-FULFILLMENT']);
+
 export function requireTestDatabase(value) {
   let url;
   try { url = new URL(value); } catch { throw new Error('An explicit loopback verification database is required.'); }
@@ -36,7 +38,7 @@ export async function createManifest({ report, root, headSha, testedSha, baseSha
     }
     scenarios.push({ id: spec.title, project: test.projectName ?? '', status: test.status === 'expected' && test.expectedStatus === 'passed' && result?.status === 'passed' && test.results.length === 1 ? 'passed' : 'failed', videos, errors });
   }
-  return { version: 1, createdAt: new Date().toISOString(), headSha, baseSha, testedSha, dirty, runId: process.env.GITHUB_RUN_ID ?? 'local', runAttempt: process.env.GITHUB_RUN_ATTEMPT ?? '1', scope: 'existing web smoke; not native or complete business acceptance', scenarios };
+  return { version: 1, createdAt: new Date().toISOString(), headSha, baseSha, testedSha, dirty, runId: process.env.GITHUB_RUN_ID ?? 'local', runAttempt: process.env.GITHUB_RUN_ATTEMPT ?? '1', scope: 'legacy web smoke and cross-role fulfillment; demo identity/payment, not native or production-v2 acceptance', scenarios };
 }
 export async function validateManifest(manifest, { root, headSha, requireClean = true, requiredScenarios = [] }) {
   if (manifest.headSha !== headSha) throw new Error('Stale evidence: PR head SHA does not match.');
@@ -61,8 +63,8 @@ export async function writeEvidence({ exitCode = 0 } = {}) {
   const manifest = await createManifest({ report, root, testedSha, headSha: process.env.VERIFY_HEAD_SHA ?? testedSha, baseSha: process.env.VERIFY_BASE_SHA || git('rev-parse', 'origin/build/laundry'), dirty: Boolean(git('status', '--porcelain')) });
   await writeFile(resolve(root, 'manifest.json'), JSON.stringify(manifest, null, 2));
   if (exitCode !== 0) throw new Error(`Browser checks failed (exit ${exitCode}); diagnostic evidence retained.`);
-  await validateManifest(manifest, { root, headSha: process.env.VERIFY_HEAD_SHA ?? testedSha, requireClean: process.env.VERIFY_ALLOW_DIRTY !== '1', requiredScenarios: ['SMOKE-CUSTOMER', 'SMOKE-RIDER', 'SMOKE-OPS'] });
-  console.log('Verified current smoke recordings and manifest: .verification/manifest.json');
+  await validateManifest(manifest, { root, headSha: process.env.VERIFY_HEAD_SHA ?? testedSha, requireClean: process.env.VERIFY_ALLOW_DIRTY !== '1', requiredScenarios: REQUIRED_WEB_SCENARIOS });
+  console.log('Verified current web smoke, fulfillment recordings and manifest: .verification/manifest.json');
 }
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   writeEvidence().catch(error => { console.error(error.message); process.exitCode = 1; });

@@ -5,7 +5,9 @@ import { createQuote } from "../../../../modules/orders/src/quotes";
 import { createCheckout, capturePayment, getOrder, listOrders, cancelOrder } from "../../../../modules/orders/src/orders";
 import { decideAdjustment, rescheduleOrder } from "../../../../modules/orders/src/fulfillment";
 import { createSupportIncident, getSupportIncident, postSupportMessage } from "../../../../modules/orders/src/support";
-import { quoteInputSchema, cancelOrderSchema } from "@laundry/contracts";
+import { quoteInputSchema, cancelOrderSchema, demoHandoverCodesSchema } from "@laundry/contracts";
+import { demoMode } from "../../../../modules/shared/src/auth";
+import { ApiError } from "../../../../modules/shared/src/errors";
 import { AuthGuard } from "../guards/auth.guard";
 
 function keyOf(headers: Record<string, unknown>): string | undefined {
@@ -36,6 +38,21 @@ export class OrdersController {
   @Get("v1/orders/:id")
   async one(@Req() req: { actor: { id: string; role: string; scopes: string[] } }, @Param("id") id: string) {
     return getOrder(getPool(), req.actor, id);
+  }
+
+  @Get("v1/orders/:id/handover-code")
+  async demoCodes(@Req() req: { actor: { id: string; role: string; scopes: string[] } }, @Param("id") id: string) {
+    if (!demoMode()) throw new ApiError("FORBIDDEN", "Demo handover codes are disabled", { status: 403 });
+    if (req.actor.role !== "customer") throw new ApiError("NOT_FOUND", "Order not found", { status: 404 });
+    // getOrder checks ownership and withholds return proof until return is ready.
+    const order = await getOrder(getPool(), req.actor, id);
+    if (order.paymentStatus !== "CAPTURED") throw new ApiError("PAYMENT_PENDING", "Complete demo payment before handover", { status: 409 });
+    return demoHandoverCodesSchema.parse({
+      orderId: id,
+      pickupOtp: order.pickupOtp,
+      returnOtp: order.returnOtp,
+      note: "DEMO only: share a code only at the matching physical handover. Live secure code delivery is not implemented.",
+    });
   }
 
   @Get("v1/orders/:id/timeline")

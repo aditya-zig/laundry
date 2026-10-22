@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { mkdtemp, writeFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { createManifest, validateManifest, requireTestDatabase } from './evidence.mjs';
+import { createManifest, validateManifest, requireTestDatabase, REQUIRED_WEB_SCENARIOS } from './evidence.mjs';
 
 const sha = 'a'.repeat(40);
 function report(status = 'passed', video = 'run.webm') {
@@ -37,6 +37,21 @@ test('failed, absent, skipped, retried or unrecorded scenarios cannot pass the e
     const input = report(); input.suites[0].specs[0].tests[0].status = 'flaky';
     const manifest = await createManifest({ report: input, root, headSha: sha, testedSha: sha, baseSha: sha, dirty: false });
     await assert.rejects(validateManifest(manifest, { root, headSha: sha }), /pass|scenario/i);
+  } finally { await rm(root, { recursive: true, force: true }); }
+});
+
+test('web acceptance requires cross-role fulfillment even when all smoke journeys passed', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'laundry-evidence-'));
+  try {
+    await writeFile(join(root, 'run.webm'), 'recorded media fixture');
+    const input = report();
+    const example = input.suites[0].specs[0];
+    input.suites[0].specs = REQUIRED_WEB_SCENARIOS.filter(id => id !== 'E2E-FULFILLMENT').map(id => ({ ...example, title: `${id}: fixture` }));
+    const manifest = await createManifest({ report: input, root, headSha: sha, testedSha: sha, baseSha: sha, dirty: false });
+    await assert.rejects(validateManifest(manifest, { root, headSha: sha, requiredScenarios: REQUIRED_WEB_SCENARIOS }), /Missing required scenario: E2E-FULFILLMENT/);
+    input.suites[0].specs.push({ ...example, title: 'E2E-FULFILLMENT: fixture' });
+    const complete = await createManifest({ report: input, root, headSha: sha, testedSha: sha, baseSha: sha, dirty: false });
+    await validateManifest(complete, { root, headSha: sha, requiredScenarios: REQUIRED_WEB_SCENARIOS });
   } finally { await rm(root, { recursive: true, force: true }); }
 });
 
