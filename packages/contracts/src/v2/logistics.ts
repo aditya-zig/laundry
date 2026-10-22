@@ -3,7 +3,7 @@ import {
   idSchema,
   instantSchema,
   windowSchema,
-  ianaTimezoneSchema,
+  expectedVersionSchema,
 } from "./common.js";
 import { orderStatusSchema, containerSchema } from "./orders.js";
 
@@ -19,6 +19,7 @@ export const legAttemptStatusSchema = z.enum([
   "IN_TRANSIT",
   "COMPLETED",
   "FAILED",
+  "CANCEL_REQUESTED",
   "CANCELLED",
 ]);
 export type LegAttemptStatus = z.infer<typeof legAttemptStatusSchema>;
@@ -28,6 +29,8 @@ export const legAttemptSchema = z
     id: idSchema,
     legId: idSchema,
     orderId: idSchema,
+    leg: legSchema,
+    version: expectedVersionSchema,
     status: legAttemptStatusSchema,
     attemptNumber: z.number().int().positive(),
     provider: z.string().trim().min(1).optional(),
@@ -68,6 +71,7 @@ export const assignmentSchema = z
     id: idSchema,
     legAttemptId: idSchema,
     riderId: idSchema,
+    version: expectedVersionSchema,
     assignedAt: instantSchema,
     releasedAt: instantSchema.optional(),
     reason: z.string().trim().min(1).optional(),
@@ -184,7 +188,7 @@ export const riderJobSchema = z.object({
   orderId: idSchema,
   leg: legSchema,
   status: legAttemptStatusSchema,
-  version: z.number().int().nonnegative(),
+  version: expectedVersionSchema,
   customerName: z.string().trim().min(1),
   addressLine1: z.string().trim().min(1),
   addressCity: z.string().trim().min(1),
@@ -196,7 +200,7 @@ export const riderJobSchema = z.object({
   contactPhone: z.string().trim().min(1).optional(),
   assignedTo: idSchema.optional(),
   assignmentActive: z.boolean(),
-});
+}).strict();
 export type RiderJob = z.infer<typeof riderJobSchema>;
 
 export const trackingStepSchema = z.object({

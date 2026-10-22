@@ -9,6 +9,7 @@ import { BillingController } from "./controllers/billing.controller";
 import { ConversationController } from "./controllers/conversation.controller";
 import { Public, AuthGuard } from "./guards/auth.guard";
 import { PilotController } from "./controllers/pilot.controller";
+import { DatabaseLifecycle } from "./database-lifecycle";
 
 @Controller()
 class MiscController {
@@ -33,5 +34,5 @@ class MiscController {
   }
 }
 
-@Module({ controllers: [MiscController, AuthController, CatalogController, OrdersController, OpsController, PartnerController, BillingController, ConversationController, PilotController] })
+@Module({ controllers: [MiscController, AuthController, CatalogController, OrdersController, OpsController, PartnerController, BillingController, ConversationController, PilotController], providers: [DatabaseLifecycle] })
 export class AppModule {}

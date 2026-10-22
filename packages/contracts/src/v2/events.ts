@@ -82,12 +82,16 @@ export const orderDeliveredPayloadSchema = z.object({
   orderId: idSchema,
   deliveredAt: instantSchema,
   legAttempt: legAttemptSchema,
+}).refine(value => value.legAttempt.leg === "RETURN" && value.legAttempt.status === "COMPLETED" && value.legAttempt.orderId === value.orderId, {
+  path: ["legAttempt"], message: "Order delivery requires a completed return attempt for the same order.",
 });
 export type OrderDeliveredPayload = z.infer<typeof orderDeliveredPayloadSchema>;
 
 export const paymentSettledPayloadSchema = z.object({
   obligation: obligationSchema,
   receipt: receiptSchema,
+}).refine(value => value.obligation.status === "SETTLED" && value.receipt.obligationId === value.obligation.id, {
+  message: "Settlement requires a settled obligation and its own receipt. A void resolution is not a payment.",
 });
 export type PaymentSettledPayload = z.infer<typeof paymentSettledPayloadSchema>;
 
@@ -113,6 +117,48 @@ export const conversationDraftConfirmedPayloadSchema = z.object({
 export type ConversationDraftConfirmedPayload = z.infer<
   typeof conversationDraftConfirmedPayloadSchema
 >;
+
+export const EVENT_PAYLOAD_SCHEMAS = {
+  "order.confirmed.v2": orderConfirmedPayloadSchema,
+  "order.intake-recorded.v2": orderIntakeRecordedPayloadSchema,
+  "order.adjustment-decided.v2": orderAdjustmentDecidedPayloadSchema,
+  "order.ready-for-return.v2": orderReadyForReturnPayloadSchema,
+  "order.delivered.v2": orderDeliveredPayloadSchema,
+  "payment.settled.v2": paymentSettledPayloadSchema,
+  "refund.updated.v2": refundUpdatedPayloadSchema,
+  "delivery.updated.v2": deliveryUpdatedPayloadSchema,
+  "media.uploaded.v2": mediaUploadedPayloadSchema,
+  "conversation.draft-confirmed.v2": conversationDraftConfirmedPayloadSchema,
+} satisfies Record<EventType, z.ZodTypeAny>;
+
+export const domainEventSchema = z.discriminatedUnion("eventType", [
+  eventEnvelopeSchema.extend({ eventType: z.literal("order.confirmed.v2"), payload: orderConfirmedPayloadSchema }),
+  eventEnvelopeSchema.extend({ eventType: z.literal("order.intake-recorded.v2"), payload: orderIntakeRecordedPayloadSchema }),
+  eventEnvelopeSchema.extend({ eventType: z.literal("order.adjustment-decided.v2"), payload: orderAdjustmentDecidedPayloadSchema }),
+  eventEnvelopeSchema.extend({ eventType: z.literal("order.ready-for-return.v2"), payload: orderReadyForReturnPayloadSchema }),
+  eventEnvelopeSchema.extend({ eventType: z.literal("order.delivered.v2"), payload: orderDeliveredPayloadSchema }),
+  eventEnvelopeSchema.extend({ eventType: z.literal("payment.settled.v2"), payload: paymentSettledPayloadSchema }),
+  eventEnvelopeSchema.extend({ eventType: z.literal("refund.updated.v2"), payload: refundUpdatedPayloadSchema }),
+  eventEnvelopeSchema.extend({ eventType: z.literal("delivery.updated.v2"), payload: deliveryUpdatedPayloadSchema }),
+  eventEnvelopeSchema.extend({ eventType: z.literal("media.uploaded.v2"), payload: mediaUploadedPayloadSchema }),
+  eventEnvelopeSchema.extend({ eventType: z.literal("conversation.draft-confirmed.v2"), payload: conversationDraftConfirmedPayloadSchema }),
+]).superRefine((event, ctx) => {
+  let payloadAggregateId: string;
+  switch (event.eventType) {
+    case "order.confirmed.v2": payloadAggregateId = event.payload.order.id; break;
+    case "order.intake-recorded.v2":
+    case "order.adjustment-decided.v2":
+    case "order.ready-for-return.v2":
+    case "order.delivered.v2": payloadAggregateId = event.payload.orderId; break;
+    case "payment.settled.v2": payloadAggregateId = event.payload.obligation.id; break;
+    case "refund.updated.v2": payloadAggregateId = event.payload.refund.id; break;
+    case "delivery.updated.v2": payloadAggregateId = event.payload.legAttempt.id; break;
+    case "media.uploaded.v2": payloadAggregateId = event.payload.media.id; break;
+    case "conversation.draft-confirmed.v2": payloadAggregateId = event.payload.confirmation.draftId; break;
+  }
+  if (event.aggregateId !== payloadAggregateId) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["aggregateId"], message: "Envelope and payload aggregate IDs must agree." });
+});
+export type DomainEvent = z.infer<typeof domainEventSchema>;
 
 export const eventConsumersSchema = z.record(
   eventTypeSchema,

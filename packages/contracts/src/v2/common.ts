@@ -6,7 +6,7 @@ export type Id = z.infer<typeof idSchema>;
 export const currencySchema = z.literal("INR");
 export type Currency = z.infer<typeof currencySchema>;
 
-export const moneySchema = z.number().int().nonnegative();
+export const moneySchema = z.number().int().nonnegative().safe();
 export type Money = z.infer<typeof moneySchema>;
 
 const instantPattern =
@@ -118,6 +118,7 @@ export type BillingUnit = z.infer<typeof billingUnitSchema>;
 export const actorRoleSchema = z.enum([
   "CUSTOMER",
   "RIDER",
+  "FACILITY",
   "OPERATOR",
   "SUPPORT",
   "ADMIN",
@@ -136,6 +137,14 @@ export const actorSchema = z.object({
   }),
 });
 export type Actor = z.infer<typeof actorSchema>;
+
+/** Internal service identity. Never parsed from a first-party request body. */
+export const systemActorSchema = z.object({
+  id: idSchema,
+  role: z.literal("SYSTEM"),
+  consumerScopes: z.array(z.string().trim().min(1)).min(1),
+}).strict();
+export type SystemActor = z.infer<typeof systemActorSchema>;
 
 export const errorCodeSchema = z.enum([
   "UNAUTHENTICATED",

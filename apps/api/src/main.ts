@@ -66,6 +66,7 @@ async function bootstrap() {
   assertProductionConfig();
   await initializeDb();
   const app = await NestFactory.create<NestExpressApplication>(AppModule, { rawBody: true });
+  app.enableShutdownHooks(["SIGINT", "SIGTERM"]);
   app.enableCors({
     origin: resolveCorsOrigins(),
     allowedHeaders: ["Content-Type", "Authorization", "Idempotency-Key"],

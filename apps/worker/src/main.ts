@@ -11,6 +11,7 @@ import { sendWhatsappText } from "../../../modules/conversations/src/whatsapp";
 async function claimOutbox(): Promise<{ id: string; event_type: string; payload: unknown; attempts: number }[]> {
   const db = getPool();
   const client = await db.connect();
+  let poisoned = false;
   try {
     await client.query("BEGIN");
     const rows = (await client.query(
@@ -28,10 +29,10 @@ async function claimOutbox(): Promise<{ id: string; event_type: string; payload:
     await client.query("COMMIT");
     return rows as { id: string; event_type: string; payload: unknown; attempts: number }[];
   } catch (e) {
-    try { await client.query("ROLLBACK"); } catch { /* settled */ }
+    try { await client.query("ROLLBACK"); } catch { poisoned = true; }
     throw e;
   } finally {
-    client.release();
+    client.release(poisoned);
   }
 }
 
@@ -118,19 +119,31 @@ async function handleEvent(type: string, payload: Record<string, unknown>): Prom
   }
 }
 
+let stopping = false;
+let wake: (() => void) | undefined;
+function stop(): void { stopping = true; wake?.(); }
+process.on("SIGTERM", stop);
+process.on("SIGINT", stop);
+
 async function main(): Promise<void> {
-  await initializeDb();
-  // eslint-disable-next-line no-console
-  console.log("[laundry-worker] started");
-  for (;;) {
-    await tick();
-    await new Promise((r) => setTimeout(r, 2000));
+  try {
+    await initializeDb();
+    console.log("[laundry-worker] started");
+    while (!stopping) {
+      await tick();
+      if (!stopping) await new Promise<void>(resolve => {
+        const timer = setTimeout(() => { wake = undefined; resolve(); }, 2000);
+        wake = () => { clearTimeout(timer); wake = undefined; resolve(); };
+      });
+    }
+  } finally {
+    // Finish the active claim/update before ending its pool. A signal must not
+    // create a second pool during shutdown or report a failed tick as success.
+    await closePool();
   }
 }
 
-process.on("SIGTERM", () => closePool().finally(() => process.exit(0)));
-main().catch((e) => {
-  // eslint-disable-next-line no-console
-  console.error("[laundry-worker] fatal", e);
-  process.exit(1);
+main().catch(error => {
+  console.error("[laundry-worker] fatal", error);
+  process.exitCode = 1;
 });

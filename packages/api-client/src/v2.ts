@@ -63,11 +63,9 @@ export class V2ApiError extends Error {
 }
 
 const DEFAULT_BASE = "http://localhost:4100/v2";
-const emptyObjectSchema = z.object({}).passthrough();
 
 type Schema<T> = z.ZodType<T>;
 type Query = Record<string, string | number | boolean | undefined>;
-type Input = Record<string, unknown>;
 
 function queryString(query?: Query): string {
   if (!query) return "";
@@ -186,8 +184,9 @@ export function createV2Client(options: V2ClientOptions = {}) {
     } = {},
   ): Promise<T> {
     const route = v2.resolveRoute(routeId, config.params);
+    const body = route.requestSchema ? v2.getWireSchema(route.requestSchema).parse(config.body) : config.body;
     return request(route.method, route.path.slice("/v2".length) + queryString(config.query),
-      schema, config.body, config.opts);
+      schema, body, config.opts);
   }
 
   const order = v2.orderSchema;
@@ -212,7 +211,6 @@ export function createV2Client(options: V2ClientOptions = {}) {
   const incidentList = v2.pageSchema(incident);
   const reviewList = v2.pageSchema(v2.publicReviewSchema);
   const jobList = z.array(riderJob);
-  const genericObject = emptyObjectSchema;
 
   return {
     requestOtp: (phone: string, opts?: V2MutatingOpts) =>
@@ -251,6 +249,39 @@ export function createV2Client(options: V2ClientOptions = {}) {
     deleteAddress: (id: string, expectedVersion: number, opts?: V2MutatingOpts) =>
       call("identity.address.delete", v2.deleteResultSchema, { params: { addressId: id }, body: v2.addressDeleteSchema.parse({ expectedVersion }), opts }),
 
+    inviteStaff: (input: v2.StaffInvitation, opts?: V2MutatingOpts) =>
+      call("identity.staff.invite", v2.staffInvitationResultSchema, { body: input, opts }),
+
+    configureStaffMfa: (input: v2.StaffMfaSetup, opts?: V2MutatingOpts) =>
+      call("identity.staff.mfa", v2.staffMfaResultSchema, { body: input, opts }),
+
+    linkWhatsApp: (input: v2.WhatsAppLink, opts?: V2MutatingOpts) =>
+      call("identity.whatsapp.link", v2.whatsAppLinkResultSchema, { body: input, opts }),
+
+    listGarmentEligibility: (query?: Query) =>
+      call("catalog.garments", v2.WIRE_SCHEMAS.GarmentEligibilityList, { query }),
+
+    getEffectiveRates: (query?: Query) =>
+      call("catalog.rates.effective", v2.WIRE_SCHEMAS.EffectiveRateSummary, { query }),
+
+    updateService: (serviceId: string, input: v2.ServiceUpdate, opts?: V2MutatingOpts) =>
+      call("catalog.services.write", service, { params: { serviceId }, body: input, opts }),
+
+    createRateCard: (input: v2.RateCardInput, opts?: V2MutatingOpts) =>
+      call("catalog.rate-cards.create", v2.rateCardSchema, { body: input, opts }),
+
+    approveRateCard: (rateCardId: string, input: v2.VersionedReason, opts?: V2MutatingOpts) =>
+      call("catalog.rate-cards.approve", v2.rateCardSchema, { params: { rateCardId }, body: input, opts }),
+
+    activateRateCard: (rateCardId: string, input: v2.VersionedReason, opts?: V2MutatingOpts) =>
+      call("catalog.rate-cards.activate", v2.rateCardSchema, { params: { rateCardId }, body: input, opts }),
+
+    getOperationsCalendar: (query?: Query) =>
+      call("availability.calendar", v2.operationsCalendarSchema, { query }),
+
+    setCapacity: (input: v2.CapacityUpdate, opts?: V2MutatingOpts) =>
+      call("availability.capacity", v2.capacityBucketSchema, { body: input, opts }),
+
     listServices: () => call("catalog.services.list", serviceList),
 
     getService: (id: string) =>
@@ -259,8 +290,10 @@ export function createV2Client(options: V2ClientOptions = {}) {
     checkServiceArea: (postalCode: string) =>
       call("availability.area", v2.serviceAreaSchema, { params: { postalCode } }),
 
-    listSlots: (input: Query) =>
-      call("availability.slots", genericObject, { query: input }),
+    listSlots: (input: v2.SlotQuery) => {
+      const parsed = v2.slotQuerySchema.parse(input);
+      return call("availability.slots", v2.slotPairListSchema, { query: { ...parsed, serviceIds: parsed.serviceIds.join(",") } });
+    },
 
     createQuote: (input: v2.QuoteInput, opts?: V2MutatingOpts) =>
       call("orders.quote", quote, { body: v2.quoteInputSchema.parse(input), opts }),
@@ -280,37 +313,50 @@ export function createV2Client(options: V2ClientOptions = {}) {
       expectedVersion: number,
       opts?: V2MutatingOpts,
     ) =>
-      call("orders.cancel", order, { params: { orderId: id }, body: {
+      call("orders.cancel", order, { params: { orderId: id }, body: v2.orderCancellationSchema.parse({
         reason,
         expectedVersion,
-      }, opts }),
+      }), opts }),
 
     rescheduleOrder: (
       id: string,
-      window: v2.ScheduleWindow,
-      expectedVersion: number,
+      input: v2.OrderReschedule,
       opts?: V2MutatingOpts,
     ) =>
-      call("orders.reschedule", order, { params: { orderId: id }, body: {
-        window,
-        expectedVersion,
-      }, opts }),
+      call("orders.reschedule", order, { params: { orderId: id }, body: v2.orderRescheduleSchema.parse(input), opts }),
 
     decideAdjustment: (
       id: string,
       adjustmentId: string,
       adjustmentVersion: number,
       decision: v2.AdjustmentDecision["decision"],
+      expectedVersion: number,
       opts?: V2MutatingOpts,
     ) =>
       call("orders.adjustment.decide", order, { params: { orderId: id }, body: v2.adjustmentDecisionSchema.parse({
         adjustmentId,
         adjustmentVersion,
         decision,
+        expectedVersion,
       }), opts }),
 
     getCustodyReceipt: (id: string) =>
       call("orders.custody-receipt", custodyReceipt, { params: { orderId: id } }),
+
+    listOrderObligations: (orderId: string, query?: Query) =>
+      call("billing.obligations", v2.WIRE_SCHEMAS.ObligationList, { params: { orderId }, query }),
+
+    listOrderPaymentAttempts: (orderId: string, query?: Query) =>
+      call("billing.attempts", v2.WIRE_SCHEMAS.PaymentAttemptList, { params: { orderId }, query }),
+
+    listOrderReceipts: (orderId: string, query?: Query) =>
+      call("billing.receipts", v2.WIRE_SCHEMAS.ReceiptList, { params: { orderId }, query }),
+
+    listOrderRefunds: (orderId: string, query?: Query) =>
+      call("billing.refunds", v2.WIRE_SCHEMAS.RefundList, { params: { orderId }, query }),
+
+    getOrderTracking: (orderId: string) =>
+      call("logistics.tracking", tracking, { params: { orderId } }),
 
     listObligations: (query?: Query) =>
       call("billing.obligations.list", obligationList, { query }),
@@ -339,25 +385,25 @@ export function createV2Client(options: V2ClientOptions = {}) {
     listIncidents: () =>
       call("support.incidents.list", incidentList),
 
-    createIncident: (input: Input, opts?: V2MutatingOpts) =>
-      call("support.incidents.create", incident, { params: { orderId: v2.idSchema.parse(input.orderId) }, body: input, opts }),
+    createIncident: (input: v2.IncidentInput, opts?: V2MutatingOpts) =>
+      call("support.incidents.create", incident, { params: { orderId: v2.idSchema.parse(input.orderId) }, body: v2.incidentInputSchema.parse(input), opts }),
 
     listIncidentMessages: (incidentId: string) =>
       call("support.incidents.messages.list", v2.pageSchema(v2.incidentMessageSchema), { params: { incidentId } }),
 
     postIncidentMessage: (
       incidentId: string,
-      input: Input,
+      input: v2.IncidentMessageInput,
       opts?: V2MutatingOpts,
     ) =>
-      call("support.incidents.messages", v2.incidentMessageSchema, { params: { incidentId }, body: input, opts }),
+      call("support.incidents.messages", v2.incidentMessageSchema, { params: { incidentId }, body: v2.incidentMessageInputSchema.parse(input), opts }),
 
     requestRewash: (
       incidentId: string,
-      input: Input,
+      input: v2.RewashRequestInput,
       opts?: V2MutatingOpts,
     ) =>
-      call("support.rewash.create", v2.rewashRequestSchema, { params: { incidentId }, body: input, opts }),
+      call("support.rewash.create", v2.rewashRequestSchema, { params: { incidentId }, body: v2.rewashRequestInputSchema.parse(input), opts }),
 
     createReview: (input: v2.ReviewInput, opts?: V2MutatingOpts) =>
       call("reviews.create", review, { params: { orderId: input.orderId }, body: v2.reviewInputSchema.parse(input), opts }),
@@ -374,65 +420,65 @@ export function createV2Client(options: V2ClientOptions = {}) {
     getJob: (id: string) =>
       call("logistics.rider.job", riderJob, { params: { jobId: id } }),
 
-    acceptJob: (id: string, opts?: V2MutatingOpts) =>
-      call("logistics.rider.accept", v2.assignmentSchema, { params: { jobId: id }, opts }),
+    acceptJob: (id: string, expectedVersion: number, opts?: V2MutatingOpts) =>
+      call("logistics.rider.accept", v2.assignmentSchema, { params: { jobId: id }, body: v2.versionedCommandSchema.parse({ expectedVersion }), opts }),
 
     recordHandover: (
       jobId: string,
-      input: Input,
+      input: Omit<v2.RiderHandover, "jobId">,
       opts?: V2MutatingOpts,
     ) =>
-      call("logistics.rider.handover", v2.handoverResultSchema, { body: { ...input, jobId }, opts }),
+      call("logistics.rider.handover", v2.handoverResultSchema, { body: v2.riderHandoverSchema.parse({ ...input, jobId }), opts }),
 
     reportJobException: (
       id: string,
-      input: Input,
+      input: v2.DeliveryException,
       opts?: V2MutatingOpts,
     ) =>
-      call("logistics.rider.exception", v2.legAttemptSchema, { params: { jobId: id }, body: input, opts }),
+      call("logistics.rider.exception", v2.legAttemptSchema, { params: { jobId: id }, body: v2.deliveryExceptionSchema.parse(input), opts }),
 
     reportLocation: (
       id: string,
-      input: Input,
+      input: Omit<v2.RiderLocationReport, "jobId">,
       opts?: V2MutatingOpts,
     ) =>
-      call("logistics.rider.location", v2.locationSchema, { body: { ...input, jobId: id }, opts }),
+      call("logistics.rider.location", v2.locationSchema, { body: v2.riderLocationReportSchema.parse({ ...input, jobId: id }), opts }),
 
     listOpsOrders: (query?: Query) =>
       call("orders.ops.queue", orderList, { query }),
 
     recordIntake: (
       id: string,
-      input: Input,
+      input: Omit<v2.IntakeRecord, "expectedVersion">,
       expectedVersion: number,
       opts?: V2MutatingOpts,
     ) =>
-      call("orders.ops.intake", order, { params: { orderId: id }, body: {
+      call("orders.ops.intake", order, { params: { orderId: id }, body: v2.intakeRecordSchema.parse({
         ...input,
         expectedVersion,
-      }, opts }),
+      }), opts }),
 
     advanceCare: (
       id: string,
-      target: v2.OrderStatus,
+      target: v2.CareUpdate["target"],
       expectedVersion: number,
       opts?: V2MutatingOpts,
     ) =>
-      call("orders.ops.care", order, { params: { orderId: id }, body: {
+      call("orders.ops.care", order, { params: { orderId: id }, body: v2.careUpdateSchema.parse({
         target,
         expectedVersion,
-      }, opts }),
+      }), opts }),
 
     recordQualityCheck: (
       id: string,
-      input: Input,
+      input: Omit<v2.QualityCheck, "expectedVersion">,
       expectedVersion: number,
       opts?: V2MutatingOpts,
     ) =>
-      call("orders.ops.qc", order, { params: { orderId: id }, body: {
+      call("orders.ops.qc", order, { params: { orderId: id }, body: v2.qualityCheckSchema.parse({
         ...input,
         expectedVersion,
-      }, opts }),
+      }), opts }),
 
     holdOrder: (
       id: string,
@@ -440,58 +486,67 @@ export function createV2Client(options: V2ClientOptions = {}) {
       expectedVersion: number,
       opts?: V2MutatingOpts,
     ) =>
-      call("orders.ops.hold", order, { params: { orderId: id }, body: {
+      call("orders.ops.hold", order, { params: { orderId: id }, body: v2.orderHoldSchema.parse({
         reason,
         expectedVersion,
-      }, opts }),
+      }), opts }),
 
     resolveException: (
       id: string,
-      input: Input,
+      input: Omit<v2.ExceptionResolution, "expectedVersion">,
       expectedVersion: number,
       opts?: V2MutatingOpts,
     ) =>
-      call("orders.ops.exception", order, { params: { orderId: id }, body: {
+      call("orders.ops.exception", order, { params: { orderId: id }, body: v2.exceptionResolutionSchema.parse({
         ...input,
         expectedVersion,
-      }, opts }),
+      }), opts }),
 
     confirmManualPayment: (
       obligationId: string,
-      input: Input,
+      input: v2.ManualPaymentConfirmation,
       opts?: V2MutatingOpts,
     ) =>
-      call("billing.manual.confirm", receipt, { params: { obligationId }, body: input, opts }),
+      call("billing.manual.confirm", receipt, { params: { obligationId }, body: v2.manualPaymentConfirmationSchema.parse(input), opts }),
 
-    createRefund: (input: Input, opts?: V2MutatingOpts) =>
-      call("billing.refund.create", refund, { body: input, opts }),
+    createRefund: (input: v2.RefundRequest, opts?: V2MutatingOpts) =>
+      call("billing.refund.create", refund, { body: v2.refundRequestSchema.parse(input), opts }),
 
     reconciliation: (period: string, opts?: V2MutatingOpts) =>
-      call("billing.reconcile", v2.reconciliationSchema, { body: { period }, opts }),
+      call("billing.reconcile", v2.reconciliationSchema, { body: v2.reconciliationRequestSchema.parse({ period }), opts }),
 
-    assignDelivery: (input: Input, opts?: V2MutatingOpts) =>
-      call("logistics.ops.assign", v2.assignmentSchema, { body: input, opts }),
+    assignDelivery: (input: v2.AssignmentInput, opts?: V2MutatingOpts) =>
+      call("logistics.ops.assign", v2.assignmentSchema, { body: v2.assignmentInputSchema.parse(input), opts }),
 
-    reassignDelivery: (id: string, input: Input, opts?: V2MutatingOpts) =>
-      call("logistics.ops.reassign", v2.assignmentSchema, { params: { assignmentId: id }, body: input, opts }),
+    reassignDelivery: (id: string, input: v2.ReassignmentInput, opts?: V2MutatingOpts) =>
+      call("logistics.ops.reassign", v2.assignmentSchema, { params: { assignmentId: id }, body: v2.reassignmentInputSchema.parse(input), opts }),
 
-    cancelLeg: (id: string, input: Input, opts?: V2MutatingOpts) =>
-      call("logistics.ops.cancel", v2.legAttemptSchema, { params: { legAttemptId: id }, body: input, opts }),
+    cancelLeg: (id: string, input: v2.LegCancellation, opts?: V2MutatingOpts) =>
+      call("logistics.ops.cancel", v2.legAttemptSchema, { params: { legAttemptId: id }, body: v2.legCancellationSchema.parse(input), opts }),
 
-    resolveIncident: (id: string, input: Input, opts?: V2MutatingOpts) =>
-      call("support.incidents.resolve", incident, { params: { incidentId: id }, body: input, opts }),
+    resolveIncident: (id: string, input: v2.IncidentResolutionInput, opts?: V2MutatingOpts) =>
+      call("support.incidents.resolve", incident, { params: { incidentId: id }, body: v2.incidentResolutionInputSchema.parse(input), opts }),
 
-    moderateReview: (id: string, input: Input, opts?: V2MutatingOpts) =>
-      call("reviews.moderate", review, { params: { reviewId: id }, body: input, opts }),
+    moderateReview: (id: string, input: v2.ReviewModerationInput, opts?: V2MutatingOpts) =>
+      call("reviews.moderate", review, { params: { reviewId: id }, body: v2.reviewModerationInputSchema.parse(input), opts }),
+
+    confirmDraft: (input: v2.DraftConfirmation, opts?: V2MutatingOpts) =>
+      call("conversations.confirm", order, { params: { draftId: input.draftId }, body: input, opts }),
+
+    optOutConversation: (input: v2.ConversationOptOut, opts?: V2MutatingOpts) =>
+      call("conversations.optout", v2.optOutResultSchema, { body: input, opts }),
+
+    handoffConversation: (draftId: string, input: v2.ConversationHandoff, opts?: V2MutatingOpts) =>
+      call("conversations.handoff", v2.conversationDraftSchema, { params: { draftId }, body: input, opts }),
 
     listDeadLetters: (query?: Query) =>
-      call("jobs.dead-letter.list", v2.pageSchema(emptyObjectSchema), { query }),
+      call("jobs.dead-letter.list", v2.pageSchema(v2.jobSchema), { query }),
 
-    replayJob: (id: string, opts?: V2MutatingOpts) =>
-      call("jobs.replay", genericObject, { params: { jobId: id }, opts }),
+    replayJob: (id: string, input: v2.JobReplay, opts?: V2MutatingOpts) =>
+      call("jobs.replay", v2.jobSchema, { params: { jobId: id }, body: v2.jobReplaySchema.parse(input), opts }),
 
     jobHealth: () =>
-      call("jobs.health", genericObject),
+      call("jobs.health", v2.jobHealthSchema),
   };
 }
 

@@ -1,10 +1,14 @@
-# C01 handoff: freeze the v2 wire contracts
+# C01 handoff: executable v2 contracts, freeze pending
 
 ## Status correction, 22 October 2026
 
-Latest identity and routing work is documented in `docs/implementation/contracts/IDENTITY-AND-ROUTING.md`. It supersedes older SDK and inventory counts below. C01 is still blocked.
+The current implementation and verification record is `docs/implementation/contracts/EXECUTABLE-BOUNDARIES.md`. It supersedes the historical counts and readiness claims below. C01 remains `BLOCKED_CONTRACT`.
 
-This is a partial implementation, not an approved freeze. The earlier readiness claims below are historical and do not authorize feature dispatch. OpenAPI, fixtures, complete schema-to-route-to-SDK coverage, transaction infrastructure and v2 consumer checks remain required. See `docs/implementation/contracts/RETRY-SAFETY.md` for the current SDK fix, local verification and remaining gates. No fresh-cloud, browser or Android acceptance is claimed.
+Executable schemas, generated OpenAPI, synthetic fixtures, SDK inventory checks, pure transition guards and PostgreSQL command infrastructure are implemented. The full workspace suite passed 584 tests on isolated PostgreSQL. Web smoke actions passed, but dirty-workspace recordings cannot approve a published revision. Real v2 business consumers, port compatibility review, fresh cloud verification and native acceptance remain gates. No production readiness, freeze or deployment is claimed.
+
+## Historical handoff below
+
+The older IMPLEMENTED status, digest, successful commands and readiness language below describe the earlier handoff only. They are not the current acceptance record and do not authorize feature dispatch.
 
 ## Identity
 

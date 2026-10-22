@@ -158,9 +158,9 @@ export type Quote = z.infer<typeof quoteSchema>;
 
 export const bookingInputSchema = z.object({
   quoteId: idSchema,
-  expectedVersion: expectedVersionSchema.optional(),
-  paymentModel: z.enum(["DUE_AT_RETURN", "PREPAID_V1"]),
-});
+  expectedVersion: expectedVersionSchema,
+  paymentModel: z.literal("DUE_AT_RETURN"),
+}).strict();
 export type BookingInput = z.infer<typeof bookingInputSchema>;
 
 export const orderStatusSchema = z.enum([
@@ -204,6 +204,8 @@ export const measuredLineSchema = z.object({
   measuredPieceQuantity: nonNegativeIntegerSchema.optional(),
   condition: custodyConditionSchema,
   note: z.string().max(2000).optional(),
+}).strict().refine(line => line.countedQuantity !== undefined || line.measuredWeightGrams !== undefined || line.measuredPieceQuantity !== undefined, {
+  message: "Intake requires counted or measured facts.",
 });
 export type MeasuredLine = z.infer<typeof measuredLineSchema>;
 
@@ -239,8 +241,9 @@ export type Adjustment = z.infer<typeof adjustmentSchema>;
 export const adjustmentDecisionSchema = z.object({
   adjustmentId: idSchema,
   adjustmentVersion: expectedVersionSchema,
+  expectedVersion: expectedVersionSchema,
   decision: z.enum(["ACCEPT", "DECLINE"]),
-});
+}).strict();
 export type AdjustmentDecision = z.infer<
   typeof adjustmentDecisionSchema
 >;

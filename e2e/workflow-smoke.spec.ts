@@ -4,17 +4,22 @@ test('SMOKE-CUSTOMER: catalog, service detail and basket preserve chosen quantit
   await test.step('Open the actual customer app and load demo services', async () => {
     await page.goto('http://localhost:8081');
     await expect(page.getByRole('heading', { name: 'Laundry', exact: true })).toBeVisible();
-    await page.getByText('Continue with demo sign-in', { exact: true }).click();
-    await expect(page.getByText('Wash and Fold', { exact: true })).toBeVisible();
+    await expect(page.getByText('DEMO', { exact: true })).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Details for Wash and Fold, T-shirt', exact: true })).toBeVisible();
   });
   await test.step('Choose two garments and verify the resulting basket', async () => {
-    await page.getByText('Wash and Fold', { exact: true }).click();
+    await page.getByRole('link', { name: 'Details for Wash and Fold, T-shirt', exact: true }).click();
     await page.getByLabel('Quantity for T-shirt', { exact: true }).fill('2');
-    await page.getByText('Add to basket', { exact: true }).click();
+    await page.getByRole('button', { name: 'Add T-shirt to basket', exact: true }).click();
     await expect(page.getByText('2 item(s) added to basket.', { exact: true })).toBeVisible();
-    await page.getByText('Review basket', { exact: true }).click();
-    await expect(page.getByText('Total garments: 2', { exact: true })).toBeVisible();
-    await expect(page.getByLabel('Quantity for line 1', { exact: true })).toHaveValue('2');
+    await page.getByRole('button', { name: 'Review basket', exact: true }).click();
+    await expect(page.getByRole('heading', { name: 'Your bag', exact: true })).toBeVisible();
+    await expect(page.getByText('2 garments', { exact: true })).toBeVisible();
+    await expect(page.getByLabel('2 T-shirt', { exact: true })).toBeVisible();
+    await page.getByRole('button', { name: 'Add one T-shirt', exact: true }).click();
+    await expect(page.getByText('3 garments', { exact: true })).toBeVisible();
+    await page.getByRole('button', { name: 'Remove one T-shirt', exact: true }).click();
+    await expect(page.getByText('2 garments', { exact: true })).toBeVisible();
   });
 });
 

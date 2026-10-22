@@ -32,6 +32,12 @@ const errorEnvelope = {
 
 const id = "11111111-1111-4111-8111-111111111111";
 const challenge = { challengeId: id, expiresAt: "2026-10-22T09:00:00Z" };
+const handover = { legAttemptId: id, expectedVersion: 1, actionId: id, method: "CODE" as const, code: "123456", capturedAt: "2026-10-22T09:00:00Z", containerIds: [id], garmentCount: 5, condition: "GOOD" as const };
+const location = { expectedVersion: 1, lat: 12, lng: 77, reportedAt: "2026-10-22T09:00:00Z" };
+const manualPayment = { expectedVersion: 1, amountMinor: 100, currency: "INR" as const, method: "CASH" as const, reason: "Synthetic cash received" };
+const moderation = { expectedVersion: 1, decision: "PUBLISH" as const, reason: "Consent checked" };
+const rewash = { expectedVersion: 1, reason: "Synthetic quality issue" };
+const incidentInput = { orderId: id, category: "QUALITY" as const, summary: "Synthetic quality issue", mediaIds: [] };
 
 describe("v2 client headers", () => {
   it("sends an idempotency key on a mutation", async () => {
@@ -210,6 +216,7 @@ describe("v2 mutation recovery", () => {
     });
     await expect(client.bookOrder({
       quoteId: "44444444-4444-4444-8444-444444444444",
+      expectedVersion: 1,
       paymentModel: "DUE_AT_RETURN",
     })).rejects.toMatchObject({
       name: "UnknownOutcomeError",
@@ -321,15 +328,15 @@ describe("v2 canonical endpoints", () => {
     { name: "ops queue", method: "GET", path: "/ops/orders/queue", invoke: c => c.listOpsOrders() },
     { name: "finalize", method: "POST", path: `/media/${id}/finalize`, invoke: c => c.finalizeUpload(id) },
     { name: "download", method: "POST", path: `/media/${id}/download`, invoke: c => c.getDownloadUrl(id) },
-    { name: "handover", method: "POST", path: "/rider/handovers", invoke: c => c.recordHandover(id, {}) },
-    { name: "location", method: "POST", path: "/rider/location", invoke: c => c.reportLocation(id, {}) },
-    { name: "manual payment", method: "POST", path: `/ops/billing/obligations/${id}/confirm-manual`, invoke: c => c.confirmManualPayment(id, {}) },
+    { name: "handover", method: "POST", path: "/rider/handovers", invoke: c => c.recordHandover(id, handover) },
+    { name: "location", method: "POST", path: "/rider/location", invoke: c => c.reportLocation(id, location) },
+    { name: "manual payment", method: "POST", path: `/ops/billing/obligations/${id}/confirm-manual`, invoke: c => c.confirmManualPayment(id, manualPayment) },
     { name: "reconciliation", method: "POST", path: "/ops/billing/reconciliation", invoke: c => c.reconciliation("2026-10") },
-    { name: "moderation", method: "POST", path: `/ops/reviews/${id}/moderation`, invoke: c => c.moderateReview(id, {}) },
+    { name: "moderation", method: "POST", path: `/ops/reviews/${id}/moderation`, invoke: c => c.moderateReview(id, moderation) },
     { name: "dead letters", method: "GET", path: "/ops/jobs/dead-letter", invoke: c => c.listDeadLetters() },
-    { name: "exception", method: "POST", path: `/ops/orders/${id}/exceptions/resolve`, invoke: c => c.resolveException(id, {}, 1) },
-    { name: "rewash", method: "POST", path: `/incidents/${id}/rewash-requests`, invoke: c => c.requestRewash(id, {}) },
-    { name: "incident", method: "POST", path: `/orders/${id}/incidents`, invoke: c => c.createIncident({ orderId: id }) },
+    { name: "exception", method: "POST", path: `/ops/orders/${id}/exceptions/resolve`, invoke: c => c.resolveException(id, { action: "RESUME", reason: "Issue resolved" }, 1) },
+    { name: "rewash", method: "POST", path: `/incidents/${id}/rewash-requests`, invoke: c => c.requestRewash(id, rewash) },
+    { name: "incident", method: "POST", path: `/orders/${id}/incidents`, invoke: c => c.createIncident(incidentInput) },
     { name: "public reviews", method: "GET", path: `/reviews?serviceId=${id}`, invoke: c => c.listPublicReviews(id) },
   ];
 
@@ -373,10 +380,10 @@ describe("v2 request and response boundaries", () => {
   it("sends one flat adjustment decision", async () => {
     const calls: Call[] = [];
     const client = createV2Client({ fetchImpl: stub(calls, () => json(errorEnvelope, 409)) });
-    await expect(client.decideAdjustment(id, id, 2, "ACCEPT")).rejects.toBeInstanceOf(V2ApiError);
+    await expect(client.decideAdjustment(id, id, 2, "ACCEPT", 4)).rejects.toBeInstanceOf(V2ApiError);
     expect(calls[0].url.endsWith(`/orders/${id}/adjustments/decision`)).toBe(true);
     expect(JSON.parse(String(calls[0].init.body))).toEqual({
-      adjustmentId: id, adjustmentVersion: 2, decision: "ACCEPT",
+      adjustmentId: id, adjustmentVersion: 2, decision: "ACCEPT", expectedVersion: 4,
     });
   });
 
@@ -396,10 +403,10 @@ describe("v2 request and response boundaries", () => {
   it("keeps rider job IDs in commands whose paths no longer contain them", async () => {
     const calls: Call[] = [];
     const client = createV2Client({ fetchImpl: stub(calls, () => json(errorEnvelope, 409)) });
-    await expect(client.recordHandover(id, { jobId: "wrong", proofId: "test" })).rejects.toBeInstanceOf(V2ApiError);
-    await expect(client.reportLocation(id, { jobId: "wrong", lat: 12, lng: 77 })).rejects.toBeInstanceOf(V2ApiError);
-    expect(JSON.parse(String(calls[0].init.body))).toEqual({ jobId: id, proofId: "test" });
-    expect(JSON.parse(String(calls[1].init.body))).toEqual({ jobId: id, lat: 12, lng: 77 });
+    await expect(client.recordHandover(id, handover)).rejects.toBeInstanceOf(V2ApiError);
+    await expect(client.reportLocation(id, location)).rejects.toBeInstanceOf(V2ApiError);
+    expect(JSON.parse(String(calls[0].init.body))).toEqual({ ...handover, jobId: id, capturedAt: "2026-10-22T09:00:00.000Z" });
+    expect(JSON.parse(String(calls[1].init.body))).toEqual({ ...location, jobId: id, reportedAt: "2026-10-22T09:00:00.000Z" });
   });
 
   it("sends reconciliation as an explicit keyed command", async () => {

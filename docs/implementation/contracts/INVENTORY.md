@@ -33,11 +33,11 @@ Billing units: 2.
 | `POST` | `/v2/identity/otp` | `OtpRequest` | `OtpChallenge` | PUBLIC | REQUIRED | INVALID_INPUT, RATE_LIMITED |
 | `POST` | `/v2/identity/otp/verify` | `OtpVerify` | `Session` | PUBLIC | REQUIRED | INVALID_INPUT, UNAUTHENTICATED |
 | `POST` | `/v2/identity/session/refresh` | `SessionRefresh` | `Session` | PUBLIC | REQUIRED | UNAUTHENTICATED |
-| `POST` | `/v2/identity/logout` | - | `LogoutResult` | CUSTOMER | REQUIRED | UNAUTHENTICATED |
-| `POST` | `/v2/identity/sessions/{sessionId}/revoke` | - | `SessionRevocation` | CUSTOMER, OPERATOR, SUPPORT, ADMIN | REQUIRED | UNAUTHENTICATED, FORBIDDEN, NOT_FOUND |
-| `GET` | `/v2/identity/me` | - | `Actor` | CUSTOMER, OPERATOR, SUPPORT, ADMIN, RIDER | NOT_APPLICABLE | UNAUTHENTICATED |
+| `POST` | `/v2/identity/logout` | - | `LogoutResult` | CUSTOMER, RIDER, FACILITY, OPERATOR, SUPPORT, ADMIN | REQUIRED | UNAUTHENTICATED |
+| `POST` | `/v2/identity/sessions/{sessionId}/revoke` | - | `SessionRevocation` | CUSTOMER, RIDER, FACILITY, OPERATOR, SUPPORT, ADMIN | REQUIRED | UNAUTHENTICATED, FORBIDDEN, NOT_FOUND |
+| `GET` | `/v2/identity/me` | - | `Actor` | CUSTOMER, RIDER, FACILITY, OPERATOR, SUPPORT, ADMIN | NOT_APPLICABLE | UNAUTHENTICATED |
 | `POST` | `/v2/identity/staff/invitations` | `StaffInvitation` | `StaffInvitationResult` | OPERATOR, ADMIN | REQUIRED | FORBIDDEN, INVALID_INPUT |
-| `POST` | `/v2/identity/staff/mfa` | `StaffMfaSetup` | `StaffMfaResult` | OPERATOR, SUPPORT, ADMIN | REQUIRED | FORBIDDEN, UNAUTHENTICATED |
+| `POST` | `/v2/identity/staff/mfa` | `StaffMfaSetup` | `StaffMfaResult` | FACILITY, OPERATOR, ADMIN, SUPPORT | REQUIRED | FORBIDDEN, UNAUTHENTICATED |
 | `POST` | `/v2/identity/addresses` | `AddressInput` | `Address` | CUSTOMER | REQUIRED | INVALID_INPUT |
 | `GET` | `/v2/identity/addresses` | - | `AddressList` | CUSTOMER | NOT_APPLICABLE | UNAUTHENTICATED |
 | `PATCH` | `/v2/identity/addresses/{addressId}` | `AddressUpdate` | `Address` | CUSTOMER | REQUIRED | NOT_FOUND, VERSION_CONFLICT |
@@ -54,8 +54,8 @@ Billing units: 2.
 | `GET` | `/v2/catalog/rates/effective` | - | `EffectiveRateSummary` | PUBLIC | NOT_APPLICABLE | NOT_FOUND |
 | `PATCH` | `/v2/ops/catalog/services/{serviceId}` | `ServiceUpdate` | `Service` | OPERATOR, ADMIN | REQUIRED | FORBIDDEN, VERSION_CONFLICT |
 | `POST` | `/v2/ops/catalog/rate-cards` | `RateCardInput` | `RateCard` | OPERATOR, ADMIN | REQUIRED | INVALID_INPUT, VERSION_CONFLICT |
-| `POST` | `/v2/ops/catalog/rate-cards/{rateCardId}/approve` | - | `RateCard` | OPERATOR, ADMIN | REQUIRED | FORBIDDEN, VERSION_CONFLICT |
-| `POST` | `/v2/ops/catalog/rate-cards/{rateCardId}/activate` | - | `RateCard` | OPERATOR, ADMIN | REQUIRED | FORBIDDEN, VERSION_CONFLICT |
+| `POST` | `/v2/ops/catalog/rate-cards/{rateCardId}/approve` | `VersionedReason` | `RateCard` | OPERATOR, ADMIN | REQUIRED | FORBIDDEN, VERSION_CONFLICT |
+| `POST` | `/v2/ops/catalog/rate-cards/{rateCardId}/activate` | `VersionedReason` | `RateCard` | OPERATOR, ADMIN | REQUIRED | FORBIDDEN, VERSION_CONFLICT |
 
 ### B03
 
@@ -78,28 +78,25 @@ Billing units: 2.
 | `POST` | `/v2/orders/{orderId}/cancel` | `OrderCancellation` | `Order` | CUSTOMER | REQUIRED | VERSION_CONFLICT, FORBIDDEN |
 | `POST` | `/v2/orders/{orderId}/reschedule` | `OrderReschedule` | `Order` | CUSTOMER | REQUIRED | VERSION_CONFLICT, FORBIDDEN |
 | `POST` | `/v2/orders/{orderId}/adjustments/decision` | `AdjustmentDecision` | `Order` | CUSTOMER | REQUIRED | VERSION_CONFLICT, FORBIDDEN |
-| `GET` | `/v2/ops/orders/queue` | - | `OrderQueue` | OPERATOR, SUPPORT, ADMIN | NOT_APPLICABLE | FORBIDDEN |
-| `POST` | `/v2/ops/orders/{orderId}/intake` | `IntakeRecord` | `Order` | OPERATOR, SUPPORT, ADMIN | REQUIRED | VERSION_CONFLICT, INVALID_INPUT |
-| `POST` | `/v2/ops/orders/{orderId}/care` | `CareUpdate` | `Order` | OPERATOR, SUPPORT, ADMIN | REQUIRED | VERSION_CONFLICT |
-| `POST` | `/v2/ops/orders/{orderId}/quality-check` | `QualityCheck` | `Order` | OPERATOR, SUPPORT, ADMIN | REQUIRED | VERSION_CONFLICT, INVALID_INPUT |
+| `GET` | `/v2/ops/orders/queue` | - | `OrderQueue` | FACILITY, OPERATOR, ADMIN, SUPPORT | NOT_APPLICABLE | FORBIDDEN |
+| `POST` | `/v2/ops/orders/{orderId}/intake` | `IntakeRecord` | `Order` | FACILITY, OPERATOR, ADMIN | REQUIRED | VERSION_CONFLICT, INVALID_INPUT |
+| `POST` | `/v2/ops/orders/{orderId}/care` | `CareUpdate` | `Order` | FACILITY, OPERATOR, ADMIN | REQUIRED | VERSION_CONFLICT |
+| `POST` | `/v2/ops/orders/{orderId}/quality-check` | `QualityCheck` | `Order` | FACILITY, OPERATOR, ADMIN | REQUIRED | VERSION_CONFLICT, INVALID_INPUT |
 | `POST` | `/v2/ops/orders/{orderId}/hold` | `OrderHold` | `Order` | OPERATOR, ADMIN | REQUIRED | VERSION_CONFLICT, FORBIDDEN |
 | `POST` | `/v2/ops/orders/{orderId}/exceptions/resolve` | `ExceptionResolution` | `Order` | OPERATOR, SUPPORT, ADMIN | REQUIRED | VERSION_CONFLICT, FORBIDDEN |
-| `GET` | `/v2/orders/{orderId}/billing/obligations` | - | `ObligationList` | CUSTOMER | NOT_APPLICABLE | NOT_FOUND, FORBIDDEN |
-| `GET` | `/v2/orders/{orderId}/billing/attempts` | - | `PaymentAttemptList` | CUSTOMER | NOT_APPLICABLE | NOT_FOUND, FORBIDDEN |
-| `GET` | `/v2/orders/{orderId}/billing/receipts` | - | `ReceiptList` | CUSTOMER | NOT_APPLICABLE | NOT_FOUND, FORBIDDEN |
-| `GET` | `/v2/orders/{orderId}/billing/refunds` | - | `RefundList` | CUSTOMER | NOT_APPLICABLE | NOT_FOUND, FORBIDDEN |
-| `GET` | `/v2/orders/{orderId}/tracking` | - | `CustomerTracking` | CUSTOMER | NOT_APPLICABLE | NOT_FOUND, FORBIDDEN |
-| `POST` | `/v2/orders/{orderId}/incidents` | `IncidentInput` | `Incident` | CUSTOMER | REQUIRED | NOT_FOUND, FORBIDDEN, INVALID_INPUT |
-| `POST` | `/v2/orders/{orderId}/reviews` | `ReviewInput` | `Review` | CUSTOMER | REQUIRED | VERSION_CONFLICT, FORBIDDEN, INVALID_INPUT |
 
 ### B05
 
 | Method | Path | Request | Response | Roles | Idempotency | Errors |
 |---|---|---|---|---|---|---|
+| `GET` | `/v2/orders/{orderId}/billing/obligations` | - | `ObligationList` | CUSTOMER | NOT_APPLICABLE | NOT_FOUND, FORBIDDEN |
+| `GET` | `/v2/orders/{orderId}/billing/attempts` | - | `PaymentAttemptList` | CUSTOMER | NOT_APPLICABLE | NOT_FOUND, FORBIDDEN |
+| `GET` | `/v2/orders/{orderId}/billing/receipts` | - | `ReceiptList` | CUSTOMER | NOT_APPLICABLE | NOT_FOUND, FORBIDDEN |
+| `GET` | `/v2/orders/{orderId}/billing/refunds` | - | `RefundList` | CUSTOMER | NOT_APPLICABLE | NOT_FOUND, FORBIDDEN |
 | `POST` | `/v2/ops/billing/obligations/{obligationId}/confirm-manual` | `ManualPaymentConfirmation` | `Receipt` | OPERATOR, ADMIN | REQUIRED | VERSION_CONFLICT, FORBIDDEN |
 | `POST` | `/v2/ops/billing/refunds` | `RefundRequest` | `Refund` | OPERATOR, ADMIN | REQUIRED | VERSION_CONFLICT, FORBIDDEN, INVALID_INPUT |
 | `POST` | `/v2/ops/billing/reconciliation` | `ReconciliationRequest` | `Reconciliation` | OPERATOR, ADMIN | REQUIRED | FORBIDDEN, INVALID_INPUT |
-| `POST` | `/v2/webhooks/payments/{provider}` | `PaymentWebhook` | `WebhookResult` | ADMIN | REQUIRED | UNAUTHENTICATED, INVALID_INPUT |
+| `POST` | `/v2/webhooks/payments/{provider}` | `PaymentWebhook` | `WebhookResult` | PROVIDER | PROVIDER_EVENT | UNAUTHENTICATED, INVALID_INPUT |
 | `GET` | `/v2/billing/obligations` | - | `ObligationPage` | CUSTOMER | NOT_APPLICABLE | UNAUTHENTICATED, INVALID_INPUT |
 | `GET` | `/v2/billing/obligations/{obligationId}` | - | `BillingSummary` | CUSTOMER | NOT_APPLICABLE | UNAUTHENTICATED, NOT_FOUND |
 | `GET` | `/v2/billing/obligations/{obligationId}/receipts` | - | `ReceiptPage` | CUSTOMER | NOT_APPLICABLE | UNAUTHENTICATED, NOT_FOUND |
@@ -111,14 +108,15 @@ Billing units: 2.
 |---|---|---|---|---|---|---|
 | `GET` | `/v2/rider/jobs` | - | `RiderJobList` | RIDER | NOT_APPLICABLE | FORBIDDEN |
 | `GET` | `/v2/rider/jobs/{jobId}` | - | `RiderJob` | RIDER | NOT_APPLICABLE | NOT_FOUND, FORBIDDEN |
-| `POST` | `/v2/rider/jobs/{jobId}/accept` | - | `Assignment` | RIDER | REQUIRED | VERSION_CONFLICT, FORBIDDEN |
-| `POST` | `/v2/rider/handovers` | `HandoverProof` | `HandoverResult` | RIDER | REQUIRED | VERSION_CONFLICT, FORBIDDEN, INVALID_INPUT |
+| `POST` | `/v2/rider/jobs/{jobId}/accept` | `VersionedCommand` | `Assignment` | RIDER | REQUIRED | VERSION_CONFLICT, FORBIDDEN |
+| `POST` | `/v2/rider/handovers` | `RiderHandover` | `HandoverResult` | RIDER | REQUIRED | VERSION_CONFLICT, FORBIDDEN, INVALID_INPUT |
 | `POST` | `/v2/rider/jobs/{jobId}/exception` | `DeliveryException` | `LegAttempt` | RIDER | REQUIRED | VERSION_CONFLICT, FORBIDDEN |
-| `POST` | `/v2/rider/location` | `LocationReport` | `Location` | RIDER | REQUIRED | FORBIDDEN, INVALID_INPUT |
+| `POST` | `/v2/rider/location` | `RiderLocationReport` | `Location` | RIDER | REQUIRED | FORBIDDEN, INVALID_INPUT |
 | `POST` | `/v2/ops/logistics/assignments` | `AssignmentInput` | `Assignment` | OPERATOR, ADMIN | REQUIRED | VERSION_CONFLICT, FORBIDDEN |
 | `POST` | `/v2/ops/logistics/assignments/{assignmentId}/reassign` | `ReassignmentInput` | `Assignment` | OPERATOR, ADMIN | REQUIRED | VERSION_CONFLICT, FORBIDDEN |
 | `POST` | `/v2/ops/logistics/legs/{legAttemptId}/cancel` | `LegCancellation` | `LegAttempt` | OPERATOR, ADMIN | REQUIRED | VERSION_CONFLICT, FORBIDDEN |
-| `POST` | `/v2/webhooks/logistics/{provider}` | `LogisticsWebhook` | `WebhookResult` | ADMIN | REQUIRED | UNAUTHENTICATED, INVALID_INPUT |
+| `POST` | `/v2/webhooks/logistics/{provider}` | `LogisticsWebhook` | `WebhookResult` | PROVIDER | PROVIDER_EVENT | UNAUTHENTICATED, INVALID_INPUT |
+| `GET` | `/v2/orders/{orderId}/tracking` | - | `CustomerTracking` | CUSTOMER | NOT_APPLICABLE | NOT_FOUND, FORBIDDEN |
 | `GET` | `/v2/logistics/tracking/{orderId}` | - | `CustomerTracking` | CUSTOMER | NOT_APPLICABLE | UNAUTHENTICATED, NOT_FOUND |
 | `GET` | `/v2/orders/{orderId}/custody-receipt` | - | `CustodyReceipt` | CUSTOMER | NOT_APPLICABLE | NOT_FOUND, FORBIDDEN |
 
@@ -126,19 +124,21 @@ Billing units: 2.
 
 | Method | Path | Request | Response | Roles | Idempotency | Errors |
 |---|---|---|---|---|---|---|
-| `POST` | `/v2/media/upload-intents` | `UploadIntent` | `UploadIntentResult` | CUSTOMER, OPERATOR, SUPPORT, ADMIN, RIDER | REQUIRED | FORBIDDEN, INVALID_INPUT |
-| `POST` | `/v2/media/{mediaId}/finalize` | - | `MediaReference` | CUSTOMER, OPERATOR, SUPPORT, ADMIN, RIDER | REQUIRED | NOT_FOUND, FORBIDDEN, INVALID_INPUT |
-| `POST` | `/v2/media/{mediaId}/download` | - | `MediaDownload` | CUSTOMER, OPERATOR, SUPPORT, ADMIN, RIDER | OPTIONAL | NOT_FOUND, FORBIDDEN |
+| `POST` | `/v2/media/upload-intents` | `UploadIntent` | `UploadIntentResult` | CUSTOMER, RIDER, FACILITY, OPERATOR, SUPPORT, ADMIN | REQUIRED | FORBIDDEN, INVALID_INPUT |
+| `POST` | `/v2/media/{mediaId}/finalize` | - | `MediaReference` | CUSTOMER, RIDER, FACILITY, OPERATOR, SUPPORT, ADMIN | REQUIRED | NOT_FOUND, FORBIDDEN, INVALID_INPUT |
+| `POST` | `/v2/media/{mediaId}/download` | - | `MediaDownload` | CUSTOMER, RIDER, FACILITY, OPERATOR, SUPPORT, ADMIN | REQUIRED | NOT_FOUND, FORBIDDEN |
 
 ### B08
 
 | Method | Path | Request | Response | Roles | Idempotency | Errors |
 |---|---|---|---|---|---|---|
+| `POST` | `/v2/orders/{orderId}/incidents` | `IncidentInput` | `Incident` | CUSTOMER | REQUIRED | NOT_FOUND, FORBIDDEN, INVALID_INPUT |
 | `GET` | `/v2/incidents` | - | `IncidentPage` | CUSTOMER | NOT_APPLICABLE | UNAUTHENTICATED |
 | `POST` | `/v2/incidents/{incidentId}/messages` | `IncidentMessageInput` | `IncidentMessage` | CUSTOMER, OPERATOR, SUPPORT, ADMIN | REQUIRED | NOT_FOUND, FORBIDDEN |
-| `POST` | `/v2/ops/incidents/{incidentId}/resolve` | `IncidentResolution` | `Incident` | OPERATOR, SUPPORT, ADMIN | REQUIRED | VERSION_CONFLICT, FORBIDDEN |
+| `POST` | `/v2/ops/incidents/{incidentId}/resolve` | `IncidentResolutionInput` | `Incident` | OPERATOR, SUPPORT, ADMIN | REQUIRED | VERSION_CONFLICT, FORBIDDEN |
 | `POST` | `/v2/incidents/{incidentId}/rewash-requests` | `RewashRequestInput` | `RewashRequest` | CUSTOMER | REQUIRED | NOT_FOUND, VERSION_CONFLICT |
-| `POST` | `/v2/ops/reviews/{reviewId}/moderation` | `ReviewModeration` | `Review` | OPERATOR, SUPPORT, ADMIN | REQUIRED | NOT_FOUND, FORBIDDEN, VERSION_CONFLICT |
+| `POST` | `/v2/orders/{orderId}/reviews` | `ReviewInput` | `Review` | CUSTOMER | REQUIRED | VERSION_CONFLICT, FORBIDDEN, INVALID_INPUT |
+| `POST` | `/v2/ops/reviews/{reviewId}/moderation` | `ReviewModerationInput` | `Review` | OPERATOR, SUPPORT, ADMIN | REQUIRED | NOT_FOUND, FORBIDDEN, VERSION_CONFLICT |
 | `GET` | `/v2/reviews` | - | `PublicReviewPage` | PUBLIC | NOT_APPLICABLE | INVALID_INPUT |
 | `GET` | `/v2/incidents/{incidentId}/messages` | - | `IncidentMessagePage` | CUSTOMER, OPERATOR, SUPPORT, ADMIN | NOT_APPLICABLE | NOT_FOUND, FORBIDDEN |
 | `GET` | `/v2/reviews/eligibility/{orderId}` | - | `ReviewEligibility` | CUSTOMER | NOT_APPLICABLE | NOT_FOUND, FORBIDDEN |
@@ -147,7 +147,7 @@ Billing units: 2.
 
 | Method | Path | Request | Response | Roles | Idempotency | Errors |
 |---|---|---|---|---|---|---|
-| `POST` | `/v2/webhooks/conversations/{provider}` | `InboundMessage` | `ConversationReply` | ADMIN | REQUIRED | UNAUTHENTICATED, INVALID_INPUT |
+| `POST` | `/v2/webhooks/conversations/{provider}` | `InboundMessage` | `ConversationReply` | PROVIDER | PROVIDER_EVENT | UNAUTHENTICATED, INVALID_INPUT |
 | `POST` | `/v2/conversations/drafts/{draftId}/confirm` | `DraftConfirmation` | `Order` | CUSTOMER | REQUIRED | VERSION_CONFLICT, INVALID_INPUT |
 | `POST` | `/v2/conversations/opt-out` | `ConversationOptOut` | `OptOutResult` | CUSTOMER | REQUIRED | INVALID_INPUT |
 | `POST` | `/v2/ops/conversations/{draftId}/handoff` | `ConversationHandoff` | `ConversationDraft` | OPERATOR, SUPPORT, ADMIN | REQUIRED | NOT_FOUND, VERSION_CONFLICT, FORBIDDEN |

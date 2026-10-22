@@ -312,6 +312,7 @@ describe("v2 booking, adjustment and custody", () => {
   it("records the payment model on a booking", () => {
     const booking = bookingInputSchema.parse({
       quoteId: "44444444-4444-4444-8444-444444444444",
+      expectedVersion: 1,
       paymentModel: "DUE_AT_RETURN",
     });
     expect(booking.paymentModel).toBe("DUE_AT_RETURN");
@@ -321,6 +322,7 @@ describe("v2 booking, adjustment and custody", () => {
     const decision = adjustmentDecisionSchema.parse({
       adjustmentId: "55555555-5555-4555-8555-555555555555",
       adjustmentVersion: 2,
+      expectedVersion: 4,
       decision: "ACCEPT",
     });
     expect(decision.adjustmentVersion).toBe(2);

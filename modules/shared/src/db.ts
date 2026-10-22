@@ -1,25 +1,73 @@
 import pgDefault from "pg";
-import type { Pool } from "pg";
+import type { Pool, PoolClient, PoolConfig } from "pg";
 const { Pool: PoolImpl } = pgDefault;
 import { readFileSync, existsSync, readdirSync } from "node:fs";
 import { join, dirname } from "node:path";
 
 let pool: Pool | null = null;
+let closing: Promise<void> | null = null;
+
+function integerSetting(name: string, fallback: number, minimum: number, maximum: number): number {
+  const raw = process.env[name];
+  if (raw === undefined || raw === "") return fallback;
+  const value = Number(raw);
+  if (!/^\d+$/.test(raw) || !Number.isSafeInteger(value) || value < minimum || value > maximum) {
+    throw new Error(`${name} must be an integer between ${minimum} and ${maximum}`);
+  }
+  return value;
+}
+
+function connectionString(): string {
+  if (process.env.DATABASE_URL) return process.env.DATABASE_URL;
+  if (process.env.NODE_ENV === "production") throw new Error("DATABASE_URL is required in production");
+  return "postgres://laundry:laundry_dev_only@localhost:5448/laundry";
+}
+
+function poolConfig(url: string, migration = false): PoolConfig {
+  let parsed: URL;
+  try { parsed = new URL(url); } catch { throw new Error("Invalid PostgreSQL connection configuration"); }
+  if (!["postgres:", "postgresql:"].includes(parsed.protocol)) throw new Error("A PostgreSQL connection URL is required");
+  if (parsed.hostname.endsWith(".neon.tech")) {
+    if (!["require", "verify-full"].includes(parsed.searchParams.get("sslmode") ?? "")) {
+      throw new Error("Neon connections require sslmode=verify-full");
+    }
+    // Preserve certificate and hostname verification explicitly across pg
+    // upgrades; sslmode=require will adopt weaker libpq semantics in pg 9.
+    parsed.searchParams.set("sslmode", "verify-full");
+  }
+  return {
+    connectionString: parsed.toString(),
+    max: migration ? 1 : integerSetting("PG_POOL_MAX", 10, 1, 100),
+    connectionTimeoutMillis: integerSetting("PG_CONNECTION_TIMEOUT_MS", 10_000, 1, 120_000),
+    idleTimeoutMillis: integerSetting("PG_IDLE_TIMEOUT_MS", 30_000, 1, 600_000),
+    maxLifetimeSeconds: integerSetting("PG_MAX_LIFETIME_SECONDS", 300, 1, 3600),
+    application_name: migration ? "laundry-migrations" : "laundry",
+  };
+}
+
+function observePoolErrors(db: Pool): Pool {
+  // Idle sockets can disappear during Neon suspension, restart or network loss.
+  // pg removes them; handling the event prevents an uncaught EventEmitter error.
+  db.on("error", error => {
+    const code = "code" in error && typeof error.code === "string" && /^[A-Z0-9_]{1,40}$/.test(error.code) ? error.code : "CONNECTION_LOST";
+    console.error("[database] idle connection removed", { code });
+  });
+  return db;
+}
 
 export function getPool(): Pool {
-  if (pool) return pool;
-  const connectionString =
-    process.env.DATABASE_URL ?? "postgres://laundry:laundry_dev_only@localhost:5448/laundry";
-  pool = new PoolImpl({ connectionString, max: 10 });
+  if (closing) throw new Error("Database pool is shutting down");
+  if (!pool) pool = observePoolErrors(new PoolImpl(poolConfig(connectionString())));
   return pool;
 }
 
 export async function closePool(): Promise<void> {
-  if (pool) {
-    const p = pool;
-    pool = null;
-    await p.end();
-  }
+  if (closing) return closing;
+  const previous = pool;
+  pool = null;
+  if (!previous) return;
+  closing = previous.end().finally(() => { closing = null; });
+  return closing;
 }
 
 function migrationDir(): string {
@@ -42,14 +90,41 @@ function migrationDir(): string {
 }
 
 export async function initializeDb(): Promise<void> {
-  const db = getPool();
-  const dir = migrationDir();
-  const files = readdirSync(dir).filter((f) => f.endsWith(".sql")).sort();
-  for (const f of files) {
-    const sql = readFileSync(join(dir, f), "utf8");
-    await db.query(sql);
+  const applicationUrl = connectionString();
+  const directUrl = process.env.DATABASE_URL_UNPOOLED || applicationUrl;
+  let direct: URL;
+  try { direct = new URL(directUrl); } catch { throw new Error("Invalid migration connection configuration"); }
+  if (direct.hostname.split(".")[0].endsWith("-pooler")) {
+    throw new Error("Migrations require a direct connection. Set DATABASE_URL_UNPOOLED to the provider's non-pooled URL.");
   }
-  await seedDemo(db);
+  // Do not let a misspelled direct URL migrate a different database or project.
+  const application = new URL(applicationUrl);
+  const endpoint = (url: URL) => url.hostname.replace(/-pooler(?=\.)/, "");
+  if (application.pathname !== direct.pathname || endpoint(application) !== endpoint(direct)) {
+    throw new Error("Application and migration connections must identify the same database and endpoint");
+  }
+  const db = observePoolErrors(new PoolImpl(poolConfig(directUrl, true)));
+  let tx: PoolClient | undefined;
+  let poisoned = false;
+  try {
+    tx = await db.connect();
+    await tx.query("BEGIN");
+    // API and worker startup must not race schema changes. This lock lives on
+    // the one direct transaction client, never a pooled session or pool.query.
+    await tx.query("SELECT pg_advisory_xact_lock(1835102820, 1)");
+    const dir = migrationDir();
+    for (const file of readdirSync(dir).filter(f => f.endsWith(".sql")).sort()) {
+      await tx.query(readFileSync(join(dir, file), "utf8"));
+    }
+    await seedDemo(tx);
+    await tx.query("COMMIT");
+  } catch (error) {
+    if (tx) try { await tx.query("ROLLBACK"); } catch { poisoned = true; }
+    throw error;
+  } finally {
+    tx?.release(poisoned);
+    await db.end();
+  }
 }
 
 export const DEMO_IDS = {
@@ -119,7 +194,7 @@ export function demoImageUrl(file: string): string {
   return `${origin}/assets/services/${file}`;
 }
 
-async function seedDemo(db: Pool): Promise<void> {
+async function seedDemo(db: Pool | PoolClient): Promise<void> {
   const demoMode = (process.env.DEMO_MODE ?? "true") !== "false";
   if (!demoMode) return;
   const customerPhone = process.env.DEMO_CUSTOMER_PHONE ?? "+91-90000-00001";

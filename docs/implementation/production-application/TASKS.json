@@ -85,6 +85,8 @@
     },
     {
       "id": "P01",
+      "progressNote": "Task-only PostgreSQL lifecycle is implemented and locally verified through Docker, including failed-child and signal cleanup. Dedicated Neon Free staging exists. Fresh cloud-runner, reviewed artifact distribution and native acceptance remain unproved.",
+      "progressDocuments": ["docs/implementation/cloud/postgres-local.md", "docs/implementation/cloud/neon-staging.md"],
       "title": "Prove a reproducible cloud PostgreSQL/browser/evidence environment",
       "role": "coordinator",
       "startBlockers": [
@@ -161,6 +163,8 @@
       "legacyPacket": "a0-foundation-and-coordinator.md",
       "initialState": "BLOCKED_DEPENDENCY",
       "state": "BLOCKED_CONTRACT",
+      "progressNote": "Executable wire/OpenAPI/SDK/fixture/transition boundaries and PostgreSQL command infrastructure implemented. No approved freeze. Production v2 consumers, port compatibility review, fresh cloud and native evidence remain gates.",
+      "progressDocument": "docs/implementation/contracts/EXECUTABLE-BOUNDARIES.md",
       "handoff": "docs/implementation/handoffs/C01/HANDOFF.md",
       "github": {
         "number": 9,
