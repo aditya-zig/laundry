@@ -25,4 +25,6 @@ The Docker task harness uses tmpfs. `--keep` preserves its stopped container/wor
 
 Ordinary branch pushes do not deploy Convex or the product backend. CI tests and artifacts do not grant production-promotion approval.
 
+`pnpm release:security` is a separate fail-closed dependency gate; its scheduled/push/PR workflow retains the actual audit result. It currently fails on two high-severity Zod/node-forge advisories. Build/browser success is not security clearance. See `docs/implementation/cloud/dependency-hardening-2026-10-24.md` for compatibility patches, verification and unresolved blockers.
+
 Execution details: `docs/implementation/cloud/production-setup-2026-10-24.md`.

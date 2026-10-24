@@ -85,8 +85,8 @@
     },
     {
       "id": "P01",
-      "progressNote": "Task-only PostgreSQL lifecycle is locally verified. Neon Free staging and an isolated release-candidate branch exist; least-privilege runtime role and authenticated Cloudflare/Neon platform preflight implemented. 612 workspace tests and 50 tooling tests pass locally; nine live infrastructure checks, clean browser fulfillment and a 36-table synthetic backup/restore rehearsal pass. Fresh cloud pilot browser/restart job passed; cloud browser/check runs exposed repaired prerequisite and obsolete-policy-test failures, awaiting current rerun. Product routes remain disabled. Fresh cloud-runner, reviewed artifact distribution and native acceptance remain unproved.",
-      "progressDocuments": ["docs/implementation/cloud/postgres-local.md", "docs/implementation/cloud/neon-staging.md", "docs/implementation/cloud/production-setup-2026-10-24.md"],
+      "progressNote": "Task-only PostgreSQL lifecycle is verified. Neon Free staging and an isolated release-candidate branch exist; least-privilege runtime role and authenticated Cloudflare/Neon platform preflight implemented. 612 workspace tests and 59 tooling tests pass locally after dependency hardening. At 5378029 both fresh GitHub workflows passed (40096669816, 40096669801); the actual downloaded artifact contains visually inspected original 1920x1080/30fps H.264 video and a clean 36-table synthetic restore receipt. Nine live infrastructure checks passed at 1ed2b58; later source needs a new deployment/receipt. Dependency audit improved from 56 advisories to two high findings (Zod, node-forge) and remains a failing release gate. Product routes remain disabled. Production-v2, native, live-provider, physical fulfillment and cloud restore acceptance remain unproved.",
+      "progressDocuments": ["docs/implementation/cloud/postgres-local.md", "docs/implementation/cloud/neon-staging.md", "docs/implementation/cloud/production-setup-2026-10-24.md", "docs/implementation/cloud/dependency-hardening-2026-10-24.md"],
       "title": "Prove a reproducible cloud PostgreSQL/browser/evidence environment",
       "role": "coordinator",
       "startBlockers": [
