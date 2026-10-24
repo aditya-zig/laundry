@@ -17,6 +17,7 @@ test('E2E-FULFILLMENT: customer booking, both rider legs, facility care and one 
   let returnCode: string;
 
   async function dispatch(leg: 'PICKUP' | 'RETURN'): Promise<string> {
+    await ops.bringToFront();
     await ops.getByRole('link', { name: 'Dispatch', exact: true }).click();
     await expect(ops.getByRole('heading', { name: 'Dispatch board' })).toBeVisible();
     await ops.getByLabel('Provisioned rider ID').fill('dddddddd-dddd-4ddd-8ddd-dddddddddddd');
@@ -32,6 +33,7 @@ test('E2E-FULFILLMENT: customer booking, both rider legs, facility care and one 
   }
 
   async function handover(jobId: string, code: string, leg: 'PICKUP' | 'RETURN', wrongCodeFirst = false) {
+    await rider.bringToFront();
     // Navigate within the already signed-in app; do not bypass its session or API.
     await rider.goto('http://localhost:8082');
     if (leg === 'PICKUP') await rider.getByRole('button', { name: '[DEMO] Sign in as Rider', exact: true }).click();
@@ -60,6 +62,7 @@ test('E2E-FULFILLMENT: customer booking, both rider legs, facility care and one 
   }
 
   await test.step('Customer creates a real quote and checkout from the app', async () => {
+    await customer.bringToFront();
     await customer.goto('http://localhost:8081');
     await customer.getByRole('link', { name: 'Details for Wash and Fold, T-shirt', exact: true }).click();
     await customer.getByLabel('Quantity for T-shirt', { exact: true }).fill('2');
@@ -90,12 +93,14 @@ test('E2E-FULFILLMENT: customer booking, both rider legs, facility care and one 
     await ops.getByRole('button', { name: 'Continue with demo operator sign-in' }).click();
     pickupJobId = await dispatch('PICKUP');
     await handover(pickupJobId, pickupCode, 'PICKUP', true);
+    await customer.bringToFront();
     await customer.getByRole('button', { name: 'Refresh order', exact: true }).click();
     await expect(customer.getByText('Status: DELIVERED', { exact: true })).toHaveCount(0);
     await expect(customer.getByLabel('Overall score 1 to 5')).toHaveCount(0);
   });
 
   await test.step('Facility records bag intake and completes care and quality checks', async () => {
+    await ops.bringToFront();
     await ops.getByRole('link', { name: 'Orders', exact: true }).click();
     await ops.getByRole('link', { name: orderId.slice(0, 8), exact: true }).click();
     await ops.getByLabel('Sealed bag IDs (comma separated)').fill(bag);
@@ -107,6 +112,7 @@ test('E2E-FULFILLMENT: customer booking, both rider legs, facility care and one 
       await ops.getByRole('button', { name: 'Advance care', exact: true }).click();
       await expect(ops.getByText(new RegExp(`^Status ${state}`))).toBeVisible();
     }
+    await customer.bringToFront();
     const codesResponse = customer.waitForResponse(response => response.request().method() === 'GET' && response.url().endsWith(`/orders/${orderId}/handover-code`));
     await customer.getByRole('button', { name: 'Show handover codes (DEMO only)', exact: true }).click();
     returnCode = (await (await codesResponse).json()).returnOtp;
@@ -116,6 +122,7 @@ test('E2E-FULFILLMENT: customer booking, both rider legs, facility care and one 
   await test.step('Return handover delivers the order and permits exactly one customer review', async () => {
     returnJobId = await dispatch('RETURN');
     await handover(returnJobId, returnCode, 'RETURN');
+    await customer.bringToFront();
     await customer.getByRole('button', { name: 'Refresh order', exact: true }).click();
     await expect(customer.getByText('Status: DELIVERED', { exact: true })).toBeVisible();
     await customer.getByLabel('Overall score 1 to 5').fill('5');

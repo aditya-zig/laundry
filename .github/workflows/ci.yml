@@ -39,7 +39,7 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - run: sudo apt-get update && sudo apt-get install -y ffmpeg
+      - run: sudo apt-get update && sudo apt-get install -y ffmpeg xvfb
       - run: pnpm install --frozen-lockfile
       - run: pnpm build
       - run: pnpm check
@@ -51,6 +51,7 @@ jobs:
       - run: pnpm exec playwright install --with-deps chromium
       - run: pnpm verify:browser
       - run: pnpm verify:restore
+      - run: pnpm verify:recording
       - uses: actions/upload-artifact@v4
         if: always()
         with:

@@ -23,6 +23,9 @@ export default defineConfig({
   ],
   use: {
     browserName: 'chromium',
+    headless: process.env.VERIFY_HEADED !== 'true',
+    launchOptions: { slowMo: process.env.VERIFY_HEADED === 'true' ? Number(process.env.VERIFY_SLOW_MO ?? 0) : 0,
+      args: process.env.VERIFY_HEADED === 'true' ? ['--window-position=0,0', '--window-size=1920,1080'] : [] },
     video: 'on', trace: 'on', screenshot: 'only-on-failure',
     viewport: { width: 390, height: 844 },
     actionTimeout: 15_000,

@@ -68,10 +68,10 @@ describe("Laundry project naming", () => {
     expect(Object.keys(workflow.jobs.verify.env).sort()).toEqual(["CI", "DATABASE_URL", "DEMO_MODE"]);
     const commands = workflow.jobs.verify.steps.flatMap(step => step.run ? [step.run] : []);
     expect(commands).toEqual([
-      "sudo apt-get update && sudo apt-get install -y ffmpeg",
+      "sudo apt-get update && sudo apt-get install -y ffmpeg xvfb",
       "pnpm install --frozen-lockfile", "pnpm build", "pnpm check", "pnpm check:convex",
       "pnpm contracts:check", "pnpm test:tooling", "pnpm test", "pnpm test:voice",
-      "pnpm exec playwright install --with-deps chromium", "pnpm verify:browser", "pnpm verify:restore",
+      "pnpm exec playwright install --with-deps chromium", "pnpm verify:browser", "pnpm verify:restore", "pnpm verify:recording",
     ]);
   });
 });
