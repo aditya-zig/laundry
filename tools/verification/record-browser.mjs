@@ -1,9 +1,10 @@
 import { spawn, spawnSync, execFileSync } from 'node:child_process';
-import { mkdir, open, readFile, writeFile } from 'node:fs/promises';
+import { mkdir, open, readFile, rm, writeFile } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
 import { resolve } from 'node:path';
 import { requireTestDatabase } from './evidence.mjs';
 import { recordingSampleIsUsable } from './viewports.mjs';
+import { checkpointSamples } from './recording-checkpoint.mjs';
 
 async function main() {
   requireTestDatabase(process.env.DATABASE_URL);
@@ -14,6 +15,9 @@ async function main() {
   const directory = resolve('.verification/hq');
   await mkdir(directory, { recursive: true });
   const output = resolve(directory, 'browser-original-1080p30.mp4');
+  const checkpointsPath = resolve(directory, 'checkpoints.jsonl');
+  await rm(checkpointsPath, { force: true });
+  await rm(resolve(directory, 'manifest.json'), { force: true });
   const log = await open(resolve(directory, 'recorder.log'), 'w');
   let recorder, journey, interrupted = false;
   const stop = () => { interrupted = true; try { if (journey?.pid) process.kill(-journey.pid, 'SIGTERM'); } catch {} recorder?.stdin.end('q\n'); };
@@ -26,6 +30,7 @@ async function main() {
   try {
     // Original 1920x1080 desktop capture at 30 fps, not a transcoded/upscaled
     // Playwright preview. Only this task's virtual display can be recorded.
+    const startedAt = Date.now();
     recorder = run('ffmpeg', ['-y', '-f', 'x11grab', '-framerate', '30', '-video_size', '1920x1080', '-i', process.env.DISPLAY,
       '-an', '-c:v', 'libx264', '-preset', 'fast', '-crf', '20', '-pix_fmt', 'yuv420p', '-movflags', '+faststart', output],
     { stdio: ['pipe', log.fd, log.fd] });
@@ -43,8 +48,8 @@ async function main() {
     if (stream.width !== 1920 || stream.height !== 1080 || stream.r_frame_rate !== '30/1' || stream.codec_name !== 'h264' || Number(metadata.format.duration) < 15) throw new Error('Original recording does not meet 1080p/30fps/H.264 requirements');
     const bytes = await readFile(output);
     const samples = [];
-    for (const fraction of [0.3, 0.5, 0.7]) {
-      const seconds = Number(metadata.format.duration) * fraction;
+    const checkpoints = (await readFile(checkpointsPath, 'utf8')).trim().split('\n').map(line => JSON.parse(line));
+    for (const { name, seconds } of checkpointSamples(checkpoints, startedAt, Number(metadata.format.duration))) {
       const file = `sample-${samples.length + 1}.png`;
       const frame = spawnSync('ffmpeg', ['-y', '-v', 'error', '-ss', String(seconds), '-i', output, '-frames:v', '1', resolve(directory, file)], { encoding: 'utf8' });
       if (frame.error || frame.status !== 0) throw new Error('Could not extract readable-review samples');
@@ -54,9 +59,9 @@ async function main() {
       const matte = spawnSync('ffmpeg', ['-v', 'info', '-i', resolve(directory, file), '-vf', 'blackframe=amount=0:threshold=24', '-frames:v', '1', '-f', 'null', '-'], { encoding: 'utf8' });
       const blackPercent = Number(matte.stderr?.match(/pblack:(\d+)/)?.[1]);
       if (matte.error || matte.status !== 0 || !Number.isFinite(blackPercent)) throw new Error('Could not validate recording framing');
-      samples.push({ file, seconds, meanLuma: brightness, blackPercent });
+      samples.push({ file, checkpoint: name, seconds, meanLuma: brightness, blackPercent });
     }
-    if (samples.filter(recordingSampleIsUsable).length < 2) throw new Error('The recording is blank or mostly unused canvas; no original evidence receipt issued');
+    if (!samples.every(recordingSampleIsUsable)) throw new Error('A required journey checkpoint is blank or mostly unused canvas; no original evidence receipt issued');
     await writeFile(resolve(directory, 'manifest.json'), JSON.stringify({ testedSha: revision, checkedAt: new Date().toISOString(), dirty: false,
       scope: 'Original virtual-desktop recording of legacy demo web acceptance; not production-v2, native or physical fulfillment evidence',
       file: 'browser-original-1080p30.mp4', sha256: createHash('sha256').update(bytes).digest('hex'), sizeBytes: bytes.length,

@@ -2,6 +2,7 @@ import { test, expect } from '@playwright/test';
 import pg from 'pg';
 import { randomUUID } from 'node:crypto';
 import { browserViewport } from '../tools/verification/viewports.mjs';
+import { recordingCheckpoint } from '../tools/verification/recording-checkpoint.mjs';
 
 // Real app screens, real HTTP handlers and a disposable PostgreSQL database.
 // Authentication/payment are explicitly the existing demo adapters, not live providers.
@@ -23,6 +24,7 @@ test('E2E-FULFILLMENT: customer booking, both rider legs, facility care and one 
     await expect(ops.getByRole('heading', { name: 'Dispatch board' })).toBeVisible();
     await ops.getByLabel('Provisioned rider ID').fill('dddddddd-dddd-4ddd-8ddd-dddddddddddd');
     const card = ops.locator('.card').filter({ hasText: orderId.slice(0, 8) }).filter({ hasText: leg });
+    if (leg === 'RETURN') await recordingCheckpoint(ops, 'return-dispatch');
     const dispatched = ops.waitForResponse(response => response.request().method() === 'POST' && /\/ops\/deliveries\/[^/]+\/dispatch$/.test(new URL(response.url()).pathname));
     await card.getByRole('button', { name: 'Assign and dispatch' }).click();
     const response = await dispatched;
@@ -60,6 +62,7 @@ test('E2E-FULFILLMENT: customer booking, both rider legs, facility care and one 
       await expect(rider.getByText('Status: COMPLETED', { exact: true })).toHaveCount(0);
     }
     await input.fill(code);
+    if (leg === 'RETURN') await recordingCheckpoint(rider, 'return-proof');
     const accepted = rider.waitForResponse(response => response.request().method() === 'POST' && response.url().endsWith(`/partner/jobs/${jobId}/handover`));
     await rider.getByRole('button', { name: 'Verify and Complete Handover', exact: true }).click();
     expect((await accepted).ok()).toBeTruthy();
@@ -85,6 +88,7 @@ test('E2E-FULFILLMENT: customer booking, both rider legs, facility care and one 
     expect((await captured).ok()).toBeTruthy();
     await expect(customer.getByText('Status: PICKUP_PENDING', { exact: true })).toBeVisible();
     await expect(customer.getByLabel('Overall score 1 to 5')).toHaveCount(0);
+    await recordingCheckpoint(customer, 'booking');
     const codesResponse = customer.waitForResponse(response => response.request().method() === 'GET' && response.url().endsWith(`/orders/${orderId}/handover-code`));
     await customer.getByRole('button', { name: 'Show handover codes (DEMO only)', exact: true }).click();
     const codes = await (await codesResponse).json();
@@ -133,6 +137,7 @@ test('E2E-FULFILLMENT: customer booking, both rider legs, facility care and one 
     await expect(customer.getByText('Pending: RETURNING', { exact: true })).toHaveCount(0);
     await expect(customer.getByText('Done: RETURNING', { exact: true })).toBeVisible();
     await expect(customer.getByText('Cancel order (when allowed)', { exact: true })).toHaveCount(0);
+    await recordingCheckpoint(customer, 'delivered');
     await customer.getByLabel('Overall score 1 to 5').fill('5');
     await customer.getByPlaceholder('How was the service?').fill('Synthetic E2E verification, not a real customer endorsement.');
     const submitted = customer.waitForResponse(response => response.request().method() === 'POST' && response.url().endsWith('/reviews'));

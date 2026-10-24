@@ -13,15 +13,28 @@ leaving room for browser chrome inside the original 1920×1080 Xvfb display. No
 source video is upscaled, cropped or composited to disguise unused space.
 
 The recorder now measures black-canvas percentage for each extracted sample and
-requires at least two of three samples to have at most 20% black pixels as well
-as adequate brightness. This threshold is specific to the current light demo
+requires every mandatory journey checkpoint to have at most 20% black pixels as
+well as adequate brightness. This threshold is specific to the current light demo
 apps; it is not a general dark-UI quality test. Human review is still mandatory.
 Four new tests distinguish ordinary/recorded viewports, reject the old narrow
 framing despite its passing mean luma, and fail on missing/invalid measurements.
-Local check and all 68 tooling tests pass. At clean `b29d34d`, the new original
+Three additional checkpoint tests bring the current tooling count to 71; local
+check and all four browser scenarios pass. At clean `b29d34d`, the new original
 recording passed: H.264, 1920×1080, 30fps, 21.033 seconds; all three samples have
 3% black pixels and were visually inspected. SHA-256:
 `682d47d2a40ed5cee52b79714fb92d79cb8627771be61c481bd15acb30012043`.
+At `cc09654`, both fresh cloud validation workflows passed (`40099754552`,
+`40099754557`), and the security gate stayed red (`40099754591`) for the two
+known high advisories. Its downloaded original was format/framing compliant, but
+manual review found the first two arbitrary fractional samples were transient
+white loading screens. That cloud artifact is not accepted as a complete visual
+review receipt. Sampling now uses four timestamped real-UI checkpoints: booking,
+return dispatch, return proof, delivered. The actual asserted tab is held briefly
+without synthesizing/cropping frames. Every checkpoint must occur exactly once
+inside the original capture; stale checkpoint/manifest files are removed before
+recording. Missing or repeated checkpoints fail rather than issuing an old
+receipt. Clean recording and visual inspection must verify this subsequent fix.
+
 The first local attempt failed because the extracted Xvfb runtime lacked its
 local libselinux library path; adding the actual extracted library directory
 fixed the environment, not the assertions. Cloud uses installed Xvfb. Subsequent
