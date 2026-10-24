@@ -227,6 +227,7 @@ export default function PartnerHome() {
                     ]}
                     accessibilityRole="button"
                     accessibilityLabel={`View job for ${job.customerName}`}
+                    testID={`delivery-job-${job.id}`}
                   >
                     <View style={styles.jobCardTop}>
                       <View style={[styles.badge, job.leg === "PICKUP" ? styles.badgeTeal : styles.badgeNavy]}>

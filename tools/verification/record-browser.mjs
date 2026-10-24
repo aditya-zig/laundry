@@ -29,7 +29,7 @@ async function main() {
       '-an', '-c:v', 'libx264', '-preset', 'fast', '-crf', '20', '-pix_fmt', 'yuv420p', '-movflags', '+faststart', output],
     { stdio: ['pipe', log.fd, log.fd] });
     recorder.stdin.on('error', () => {});
-    journey = run('pnpm', ['verify:browser'], { detached: true, stdio: 'inherit', env: { ...process.env, VERIFY_HEADED: 'true', VERIFY_SLOW_MO: '150' } });
+    journey = run('pnpm', ['verify:browser'], { detached: true, stdio: 'inherit', env: { ...process.env, WAYLAND_DISPLAY: '', WAYLAND_SOCKET: '', XDG_SESSION_TYPE: 'x11', VERIFY_HEADED: 'true', VERIFY_SLOW_MO: '150' } });
     const timeout = setTimeout(stop, 240000);
     const result = await journey.result;
     clearTimeout(timeout);
@@ -47,8 +47,12 @@ async function main() {
       const file = `sample-${samples.length + 1}.png`;
       const frame = spawnSync('ffmpeg', ['-y', '-v', 'error', '-ss', String(seconds), '-i', output, '-frames:v', '1', resolve(directory, file)], { encoding: 'utf8' });
       if (frame.error || frame.status !== 0) throw new Error('Could not extract readable-review samples');
-      samples.push({ file, seconds });
+      const visible = spawnSync('ffmpeg', ['-v', 'info', '-i', resolve(directory, file), '-vf', 'signalstats,metadata=print:key=lavfi.signalstats.YAVG', '-frames:v', '1', '-f', 'null', '-'], { encoding: 'utf8' });
+      const brightness = Number(visible.stderr?.match(/lavfi\.signalstats\.YAVG=([\d.]+)/)?.[1]);
+      if (visible.status !== 0 || !Number.isFinite(brightness)) throw new Error('Could not validate visible sample content');
+      samples.push({ file, seconds, meanLuma: brightness });
     }
+    if (samples.filter(sample => sample.meanLuma > 25).length < 2) throw new Error('The recording is blank or unreadable; no original evidence receipt issued');
     await writeFile(resolve(directory, 'manifest.json'), JSON.stringify({ testedSha: revision, checkedAt: new Date().toISOString(), dirty: false,
       scope: 'Original virtual-desktop recording of legacy demo web acceptance; not production-v2, native or physical fulfillment evidence',
       file: 'browser-original-1080p30.mp4', sha256: createHash('sha256').update(bytes).digest('hex'), sizeBytes: bytes.length,

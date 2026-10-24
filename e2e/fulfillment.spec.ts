@@ -38,7 +38,11 @@ test('E2E-FULFILLMENT: customer booking, both rider legs, facility care and one 
     await rider.goto('http://localhost:8082');
     if (leg === 'PICKUP') await rider.getByRole('button', { name: '[DEMO] Sign in as Rider', exact: true }).click();
     else await expect(rider.getByText(/Assigned Tasks \(\d+\)/)).toBeVisible();
-    const job = rider.getByRole('button', { name: 'View job for Demo Customer', exact: true }).filter({ has: rider.getByText(leg, { exact: true }) });
+    // Existing acceptance fixtures can leave multiple assigned jobs for the
+    // same customer. Select this command's actual delivery ID, not the first
+    // customer/leg match or an assumption that the queue has only one order.
+    const job = rider.getByTestId(`delivery-job-${jobId}`);
+    await expect(job.getByText(leg, { exact: true })).toBeVisible();
     await expect(job).toHaveCount(1);
     await job.click();
     await expect(rider).toHaveURL(new RegExp(`/jobs/${jobId}`));
