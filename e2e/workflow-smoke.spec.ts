@@ -9,6 +9,10 @@ test('SMOKE-CUSTOMER: catalog, service detail and basket preserve chosen quantit
   });
   await test.step('Choose two garments and verify the resulting basket', async () => {
     await page.getByRole('link', { name: 'Details for Wash and Fold, T-shirt', exact: true }).click();
+    // A fresh navigation to an app route must load the application, not the
+    // preview server's file-not-found document.
+    await page.reload();
+    await expect(page.getByRole('heading', { name: 'Service Details', exact: true })).toBeVisible();
     await page.getByLabel('Quantity for T-shirt', { exact: true }).fill('2');
     await page.getByRole('button', { name: 'Add T-shirt to basket', exact: true }).click();
     await expect(page.getByText('2 item(s) added to basket.', { exact: true })).toBeVisible();

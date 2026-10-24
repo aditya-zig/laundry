@@ -35,7 +35,7 @@ export default defineConfig({
     ...[
       ['customer', 8081], ['partner', 8082], ['ops', 5173],
     ].map(([app, port]) => ({
-      command: `python3 -m http.server ${port} --bind 127.0.0.1 --directory apps/${app}/dist`,
+      command: `node tools/verification/serve-web.mjs ${app} ${port}`,
       url: `http://localhost:${port}`, timeout: 30_000, reuseExistingServer: false,
     })),
   ],

@@ -27,4 +27,6 @@ Ordinary branch pushes do not deploy Convex or the product backend. CI tests and
 
 `pnpm release:security` is a separate fail-closed dependency gate; its scheduled/push/PR workflow retains the actual audit result. It currently fails on two high-severity Zod/node-forge advisories. Build/browser success is not security clearance. See `docs/implementation/cloud/dependency-hardening-2026-10-24.md` for compatibility patches, verification and unresolved blockers.
 
+Web acceptance serves the exported apps with `tools/verification/serve-web.mjs`, a loopback-only SPA preview. It supports direct/reloaded app routes without treating missing assets or API routes as HTML successes. Production hosting must separately configure and verify its own rewrites; see `docs/implementation/cloud/spa-preview-routing.md`.
+
 Execution details: `docs/implementation/cloud/production-setup-2026-10-24.md`.

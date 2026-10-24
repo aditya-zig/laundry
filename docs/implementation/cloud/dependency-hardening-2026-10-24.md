@@ -58,5 +58,9 @@ that depend on retaining a developer's node_modules directory.
   audit, is not an acceptable remediation.
 
 No risk acceptance is inferred. Production ordering remains disabled independently
-of these findings. New cloud build/browser/restore runs must be observed for this
-change; the prior green runs at `5378029` are not evidence for a later revision.
+of these findings. At committed `f9b00f1`, Laundry checks `40098252157` and Agent verification
+evidence `40098252129` completed successfully. The separate security run
+`40098252218` actually failed on these two findings; its retained log was
+downloaded and inspected. The clean staging redeployment passed nine live checks
+and the synthetic restore passed. These SHA-bound results do not certify a later
+revision.
