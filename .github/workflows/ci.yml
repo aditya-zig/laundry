@@ -13,7 +13,7 @@ jobs:
         env:
           POSTGRES_USER: laundry
           POSTGRES_PASSWORD: laundry_dev_only
-          POSTGRES_DB: laundry
+          POSTGRES_DB: laundry_verify_ci
         ports:
           - 5448:5432
         options: >-
@@ -22,7 +22,7 @@ jobs:
           --health-timeout 5s
           --health-retries 10
     env:
-      DATABASE_URL: postgres://laundry:laundry_dev_only@localhost:5448/laundry
+      DATABASE_URL: postgres://laundry:laundry_dev_only@localhost:5448/laundry_verify_ci
       DEMO_MODE: "true"
       CI: "true"
     steps:
@@ -32,7 +32,7 @@ jobs:
           version: 10.33.2
       - uses: actions/setup-node@v4
         with:
-          node-version: 24
+          node-version: 24.22.0
           cache: pnpm
       - uses: actions/setup-python@v5
         with:
@@ -42,25 +42,20 @@ jobs:
       - run: pnpm build
       - run: pnpm check
       - run: pnpm check:convex
+      - run: pnpm contracts:check
+      - run: pnpm test:tooling
       - run: pnpm test
       - run: pnpm test:voice
-  deploy-convex:
-    needs: verify
-    if: github.event_name == 'push' && github.ref == 'refs/heads/build/laundry'
-    runs-on: ubuntu-latest
-    concurrency:
-      group: laundry-production-backend
-      cancel-in-progress: false
-    env:
-      CONVEX_DEPLOY_KEY: ${{ secrets.CONVEX_DEPLOY_KEY }}
-    steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
+      - run: pnpm exec playwright install --with-deps chromium
+      - run: pnpm verify:browser
+      - uses: actions/upload-artifact@v4
+        if: always()
         with:
-          version: 10.33.2
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 24
-          cache: pnpm
-      - run: pnpm install --frozen-lockfile
-      - run: pnpm exec convex deploy --typecheck enable
+          name: web-acceptance-${{ github.sha }}
+          path: .verification/
+          include-hidden-files: true
+          if-no-files-found: error
+          retention-days: 14
+# No branch push deploys a product backend. Production promotion is a separate,
+# explicitly gated release action; the historical Convex adapter is not the
+# canonical PostgreSQL product backend.

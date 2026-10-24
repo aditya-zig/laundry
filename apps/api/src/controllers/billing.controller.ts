@@ -55,8 +55,10 @@ export class BillingController {
   @Post("v1/webhooks/logistics/:provider")
   async logistics(@Param("provider") provider: string, @Body() body: unknown) {
     if (provider !== "manual") throw new ApiError("PROVIDER_UNAVAILABLE", `Provider ${provider} not configured`, { status: 502 });
-    const parsed = z.object({ eventId: z.string().min(1), jobId: z.string().uuid(), status: z.string().min(1) }).parse(body);
-    const { applyDeliveryEvent } = await import("../../../../modules/logistics/src/logistics");
-    return applyDeliveryEvent(getPool(), parsed.eventId, { jobId: parsed.jobId, status: parsed.status });
+    void body;
+    // Manual handovers use authenticated, assigned job commands. There is no
+    // provider signature to verify here, so an anonymous manual callback can
+    // never be an authoritative delivery/custody event.
+    throw new ApiError("FORBIDDEN", "Manual logistics has no public webhook", { status: 403 });
   }
 }

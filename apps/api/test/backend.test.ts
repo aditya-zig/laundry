@@ -54,8 +54,11 @@ async function fullOrder(tc: string, tr: string, to: string, slot: string, qty =
 
 beforeAll(async () => {
   if (process.env.NODE_ENV === "production") throw new Error("Refusing to run acceptance tests against production");
-  const dbUrl = process.env.DATABASE_URL ?? "";
-  if (/prod|amazonaws|neon|supabase\.co/i.test(dbUrl)) throw new Error(`Refusing to run acceptance tests against non-local DB: ${dbUrl.replace(/:[^:@/]+@/, ":***@")}`);
+  let dbUrl: URL;
+  try { dbUrl = new URL(process.env.DATABASE_URL ?? ""); } catch { throw new Error("An explicit verification database URL is required"); }
+  if (!["postgres:", "postgresql:"].includes(dbUrl.protocol) || !["localhost", "127.0.0.1", "[::1]"].includes(dbUrl.hostname) || !/^\/laundry_verify_[a-zA-Z0-9_]+$/.test(dbUrl.pathname)) {
+    throw new Error("Acceptance tests require a loopback laundry_verify_<run> database");
+  }
   await initializeDb();
   const db = getPool();
   await db.query("TRUNCATE support_incidents, conversation_messages, conversation_drafts, reviews, handover_actions, delivery_jobs, refunds, refund_obligations, payments, order_timeline, orders, idempotency_records, capacity_holds, capacity_buckets, quotes, outbox, inbox, sessions, otp_challenges RESTART IDENTITY CASCADE");

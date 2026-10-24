@@ -7,7 +7,7 @@ export interface Actor { id: string; role: string; scopes: string[] }
 /** Demo is opt-in. An unset or misspelled flag must not open credential-free
  * operator sessions on a host that happens to be reachable. */
 export function demoMode(): boolean {
-  return process.env.DEMO_MODE === "true";
+  return process.env.NODE_ENV !== "production" && process.env.DEMO_MODE === "true";
 }
 
 export function demoOtpCode(): string {
@@ -15,7 +15,10 @@ export function demoOtpCode(): string {
 }
 
 export async function requestOtp(db: Pool, phone: string): Promise<{ challengeId: string; demoCode?: string }> {
-  const code = demoMode() ? demoOtpCode() : String(Math.floor(100000 + Math.random() * 900000));
+  // The legacy adapter does not have a real delivery provider. Never persist an
+  // undeliverable plaintext OTP or pretend that a sign-in message was sent.
+  if (!demoMode()) throw new ApiError("PROVIDER_UNAVAILABLE", "Production phone verification is not configured", { status: 503 });
+  const code = demoOtpCode();
   const expiresAt = new Date(Date.now() + 5 * 60 * 1000).toISOString();
   const row = await db.query(`INSERT INTO otp_challenges (phone, code, expires_at) VALUES ($1,$2,$3) RETURNING id`, [phone, code, expiresAt]);
   return demoMode()
@@ -24,6 +27,7 @@ export async function requestOtp(db: Pool, phone: string): Promise<{ challengeId
 }
 
 export async function verifyOtp(db: Pool, challengeId: string, code: string): Promise<{ token: string; user: { id: string; role: string; name: string; phone: string } }> {
+  if (!demoMode()) throw new ApiError("PROVIDER_UNAVAILABLE", "Production phone verification is not configured", { status: 503 });
   const client = await db.connect();
   try {
     await client.query("BEGIN");

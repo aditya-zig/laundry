@@ -106,6 +106,11 @@ export class AuthController {
       const { ApiError } = await import("../../../../modules/shared/src/errors");
       throw new ApiError("INVALID_INPUT", "senderPhone is not a phone number", { status: 400 });
     }
+    const account = (await getPool().query(`SELECT phone FROM users WHERE id = $1`, [req.actor.id])).rows[0];
+    if (!account || String(account.phone).replace(/[^\d]/g, "") !== sender) {
+      const { ApiError } = await import("../../../../modules/shared/src/errors");
+      throw new ApiError("FORBIDDEN", "Verify ownership of this phone before linking WhatsApp", { status: 403 });
+    }
     const key = `wa:${parsed.senderPhone}`;
     const altKey = `wa:${sender}`;
     const res = await getPool().query(

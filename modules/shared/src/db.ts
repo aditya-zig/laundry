@@ -195,8 +195,9 @@ export function demoImageUrl(file: string): string {
 }
 
 async function seedDemo(db: Pool | PoolClient): Promise<void> {
-  const demoMode = (process.env.DEMO_MODE ?? "true") !== "false";
-  if (!demoMode) return;
+  // Missing flags and production starts must never introduce synthetic users,
+  // rates, promises or addresses into a managed database.
+  if (process.env.NODE_ENV === "production" || process.env.DEMO_MODE !== "true") return;
   const customerPhone = process.env.DEMO_CUSTOMER_PHONE ?? "+91-90000-00001";
   const riderPhone = process.env.DEMO_RIDER_PHONE ?? "+91-90000-00002";
   const operatorPhone = process.env.DEMO_OPERATOR_PHONE ?? "+91-90000-00003";

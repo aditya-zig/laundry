@@ -85,8 +85,8 @@
     },
     {
       "id": "P01",
-      "progressNote": "Task-only PostgreSQL lifecycle is implemented and locally verified through Docker, including failed-child and signal cleanup. Dedicated Neon Free staging exists. Fresh cloud-runner, reviewed artifact distribution and native acceptance remain unproved.",
-      "progressDocuments": ["docs/implementation/cloud/postgres-local.md", "docs/implementation/cloud/neon-staging.md"],
+      "progressNote": "Task-only PostgreSQL lifecycle is locally verified. Neon Free staging and an isolated release-candidate branch exist; least-privilege runtime role and authenticated Cloudflare/Neon platform preflight implemented. 611 workspace tests and 44 tooling tests pass locally. Product routes remain disabled. Fresh cloud-runner, reviewed artifact distribution and native acceptance remain unproved.",
+      "progressDocuments": ["docs/implementation/cloud/postgres-local.md", "docs/implementation/cloud/neon-staging.md", "docs/implementation/cloud/production-setup-2026-10-24.md"],
       "title": "Prove a reproducible cloud PostgreSQL/browser/evidence environment",
       "role": "coordinator",
       "startBlockers": [

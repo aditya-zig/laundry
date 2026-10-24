@@ -1,7 +1,7 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
 import type { Pool } from "pg";
 import { ApiError, assertUuid } from "../../shared/src/errors";
-import type { Actor } from "../../shared/src/auth";
+import { demoMode, type Actor } from "../../shared/src/auth";
 
 /** Razorpay webhook signature: HMAC-SHA256 of raw body with key secret. */
 export function verifyRazorpaySignature(rawBody: Buffer, signature: string, secret: string): boolean {
@@ -29,6 +29,7 @@ export const razorpayProvider = {
 };
 
 export async function getPayment(db: Pool, actor: Actor, id: string) {
+  if (!["customer", "operator", "admin"].includes(actor.role)) throw new ApiError("NOT_FOUND", "Payment not found", { status: 404 });
   assertUuid(id, "paymentId");
   const pay = (await db.query(`SELECT * FROM payments WHERE id = $1`, [id])).rows[0];
   if (!pay) throw new ApiError("NOT_FOUND", "Payment not found", { status: 404 });
@@ -41,6 +42,8 @@ export async function getPayment(db: Pool, actor: Actor, id: string) {
 }
 
 export async function listReceipts(db: Pool, actor: Actor, orderId: string) {
+  if (!["customer", "operator", "admin"].includes(actor.role)) throw new ApiError("NOT_FOUND", "Order not found", { status: 404 });
+  assertUuid(orderId, "orderId");
   const order = (await db.query(`SELECT * FROM orders WHERE id = $1`, [orderId])).rows[0];
   if (!order || (actor.role === "customer" && order.customer_id !== actor.id)) throw new ApiError("NOT_FOUND", "Order not found", { status: 404 });
   const rows = (await db.query(`SELECT * FROM payments WHERE order_id = $1 ORDER BY created_at`, [orderId])).rows;
@@ -49,6 +52,9 @@ export async function listReceipts(db: Pool, actor: Actor, orderId: string) {
 
 export async function requestRefund(db: Pool, actor: Actor, input: { orderId: string; paymentId: string; amountMinor: number; reason: string; obligationId?: string }) {
   if (actor.role !== "operator" && actor.role !== "admin") throw new ApiError("FORBIDDEN", "Ops only", { status: 403 });
+  // This adapter has no durable live-provider reconciliation or stable external
+  // refund reference. Real refunds belong to B05, never to the legacy simulator.
+  if (!demoMode()) throw new ApiError("PROVIDER_UNAVAILABLE", "Live refunds are not enabled on the legacy API", { status: 503 });
   if (input.amountMinor <= 0) throw new ApiError("INVALID_INPUT", "Refund amount must be positive", { status: 400 });
   const captured = Number((await db.query(`SELECT COALESCE(SUM(amount_minor),0)::int AS s FROM payments WHERE order_id = $1 AND status = 'CAPTURED'`, [input.orderId])).rows[0].s);
   const refunded = Number((await db.query(`SELECT COALESCE(SUM(amount_minor),0)::int AS s FROM refunds WHERE order_id = $1 AND status <> 'FAILED'`, [input.orderId])).rows[0].s);
@@ -57,20 +63,10 @@ export async function requestRefund(db: Pool, actor: Actor, input: { orderId: st
     `INSERT INTO refunds (order_id, payment_id, obligation_id, amount_minor, reason, status) VALUES ($1,$2,$3,$4,$5,'REQUESTED') RETURNING *`,
     [input.orderId, input.paymentId, input.obligationId ?? null, input.amountMinor, input.reason],
   )).rows[0];
-  if (process.env.RAZORPAY_KEY_ID && process.env.RAZORPAY_KEY_SECRET) {
-    try {
-      await razorpayProvider.createRefund(input.paymentId, input.amountMinor);
-      await db.query(`UPDATE refunds SET status = 'PROCESSING' WHERE id = $1`, [row.id]);
-      row.status = "PROCESSING";
-    } catch {
-      await db.query(`UPDATE refunds SET status = 'FAILED' WHERE id = $1`, [row.id]);
-      row.status = "FAILED";
-    }
-  } else {
-    // Demo/local: mark succeeded so reconciliation stays testable without live money.
-    await db.query(`UPDATE refunds SET status = 'SUCCEEDED' WHERE id = $1`, [row.id]);
-    row.status = "SUCCEEDED";
-  }
+  // Explicit demo-only ledger behavior. The presence of keys must not make a
+  // simulator contact a commercial provider or send a local UUID as a payment ID.
+  await db.query(`UPDATE refunds SET status = 'SUCCEEDED' WHERE id = $1`, [row.id]);
+  row.status = "SUCCEEDED";
   return { id: row.id as string, status: row.status as string, amountMinor: row.amount_minor as number };
 }
 

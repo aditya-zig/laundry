@@ -35,14 +35,18 @@
     "cloud:submit": "node tools/agents/workflow.mjs submit",
     "test:tooling": "node --test tools/agents/*.test.mjs tools/verification/*.test.mjs tools/cloud/*.test.mjs tools/contracts/*.test.mjs",
     "verify:browser": "node tools/verification/run.mjs",
-    "verify:evidence": "node tools/verification/evidence.mjs"
+    "verify:evidence": "node tools/verification/evidence.mjs",
+    "platform:deploy": "node tools/cloud/deploy-platform.mjs --deploy",
+    "platform:test": "node --test tools/cloud/platform.test.mjs"
   },
   "devDependencies": {
+    "@neon/config": "1.9.3",
     "@playwright/test": "1.64.1",
     "@types/node": "^24.19.2",
     "@types/pg": "8.11.10",
     "@types/react": "18.3.18",
     "@types/react-dom": "18.3.5",
+    "neon": "8.11.1",
     "typescript": "5.7.3",
     "vitest": "3.2.4"
   },

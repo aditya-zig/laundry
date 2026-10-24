@@ -1,0 +1,15 @@
+{
+  "name": "@laundry/gateway",
+  "private": true,
+  "type": "module",
+  "version": "0.1.0",
+  "scripts": {
+    "build": "vite build --mode staging",
+    "test": "node --test ../../tools/cloud/platform.test.mjs"
+  },
+  "devDependencies": {
+    "@cloudflare/vite-plugin": "2.0.0-beta.v.4",
+    "cf": "1.0.0-beta.21",
+    "vite": "7.3.7"
+  }
+}
