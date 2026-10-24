@@ -2,6 +2,7 @@ import { spawnSync, execFileSync } from 'node:child_process';
 import { readFile, writeFile, mkdir, appendFile, stat } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { parseEnv } from 'node:util';
+import { waitForGatewayRevision } from './deployment-receipt.mjs';
 
 const PROJECT = 'broad-rain-86048848';
 const BRANCH = 'br-fancy-glade-a1tjuotr';
@@ -48,9 +49,11 @@ async function main() {
   await writeFile(workerSecrets, `ORIGIN_SECRET=${values.ORIGIN_SECRET}\nOPERATIONS_TOKEN=${values.OPERATIONS_TOKEN}\n`, { mode: 0o600 });
   await run(['--filter', '@laundry/gateway', 'build'], 'Build staging gateway');
   await run(['--filter', '@laundry/gateway', 'exec', 'cf', 'deploy', '--prebuilt', '--mode', 'staging', '--dry-run'], 'Validate Cloudflare build without uploading');
-  const result = await run(['--filter', '@laundry/gateway', 'exec', 'cf', 'deploy', '--prebuilt', '--mode', 'staging', '--profile', 'laundry', '--secrets-file', workerSecrets], 'Deploy staging gateway');
-  const gatewayUrl = result.match(/https:\/\/laundry-platform-staging\.[a-z0-9-]+\.workers\.dev/)?.[0];
-  if (!gatewayUrl) throw new Error('Deployment returned no expected staging URL; inspect the private log before retrying');
+  await run(['--filter', '@laundry/gateway', 'exec', 'cf', 'deploy', '--prebuilt', '--mode', 'staging', '--profile', 'laundry', '--secrets-file', workerSecrets], 'Deploy staging gateway');
+  // CLI progress can be emitted on stderr. Do not infer deployment identity by
+  // scraping human output: verify the known account endpoint and actual revision.
+  const gatewayUrl = 'https://laundry-platform-staging.aditya-s274adi.workers.dev';
+  await waitForGatewayRevision(gatewayUrl, revision);
   const receipt = { revision, project: PROJECT, branch: BRANCH, account: ACCOUNT, gatewayUrl, nativeOrigin: origin,
     productApiEnabled: false, productionReady: false, createdAt: new Date().toISOString() };
   await writeFile(resolve(directory, 'platform-deployment.json'), JSON.stringify(receipt, null, 2), { mode: 0o600 });

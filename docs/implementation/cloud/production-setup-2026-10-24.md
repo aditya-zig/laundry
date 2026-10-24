@@ -41,7 +41,7 @@ Cloudflare CLI 1.0.0-beta.21 requires Node 24.22.0; the existing product toolcha
 
 - New PostgreSQL production-safety suite: eight cases failed before the fixes; eight pass after. One initial assertion cascaded from a deliberately changed seed; test cleanup was corrected before the passing run.
 - `pnpm check`: exit 0.
-- `pnpm test:tooling`: 44 pass.
+- `pnpm test:tooling`: 47 pass, including public-revision propagation checks (the initial hardening run had 44).
 - Full workspace tests on a fresh disposable PostgreSQL 17 Docker instance: exit 0, 611 tests across all suites including the gateway's 11 tests. The first broad run failed because the old DB guard matched the test label; it was not reported as passing.
 - Complete workspace build with Node 24.22.0: exit 0, including both Expo web exports, operations, pilot console, API/worker and the staging gateway. An interrupted earlier build was not counted as a pass.
 - Gateway staging Vite build: exit 0.
@@ -55,7 +55,8 @@ The CI workflow now uses an explicitly isolated `laundry_verify_ci` database, pi
 - Gateway: `https://laundry-platform-staging.aditya-s274adi.workers.dev`.
 - Manual live probes returned liveness 200, readiness 503, anonymous gateway/native-origin 401 and authenticated edge → Function → restricted PostgreSQL 200. The latter explicitly returned `productionReady: false` and `productApiEnabled: false`.
 - Cloudflare initially reported a missing subdomain despite the dashboard and authenticated API confirming `aditya-s274adi.workers.dev`. Binding the named Laundry profile to this checkout resolved the beta CLI helper's inconsistent credential lookup. The automated deployment command now performs that scoped binding.
-- All four legacy/demo browser scenarios passed on clean commit `d1ad1cd`, with the actual SDK/API/PostgreSQL and SHA-bound videos/traces.
+- All four legacy/demo browser scenarios passed on clean commits `d1ad1cd` and `f31f7b9`, with the actual SDK/API/PostgreSQL and SHA-bound videos/traces. The recovery rehearsal also passed cleanly at `f31f7b9`.
+- A later deployment succeeded but its receipt command failed because Cloudflare emits its progress/URL on stderr. The tool no longer scrapes human output: it verifies the pinned public endpoint actually serves the intended committed revision before issuing a receipt. Stale revisions, redirects, failures and unexpected production-ready claims fail that check.
 - The new recovery rehearsal passed in its working-tree check: 36 public tables, every sequence, capture amounts, both completed custody legs and review uniqueness matched after `pg_dump`/`pg_restore` to a second empty PostgreSQL 17 instance. The first attempt failed because stopping the task container discards its tmpfs contents; the corrected rehearsal keeps the source running until the dump. Both attempts cleaned up their owned contexts. A stopped task database is not advertised as durable storage.
 - `pnpm test:voice`: 23 adapter/tool tests pass; this is not production speech-provider acceptance. `pnpm check:convex`: exit 0; historical adapter compilation is not product backend activation.
 
