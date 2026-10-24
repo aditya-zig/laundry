@@ -1,13 +1,14 @@
 import { test, expect } from '@playwright/test';
 import pg from 'pg';
 import { randomUUID } from 'node:crypto';
+import { browserViewport } from '../tools/verification/viewports.mjs';
 
 // Real app screens, real HTTP handlers and a disposable PostgreSQL database.
 // Authentication/payment are explicitly the existing demo adapters, not live providers.
 test('E2E-FULFILLMENT: customer booking, both rider legs, facility care and one verified review', async ({ page: customer, context }) => {
   test.setTimeout(120_000);
   const ops = await context.newPage();
-  await ops.setViewportSize({ width: 1280, height: 800 });
+  await ops.setViewportSize(browserViewport(process.env.VERIFY_HEADED === 'true', true));
   const rider = await context.newPage();
   const bag = `e2e-${randomUUID()}`;
   let orderId: string;

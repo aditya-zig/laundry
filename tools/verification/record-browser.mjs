@@ -3,6 +3,7 @@ import { mkdir, open, readFile, writeFile } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
 import { resolve } from 'node:path';
 import { requireTestDatabase } from './evidence.mjs';
+import { recordingSampleIsUsable } from './viewports.mjs';
 
 async function main() {
   requireTestDatabase(process.env.DATABASE_URL);
@@ -50,9 +51,12 @@ async function main() {
       const visible = spawnSync('ffmpeg', ['-v', 'info', '-i', resolve(directory, file), '-vf', 'signalstats,metadata=print:key=lavfi.signalstats.YAVG', '-frames:v', '1', '-f', 'null', '-'], { encoding: 'utf8' });
       const brightness = Number(visible.stderr?.match(/lavfi\.signalstats\.YAVG=([\d.]+)/)?.[1]);
       if (visible.status !== 0 || !Number.isFinite(brightness)) throw new Error('Could not validate visible sample content');
-      samples.push({ file, seconds, meanLuma: brightness });
+      const matte = spawnSync('ffmpeg', ['-v', 'info', '-i', resolve(directory, file), '-vf', 'blackframe=amount=0:threshold=24', '-frames:v', '1', '-f', 'null', '-'], { encoding: 'utf8' });
+      const blackPercent = Number(matte.stderr?.match(/pblack:(\d+)/)?.[1]);
+      if (matte.error || matte.status !== 0 || !Number.isFinite(blackPercent)) throw new Error('Could not validate recording framing');
+      samples.push({ file, seconds, meanLuma: brightness, blackPercent });
     }
-    if (samples.filter(sample => sample.meanLuma > 25).length < 2) throw new Error('The recording is blank or unreadable; no original evidence receipt issued');
+    if (samples.filter(recordingSampleIsUsable).length < 2) throw new Error('The recording is blank or mostly unused canvas; no original evidence receipt issued');
     await writeFile(resolve(directory, 'manifest.json'), JSON.stringify({ testedSha: revision, checkedAt: new Date().toISOString(), dirty: false,
       scope: 'Original virtual-desktop recording of legacy demo web acceptance; not production-v2, native or physical fulfillment evidence',
       file: 'browser-original-1080p30.mp4', sha256: createHash('sha256').update(bytes).digest('hex'), sizeBytes: bytes.length,

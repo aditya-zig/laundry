@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { browserViewport } from '../tools/verification/viewports.mjs';
 
 test('SMOKE-CUSTOMER: catalog, service detail and basket preserve chosen quantity', async ({ page }) => {
   await test.step('Open the actual customer app and load demo services', async () => {
@@ -35,7 +36,7 @@ test('SMOKE-RIDER: isolated demo rider can load assigned tasks', async ({ page }
 });
 
 test('SMOKE-OPS: operator sign-in opens the real service catalog', async ({ page }) => {
-  await page.setViewportSize({ width: 1280, height: 800 });
+  await page.setViewportSize(browserViewport(process.env.VERIFY_HEADED === 'true', true));
   await page.goto('http://localhost:5173');
   await page.getByRole('button', { name: 'Continue with demo operator sign-in' }).click();
   await page.getByRole('link', { name: 'Catalog', exact: true }).click();

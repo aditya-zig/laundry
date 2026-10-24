@@ -1,6 +1,7 @@
 import { defineConfig } from '@playwright/test';
 import { readFileSync } from 'node:fs';
 import { requireTestDatabase } from './tools/verification/evidence.mjs';
+import { browserViewport } from './tools/verification/viewports.mjs';
 
 requireTestDatabase(process.env.DATABASE_URL);
 const apiPackage = JSON.parse(readFileSync('apps/api/package.json', 'utf8')).name;
@@ -27,7 +28,7 @@ export default defineConfig({
     launchOptions: { slowMo: process.env.VERIFY_HEADED === 'true' ? Number(process.env.VERIFY_SLOW_MO ?? 0) : 0,
       args: process.env.VERIFY_HEADED === 'true' ? ['--ozone-platform=x11', '--window-position=0,0', '--window-size=1920,1080'] : [] },
     video: 'on', trace: 'on', screenshot: 'only-on-failure',
-    viewport: { width: 390, height: 844 },
+    viewport: browserViewport(process.env.VERIFY_HEADED === 'true'),
     actionTimeout: 15_000,
   },
   webServer: [

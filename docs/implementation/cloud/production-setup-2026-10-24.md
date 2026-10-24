@@ -69,6 +69,10 @@ Fresh GitHub run `40095269561` passed the pilot browser/restart job and uploaded
 
 The next hardening change reduces the production-dependency audit from 56 advisories (including one critical) to two high findings. It upgrades NestJS and scoped transitive dependencies, with version-pinned compatibility patches for Metro's image decoder and Expo Router's query dependency. Local full build/check, 612 workspace tests and 59 tooling tests pass. The audit itself still exits 1 for Zod and node-forge; the separate security workflow is deliberately fail-closed, with no advisory waivers. See [the dependency handoff](dependency-hardening-2026-10-24.md). This is not security clearance or production enablement.
 
+## Subsequent browser and artifact review
+
+The actual service-detail reload returned 404 under the old static preview server. The [SPA routing repair](spa-preview-routing.md) adds a real browser reload regression and a task-only safe fallback server; it does not configure production hosting. A later artifact review also found 77% unused black canvas in an otherwise format-compliant 1080p recording. That footage is not treated as satisfactory full-frame review evidence. The [recording correction](recording-framing.md) separates phone acceptance from desktop recording viewports and adds a black-canvas gate; 68 tooling tests pass locally. New SHA-bound clean footage still requires sample inspection.
+
 ## Still required for the actual product
 
 Production v2 identity/business HTTP handlers and real app consumers, shared design/app work, verified phone/staff MFA delivery, complete due-at-return accounting, private media lifecycle, durable workers, signed provider callbacks, current native acceptance, restore rehearsal, approved rates/areas/capacity/care/refund policies and a physical fulfillment pilot. Production ordering stays disabled while these are absent. Founder approval cannot be invented from a request to finish autonomously.
