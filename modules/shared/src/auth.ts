@@ -80,7 +80,10 @@ export async function demoAuth(db: Pool, role: "customer" | "rider" | "operator"
 }
 
 export async function actorFromToken(db: Pool, token: string | undefined): Promise<Actor | null> {
-  if (!token) return null;
+  // Every token minted by this legacy adapter is a demo token. Turning off
+  // demo issuance must also close sessions that were minted before the switch.
+  // Production v2 sessions are verified by the identity module, not this table.
+  if (!token || !demoMode()) return null;
   const row = (await db.query(
     `SELECT u.id, u.role FROM sessions s JOIN users u ON u.id = s.user_id WHERE s.token = $1`, [token])).rows[0];
   if (!row) return null;

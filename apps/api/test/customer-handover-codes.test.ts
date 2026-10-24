@@ -112,7 +112,10 @@ test('demo code retrieval is disabled when demo mode is off', async () => {
   process.env.DEMO_MODE = 'false';
   try {
     const response = await request('GET', `/orders/${orderId}/handover-code`, customer);
-    expect(response.status).toBe(403);
+    // Legacy sessions are demo identities too: real mode rejects them at the
+    // authentication boundary, before reaching the code-disclosure route.
+    expect(response.status).toBe(401);
+    expect(response.body.code).toBe('UNAUTHENTICATED');
     expect(response.body.pickupOtp).toBeUndefined();
     expect(response.body.returnOtp).toBeUndefined();
   } finally {

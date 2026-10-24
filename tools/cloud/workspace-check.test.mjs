@@ -8,7 +8,7 @@ import { test } from 'node:test';
 const root = new URL('../../', import.meta.url);
 const manifest = JSON.parse(await readFile(new URL('package.json', root), 'utf8'));
 
-async function runCheck(failOn) {
+async function runCheck(failOn, script = 'check') {
   const directory = await mkdtemp(join(tmpdir(), 'laundry-check-order-'));
   try {
     // Exercise the public shell sequence with stand-ins for compiler/package-manager
@@ -18,7 +18,7 @@ import { appendFileSync, existsSync, writeFileSync } from 'node:fs';
 import { basename, join } from 'node:path';
 const args = process.argv.slice(2);
 const name = basename(process.argv[1]);
-const kind = name === 'tsc' ? 'root' : args.includes('--filter') ? 'contracts' : args.at(-1);
+const kind = name === 'node' ? 'tooling' : name === 'tsc' ? 'root' : args.includes('--filter') ? 'contracts' : args.at(-1);
 appendFileSync(join(process.env.PROBE_ROOT, 'calls'), kind + '\\n');
 if (process.env.FAIL_ON === kind) process.exit(23);
 const marker = join(process.env.PROBE_ROOT, 'contracts-built');
@@ -27,12 +27,12 @@ if (kind === 'contracts') {
   writeFileSync(marker, 'built');
 } else if (!existsSync(marker)) process.exit(24);
 `;
-    for (const name of ['pnpm', 'tsc']) {
+    for (const name of ['pnpm', 'tsc', 'node']) {
       const path = join(directory, name);
       await writeFile(path, tool);
       await chmod(path, 0o700);
     }
-    const result = spawnSync('/bin/sh', ['-c', manifest.scripts.check], {
+    const result = spawnSync('/bin/sh', ['-c', manifest.scripts[script]], {
       cwd: directory,
       env: { ...process.env, PATH: `${directory}${delimiter}${process.env.PATH}`, PROBE_ROOT: directory, FAIL_ON: failOn ?? '' },
       encoding: 'utf8',
@@ -68,6 +68,24 @@ test('consumer typecheck failures cannot become a successful public check', asyn
   const result = await runCheck('typecheck');
   assert.equal(result.code, 23);
   assert.deepEqual(result.calls, ['contracts', 'root', 'check', 'typecheck']);
+});
+
+test('public tooling tests build contracts before executing Node on a fresh checkout', async () => {
+  const result = await runCheck(undefined, 'test:tooling');
+  assert.equal(result.code, 0, result.stderr);
+  assert.deepEqual(result.calls, ['contracts', 'tooling']);
+});
+
+test('failed tooling prerequisites stop the suite with their original exit', async () => {
+  const result = await runCheck('contracts', 'test:tooling');
+  assert.equal(result.code, 23);
+  assert.deepEqual(result.calls, ['contracts']);
+});
+
+test('failed Node tooling tests cannot be hidden by a successful build', async () => {
+  const result = await runCheck('tooling', 'test:tooling');
+  assert.equal(result.code, 23);
+  assert.deepEqual(result.calls, ['contracts', 'tooling']);
 });
 
 test('shared package checks include their test TypeScript projects', async () => {

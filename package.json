@@ -33,7 +33,7 @@
     "cloud:doctor": "node tools/agents/workflow.mjs doctor",
     "cloud:packet": "node tools/agents/workflow.mjs packet",
     "cloud:submit": "node tools/agents/workflow.mjs submit",
-    "test:tooling": "node --test tools/agents/*.test.mjs tools/verification/*.test.mjs tools/cloud/*.test.mjs tools/contracts/*.test.mjs",
+    "test:tooling": "pnpm --filter @laundry/contracts build && node --test tools/agents/*.test.mjs tools/verification/*.test.mjs tools/cloud/*.test.mjs tools/contracts/*.test.mjs",
     "verify:browser": "node tools/verification/run.mjs",
     "verify:evidence": "node tools/verification/evidence.mjs",
     "platform:deploy": "node tools/cloud/deploy-platform.mjs --deploy",
@@ -50,7 +50,8 @@
     "@types/react-dom": "18.3.5",
     "neon": "8.11.1",
     "typescript": "5.7.3",
-    "vitest": "3.2.4"
+    "vitest": "3.2.4",
+    "yaml": "2.9.1"
   },
   "laundry": {
     "pinnedVersions": {

@@ -33,16 +33,17 @@ Cloudflare CLI 1.0.0-beta.21 requires Node 24.22.0; the existing product toolcha
 - The legacy OTP adapter rejects real-mode request/verification before storing an undeliverable plaintext challenge or issuing a session. A real production identity module is still required.
 - Legacy refunds are explicitly demo-only and cannot contact a commercial provider merely because keys exist. Missing live reconciliation cannot be labeled a successful refund.
 - Rider/facility/system identities cannot read customer payment or receipt resources.
+- Existing legacy/demo sessions are rejected by the authentication boundary when demo mode is switched off, including sessions minted before the switch.
 - Removed anonymous manual-logistics event writes. Manual handovers must use authenticated assigned-job commands.
 - WhatsApp draft linking verifies the claimed number against the signed-in account rather than accepting any claimed phone.
 - The legacy acceptance DB guard now parses the URL and requires a loopback `laundry_verify_` database. Its old substring test incorrectly rejected a safe isolated database with `production` in the test label. No hosted database is permitted by the replacement.
 
 ## Verification before deployment
 
-- New PostgreSQL production-safety suite: eight cases failed before the fixes; eight pass after. One initial assertion cascaded from a deliberately changed seed; test cleanup was corrected before the passing run.
+- New PostgreSQL production-safety suite: nine cases pass, each reproduced before its fix. The ninth closes preexisting legacy/demo sessions when real mode is selected, rather than only preventing new demo sessions. One initial assertion cascaded from a deliberately changed seed; test cleanup was corrected before the passing run.
 - `pnpm check`: exit 0.
-- `pnpm test:tooling`: 47 pass, including public-revision propagation checks (the initial hardening run had 44).
-- Full workspace tests on a fresh disposable PostgreSQL 17 Docker instance: exit 0, 611 tests across all suites including the gateway's 11 tests. The first broad run failed because the old DB guard matched the test label; it was not reported as passing.
+- `pnpm test:tooling`: 50 pass, including public-revision propagation and clean-tooling prerequisite/exit-code checks (the initial hardening run had 44).
+- Full workspace tests on a fresh disposable PostgreSQL 17 Docker instance: exit 0, 612 tests across all suites including the gateway's 11 tests. The first broad run failed because the old DB guard matched the test label; it was not reported as passing.
 - Complete workspace build with Node 24.22.0: exit 0, including both Expo web exports, operations, pilot console, API/worker and the staging gateway. An interrupted earlier build was not counted as a pass.
 - Gateway staging Vite build: exit 0.
 - Docker Desktop was stopped at session start. It was started for isolated acceptance; owned task containers were cleaned up. Downloaded binary experimentation was not substituted for PostgreSQL-backed evidence.
@@ -59,6 +60,8 @@ The CI workflow now uses an explicitly isolated `laundry_verify_ci` database, pi
 - A later deployment succeeded but its receipt command failed because Cloudflare emits its progress/URL on stderr. The tool no longer scrapes human output: it verifies the pinned public endpoint actually serves the intended committed revision before issuing a receipt. Stale revisions, redirects, failures and unexpected production-ready claims fail that check.
 - The new recovery rehearsal passed in its working-tree check: 36 public tables, every sequence, capture amounts, both completed custody legs and review uniqueness matched after `pg_dump`/`pg_restore` to a second empty PostgreSQL 17 instance. The first attempt failed because stopping the task container discards its tmpfs contents; the corrected rehearsal keeps the source running until the dump. Both attempts cleaned up their owned contexts. A stopped task database is not advertised as durable storage.
 - `pnpm test:voice`: 23 adapter/tool tests pass; this is not production speech-provider acceptance. `pnpm check:convex`: exit 0; historical adapter compilation is not product backend activation.
+
+Fresh GitHub run `40095269561` passed the pilot browser/restart job and uploaded its original artifact. Its browser job failed because `pnpm test:tooling` did not build its contract prerequisite. Fresh run `40095269584` exposed an old source-substring test that required the now-forbidden automatic production branch deployment. Both were repaired: the public tooling command now builds contracts first (with three execution-level regressions), and the workflow test parses the declarative YAML into a typed model and checks the non-deploying verification policy. A future passing cloud run must be observed; these failures are not claimed green.
 
 `pnpm platform:verify` records nine current live checks in `.verification/platform-live.json`; `pnpm verify:restore` records the tested SHA, dirty state, archive digest and row fingerprints in `.verification/restore-rehearsal.json`. Neither receipt certifies the production-v2 application. Fresh cloud-runner/current committed recovery receipts must be checked rather than inferred from these working-tree results. These implementation results are not a launch approval.
 

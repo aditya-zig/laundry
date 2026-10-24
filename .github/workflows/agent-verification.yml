@@ -37,7 +37,7 @@ jobs:
           version: 10.33.2
       - uses: actions/setup-node@v4
         with:
-          node-version: 24
+          node-version: 24.22.0
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm exec playwright install --with-deps chromium
@@ -84,7 +84,7 @@ jobs:
           version: 10.33.2
       - uses: actions/setup-node@v4
         with:
-          node-version: 24
+          node-version: 24.22.0
           cache: pnpm
       - uses: actions/setup-python@v5
         with:

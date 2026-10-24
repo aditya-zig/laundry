@@ -44,6 +44,14 @@ test('production cannot enable demo identity even with DEMO_MODE=true', async ()
   expect(demoMode()).toBe(false);
   await expect(demoAuth(getPool(), 'operator')).rejects.toMatchObject({ code: 'FORBIDDEN' });
 });
+test('legacy demo sessions cannot authenticate after switching to real mode', async () => {
+  process.env.DEMO_MODE = 'true';
+  const { token } = await demoAuth(getPool(), 'operator');
+  process.env.DEMO_MODE = 'false';
+  const result = await fetch(base + '/v1/me', { headers: { authorization: `Bearer ${token}` } });
+  expect(result.status).toBe(401);
+  expect((await result.json()).code).toBe('UNAUTHENTICATED');
+});
 test('real-mode OTP requests fail before persisting undeliverable or plaintext challenges', async () => {
   process.env.DEMO_MODE = 'false';
   const before = (await getPool().query('SELECT count(*)::int AS n FROM otp_challenges')).rows[0].n;

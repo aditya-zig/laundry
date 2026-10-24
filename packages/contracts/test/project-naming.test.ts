@@ -2,6 +2,8 @@ import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
+import { parse } from "yaml";
+import { z } from "zod";
 
 const root = fileURLToPath(new URL("../../../", import.meta.url));
 const files = execFileSync("git", ["ls-files", "-z"], { cwd: root, encoding: "utf8" })
@@ -50,8 +52,26 @@ describe("Laundry project naming", () => {
     expect(project.laundry.pinnedVersions).toBeDefined();
   });
 
-  it("builds and deploys the renamed production branch and packages", () => {
-    expect(read(".github/workflows/ci.yml")).toContain("refs/heads/build/laundry");
-    expect(read("tools/build-web.mjs")).toContain("@laundry/${app}");
+  it("validates builds and browser evidence without automatically deploying on a branch push", () => {
+    // The workflow is the machine-consumed policy contract. Parse its meaning;
+    // never require an old deployment string to appear in source or comments.
+    const workflow = z.object({
+      on: z.record(z.unknown()),
+      permissions: z.object({ contents: z.literal("read") }).strict(),
+      jobs: z.record(z.object({
+        env: z.record(z.string()),
+        steps: z.array(z.object({ run: z.string().optional(), uses: z.string().optional() }).passthrough()),
+      }).passthrough()),
+    }).parse(parse(read(".github/workflows/ci.yml")));
+    expect(Object.keys(workflow.on).sort()).toEqual(["pull_request", "push"]);
+    expect(Object.keys(workflow.jobs)).toEqual(["verify"]);
+    expect(Object.keys(workflow.jobs.verify.env).sort()).toEqual(["CI", "DATABASE_URL", "DEMO_MODE"]);
+    const commands = workflow.jobs.verify.steps.flatMap(step => step.run ? [step.run] : []);
+    expect(commands).toEqual([
+      "sudo apt-get update && sudo apt-get install -y ffmpeg",
+      "pnpm install --frozen-lockfile", "pnpm build", "pnpm check", "pnpm check:convex",
+      "pnpm contracts:check", "pnpm test:tooling", "pnpm test", "pnpm test:voice",
+      "pnpm exec playwright install --with-deps chromium", "pnpm verify:browser", "pnpm verify:restore",
+    ]);
   });
 });
