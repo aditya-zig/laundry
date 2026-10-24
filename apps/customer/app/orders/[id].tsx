@@ -4,9 +4,8 @@ import { useLocalSearchParams } from "expo-router";
 import type { Order } from "@laundry/contracts";
 import { getClient } from "../../src/api";
 import { formatINR, paymentStatusLabel } from "../../src/guards";
+import { canOfferCancellation, trackingProgress } from "../../src/tracking";
 import { colors, spacing, minTouchTarget } from "../../src/theme";
-
-const TRACKING = ["CONFIRMED", "PICKUP_PENDING", "AT_FACILITY", "IN_CARE", "QUALITY_CHECK", "READY_FOR_RETURN", "RETURNING", "DELIVERED"];
 
 export default function OrderDetail() {
   const { id, paymentId } = useLocalSearchParams<{ id: string; paymentId?: string }>();
@@ -108,9 +107,9 @@ export default function OrderDetail() {
         </View>
       )}
       <Text style={{ marginTop: spacing.md, fontWeight: "700", color: colors.ink }}>Tracking</Text>
-      {TRACKING.map((s) => (
-        <Text key={s} style={{ color: order.timeline.some((t) => t.status === s) ? colors.success : colors.inkMuted }}>
-          {order.timeline.some((t) => t.status === s) ? "Done" : "Pending"}: {s}
+      {trackingProgress(order.status, order.timeline).map((step) => (
+        <Text key={step.status} style={{ color: step.label === "Done" ? colors.success : colors.inkMuted }}>
+          {step.label}: {step.status}
         </Text>
       ))}
       {(order.paymentStatus === "PENDING" || order.paymentStatus === "CREATED") &&
@@ -140,9 +139,11 @@ export default function OrderDetail() {
           Reviews open after delivery. Only delivered orders accept one review each.
         </Text>
       )}
-      <Pressable onPress={cancel} style={{ marginTop: 12, minHeight: minTouchTarget, justifyContent: "center" }}>
-        <Text style={{ color: colors.danger, fontWeight: "700" }}>Cancel order (when allowed)</Text>
-      </Pressable>
+      {canOfferCancellation(order.status) && (
+        <Pressable onPress={cancel} accessibilityRole="button" style={{ marginTop: 12, minHeight: minTouchTarget, justifyContent: "center" }}>
+          <Text style={{ color: colors.danger, fontWeight: "700" }}>Cancel order (when allowed)</Text>
+        </Pressable>
+      )}
       {notice && <Text style={{ marginTop: 12, color: colors.ink }}>{notice}</Text>}
     </ScrollView>
   );

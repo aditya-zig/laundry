@@ -130,6 +130,9 @@ test('E2E-FULFILLMENT: customer booking, both rider legs, facility care and one 
     await customer.bringToFront();
     await customer.getByRole('button', { name: 'Refresh order', exact: true }).click();
     await expect(customer.getByText('Status: DELIVERED', { exact: true })).toBeVisible();
+    await expect(customer.getByText('Pending: RETURNING', { exact: true })).toHaveCount(0);
+    await expect(customer.getByText('Done: RETURNING', { exact: true })).toBeVisible();
+    await expect(customer.getByText('Cancel order (when allowed)', { exact: true })).toHaveCount(0);
     await customer.getByLabel('Overall score 1 to 5').fill('5');
     await customer.getByPlaceholder('How was the service?').fill('Synthetic E2E verification, not a real customer endorsement.');
     const submitted = customer.waitForResponse(response => response.request().method() === 'POST' && response.url().endsWith('/reviews'));
