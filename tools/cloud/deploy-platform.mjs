@@ -1,5 +1,5 @@
 import { spawnSync, execFileSync } from 'node:child_process';
-import { readFile, writeFile, mkdir, appendFile } from 'node:fs/promises';
+import { readFile, writeFile, mkdir, appendFile, stat } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { parseEnv } from 'node:util';
 
@@ -15,6 +15,7 @@ async function main() {
   const directory = resolve('.data');
   await mkdir(directory, { recursive: true, mode: 0o700 });
   const secretsFile = resolve(directory, 'platform.env');
+  if ((await stat(secretsFile)).mode & 0o077) throw new Error('Private platform credentials must have mode 0600');
   const values = parseEnv(await readFile(secretsFile, 'utf8'));
   for (const key of ['ORIGIN_SECRET', 'OPERATIONS_TOKEN']) if (!/^[a-f0-9]{64}$/.test(values[key] ?? '')) throw new Error(`Invalid private ${key}`);
   const database = new URL(values.PLATFORM_DATABASE_URL);
@@ -31,6 +32,9 @@ async function main() {
     if (child.error || child.status !== 0) throw new Error(`${label} failed; diagnostics are in ignored .data/platform-deploy.log`);
     return child.stdout;
   }
+  // Some beta cf deployment helpers resolve credentials without carrying the
+  // explicit --profile flag. Bind only this checkout so all helpers use Laundry.
+  await run(['--filter', '@laundry/gateway', 'exec', 'cf', 'auth', 'activate', 'laundry', resolve('.')], 'Bind the Laundry Cloudflare profile to this checkout');
   // Explicit branch and no env-pull prevent accidental parent deployment or local secret replacement.
   await run(['exec', 'neon', 'deploy', '--config', 'neon.ts', '--env', secretsFile, '--project-id', PROJECT, '--branch', BRANCH, '--profile', 'laundry', '--no-env-pull'], 'Deploy authenticated Neon platform preflight');
   const output = await run(['exec', 'neon', 'functions', 'get', 'platform', '--project-id', PROJECT, '--branch', BRANCH, '--profile', 'laundry', '-o', 'json'], 'Read deployed function identity');

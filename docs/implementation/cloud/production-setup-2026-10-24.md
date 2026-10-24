@@ -7,7 +7,7 @@ The founder authorized continuing the production build and account setup autonom
 
 - Chrome DevTools connected to the user's existing Chrome via auto-connect. Existing personal tabs were left in place. No cookie/profile/credential extraction was used.
 - Cloudflare's only account was created on 22 October and had no Worker scripts. Creating a dedicated `Laundry` account failed with the provider's seven-day account-age restriction. No unrelated project resources were reused or modified.
-- A named Cloudflare CLI profile `laundry` was authorized with user-read, account-read and Workers-write scopes. OAuth storage is outside the repository. No payment method or paid plan was activated.
+- A named Cloudflare CLI profile `laundry` was authorized with user-read, account-read, Workers-write, Workers-scripts-write and Workers-deployments-read scopes. The two legacy script/deployment scopes were added after the initial deployment was denied. OAuth storage is outside the repository. No payment method or paid plan was activated.
 - The existing Neon Laundry organization and Free project `laundry-staging` (`broad-rain-86048848`, Singapore, PostgreSQL 17) were confirmed in Chrome.
 - A project-scoped Neon API-key profile `laundry` was established. It is not an account-wide application credential.
 - Created child branch `release-candidate`, `br-fancy-glade-a1tjuotr`, under the staging parent. Fixed 0.25 CU; Free default suspension retained. The API rejected explicitly setting the Free-plan suspension setting; no upgrade was attempted.
@@ -49,7 +49,17 @@ Cloudflare CLI 1.0.0-beta.21 requires Node 24.22.0; the existing product toolcha
 
 The CI workflow now uses an explicitly isolated `laundry_verify_ci` database, pins Node 24.22.0, runs tooling/contract checks and all four browser scenarios, and retains SHA-bound browser artifacts. Removed the automatic Convex deployment on ordinary branch pushes; it is not the canonical production backend. The checked-in platform deployment command refuses dirty trees, pins the Laundry account/project/candidate branch, keeps database credentials out of Cloudflare, validates the build before uploading, and records a private receipt. The workflow itself still needs an actual fresh cloud-runner receipt.
 
-Deployment URLs, clean-SHA browser receipts and cloud acceptance will be recorded separately after actual verification. These implementation results are not a launch approval.
+## Actual staging deployment and recovery
+
+- Deployed initial source `d1ad1cd4f643a54a7c2f054e7e0ab3b965633458` to the Neon `platform` Function and Cloudflare `laundry-platform-staging` Worker.
+- Gateway: `https://laundry-platform-staging.aditya-s274adi.workers.dev`.
+- Manual live probes returned liveness 200, readiness 503, anonymous gateway/native-origin 401 and authenticated edge → Function → restricted PostgreSQL 200. The latter explicitly returned `productionReady: false` and `productApiEnabled: false`.
+- Cloudflare initially reported a missing subdomain despite the dashboard and authenticated API confirming `aditya-s274adi.workers.dev`. Binding the named Laundry profile to this checkout resolved the beta CLI helper's inconsistent credential lookup. The automated deployment command now performs that scoped binding.
+- All four legacy/demo browser scenarios passed on clean commit `d1ad1cd`, with the actual SDK/API/PostgreSQL and SHA-bound videos/traces.
+- The new recovery rehearsal passed in its working-tree check: 36 public tables, every sequence, capture amounts, both completed custody legs and review uniqueness matched after `pg_dump`/`pg_restore` to a second empty PostgreSQL 17 instance. The first attempt failed because stopping the task container discards its tmpfs contents; the corrected rehearsal keeps the source running until the dump. Both attempts cleaned up their owned contexts. A stopped task database is not advertised as durable storage.
+- `pnpm test:voice`: 23 adapter/tool tests pass; this is not production speech-provider acceptance. `pnpm check:convex`: exit 0; historical adapter compilation is not product backend activation.
+
+`pnpm platform:verify` records nine current live checks in `.verification/platform-live.json`; `pnpm verify:restore` records the tested SHA, dirty state, archive digest and row fingerprints in `.verification/restore-rehearsal.json`. Neither receipt certifies the production-v2 application. Fresh cloud-runner/current committed recovery receipts must be checked rather than inferred from these working-tree results. These implementation results are not a launch approval.
 
 ## Still required for the actual product
 

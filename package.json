@@ -37,7 +37,9 @@
     "verify:browser": "node tools/verification/run.mjs",
     "verify:evidence": "node tools/verification/evidence.mjs",
     "platform:deploy": "node tools/cloud/deploy-platform.mjs --deploy",
-    "platform:test": "node --test tools/cloud/platform.test.mjs"
+    "platform:test": "node --test tools/cloud/platform.test.mjs",
+    "platform:verify": "node tools/cloud/verify-platform-live.mjs",
+    "verify:restore": "node tools/verification/restore-rehearsal.mjs"
   },
   "devDependencies": {
     "@neon/config": "1.9.3",
