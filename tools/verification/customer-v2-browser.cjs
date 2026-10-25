@@ -4,13 +4,18 @@ const {readFile,writeFile,mkdir} = require('node:fs/promises');
 const {resolve} = require('node:path');
 const {execFileSync} = require('node:child_process');
 const {startFixture} = require('./customer-v2-fixture.cjs');
-async function main() {
+async function main(proposeAdjustment) {
   const output=resolve('.data/browser-evidence/customer-v2'); await mkdir(output,{recursive:true});
   const browser=await chromium.launch({headless:true});
   const context=await browser.newContext({viewport:{width:1280,height:900}});
-  const page=await context.newPage(); const mutations=[], errors=[];
+  const page=await context.newPage(); const mutations=[], decisions=[], errors=[];
   page.on('pageerror',error=>errors.push(error.message));
-  page.on('request',request=>{ if(request.url()==='http://127.0.0.1:4499/v2/orders' && request.method()==='POST') mutations.push({key:request.headers()['idempotency-key'],body:request.postData()}); });
+  page.on('request',request=>{
+    if(request.method() !== 'POST') return;
+    const record = {key:request.headers()['idempotency-key'],body:request.postData()};
+    if(request.url()==='http://127.0.0.1:4499/v2/orders') mutations.push(record);
+    if(request.url().endsWith('/adjustments/decision')) decisions.push(record);
+  });
   try {
     await page.goto('http://127.0.0.1:4219',{waitUntil:'networkidle'});
     await expect(page.getByLabel(/^Synthetic wash and fold\..*Open details$/)).toBeVisible();
@@ -52,10 +57,28 @@ async function main() {
     await page.screenshot({path:resolve(output,'owned-order-mobile.png'),fullPage:true});
     expect(mutations).toHaveLength(2); expect(mutations[0].key).toBeTruthy(); expect(mutations[0]).toEqual(mutations[1]);
     const evidence=await (await fetch('http://127.0.0.1:4499/__synthetic_evidence')).json();
-    expect(evidence).toEqual({syntheticOnly:true,orders:1,obligations:1,legs:1,confirmed_events:1});
+    expect(evidence).toEqual({syntheticOnly:true,orders:1,obligations:1,legs:1,confirmed_events:1,accepted_decisions:0});
+    await proposeAdjustment();
+    await page.getByRole('button',{name:'Refresh',exact:true}).click();
+    await page.getByRole('button',{name:'Accept revised total INR 100.00',exact:true}).click();
+    await expect(page.getByRole('button',{name:'Check original accept decision',exact:true})).toBeVisible();
+    await page.goBack();
+    await page.getByRole('button',{name:'View order',exact:true}).click();
+    const orderUrl = `http://127.0.0.1:4499/v2${new URL(page.url()).pathname}`;
+    const reread = page.waitForResponse(response => response.url() === orderUrl && response.request().method() === 'GET');
+    await page.getByRole('button',{name:'Check original accept decision',exact:true}).click();
+    await reread;
+    await expect(page.getByText(/^Adjustment accepted/)).toBeVisible();
+    await expect(page.getByRole('button',{name:'Check original accept decision',exact:true})).toHaveCount(0);
+    await expect(page.getByText(/^State: ACCEPTED\./)).toBeVisible();
+    await expect(page.getByText('INR 100.00 · Payment due at return',{exact:true})).toBeVisible();
+    await page.screenshot({path:resolve(output,'adjustment-accepted-mobile.png'),fullPage:true});
+    expect(decisions).toHaveLength(2); expect(decisions[0].key).toBeTruthy(); expect(decisions[0]).toEqual(decisions[1]);
+    const finalEvidence=await (await fetch('http://127.0.0.1:4499/__synthetic_evidence')).json();
+    expect(finalEvidence).toEqual({...evidence,accepted_decisions:1});
     expect(errors).toEqual([]);
-    await writeFile(resolve(output,'result.json'),JSON.stringify({status:'passed',sourceRevision:execFileSync('git',['rev-parse','HEAD'],{encoding:'utf8'}).trim(),sourceDirty:Boolean(execFileSync('git',['status','--porcelain'],{encoding:'utf8'}).trim()),syntheticOnly:true,commercialCalls:0,sameBookingKeyAndBody:true,...evidence,browserErrors:errors},null,2));
-    console.log('PASS: actual customer UI + SDK + compiled HTTP services + disposable PostgreSQL. First committed reply replaced by 503/unknown; navigation/retry reused key/body; exactly one order/obligation/pickup/event. Synthetic OTP/prices/capacity only.');
+    await writeFile(resolve(output,'result.json'),JSON.stringify({status:'passed',sourceRevision:execFileSync('git',['rev-parse','HEAD'],{encoding:'utf8'}).trim(),sourceDirty:Boolean(execFileSync('git',['status','--porcelain'],{encoding:'utf8'}).trim()),syntheticOnly:true,commercialCalls:0,sameBookingKeyAndBody:true,sameAdjustmentKeyAndBody:true,...finalEvidence,browserErrors:errors},null,2));
+    console.log('PASS: actual customer UI + SDK + compiled HTTP services + disposable PostgreSQL. First committed reply replaced by 503/unknown; navigation/retry reused key/body; exactly one order/obligation/pickup/event. Explicit intake-adjustment acceptance also survives reply loss/navigation with one decision audit. Synthetic OTP/prices/capacity only.');
   } catch(error) {
     console.error('Browser runtime errors:', errors);
     await page.screenshot({path:resolve(output,'failed.png'),fullPage:true}).catch(()=>{});
@@ -65,6 +88,6 @@ async function main() {
 }
 async function run() {
   const close = await startFixture();
-  try { await main(); } finally { await close(); }
+  try { await main(close.proposeAdjustment); } finally { await close(); }
 }
 run().catch(error=>{console.error(error);process.exit(1);});

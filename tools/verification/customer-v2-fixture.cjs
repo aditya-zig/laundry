@@ -21,7 +21,8 @@ async function startFixture() {
   const db = getPool();
   const clock = () => new Date();
   const { IdentityService } = load('modules/identity/src/index.js');
-  const identity = new IdentityService({ db, clock, hashKey: randomBytes(32).toString('hex'), encryptionKey: randomBytes(32).toString('hex'), provider: { mode: 'FAKE', async send(input) { await writeFile(resolve(root,'.data/customer-v2-private-otp.json'), JSON.stringify(input), { mode: 0o600 }); return { reference: `synthetic-${input.challengeId}` }; } } });
+  const deliveries = new Map();
+  const identity = new IdentityService({ db, clock, hashKey: randomBytes(32).toString('hex'), encryptionKey: randomBytes(32).toString('hex'), provider: { mode: 'FAKE', async send(input) { deliveries.set(input.challengeId, input); await writeFile(resolve(root,'.data/customer-v2-private-otp.json'), JSON.stringify(input), { mode: 0o600 }); return { reference: `synthetic-${input.challengeId}` }; } } });
   const authenticate = token => identity.authenticate(token);
   const { CatalogService } = load('modules/catalog/src/index.js');
   const { AvailabilityService } = load('modules/availability/src/index.js');
@@ -52,17 +53,35 @@ async function startFixture() {
   app.useGlobalFilters(new (load('apps/api/src/filters/http-exception.filter.js').EnvelopeFilter)());
   app.enableCors({origin:'http://127.0.0.1:4219'});
   app.getHttpAdapter().get('/__synthetic_evidence', async (_request, response) => {
-    const { rows } = await db.query(`SELECT (SELECT COUNT(*)::int FROM orders_v2_orders) AS orders, (SELECT COUNT(*)::int FROM billing_obligations) AS obligations, (SELECT COUNT(*)::int FROM logistics_leg_attempts) AS legs, (SELECT COUNT(*)::int FROM v2_outbox WHERE event_type='order.confirmed.v2') AS confirmed_events`);
+    const { rows } = await db.query(`SELECT (SELECT COUNT(*)::int FROM orders_v2_orders) AS orders, (SELECT COUNT(*)::int FROM billing_obligations) AS obligations, (SELECT COUNT(*)::int FROM logistics_leg_attempts) AS legs, (SELECT COUNT(*)::int FROM v2_outbox WHERE event_type='order.confirmed.v2') AS confirmed_events, (SELECT COUNT(*)::int FROM v2_audit WHERE action='ADJUSTMENT_ACCEPTED') AS accepted_decisions`);
     response.json({ syntheticOnly: true, ...rows[0] });
   });
-  let dropNextBooking = true;
-  app.use((request,response,next)=>{ const json=response.json.bind(response); response.json=body=>{ if(request.method==='POST' && request.path==='/v2/orders' && body?.id && dropNextBooking) { dropNextBooking=false; response.status(503); return json({code:'PROVIDER_OUTCOME_UNKNOWN',message:'Synthetic post-commit response loss',traceId:randomUUID(),retryable:true}); } return json(body); }; next(); });
+  let dropNextBooking = true, dropNextDecision = true;
+  app.use((request,response,next)=>{ const json=response.json.bind(response); response.json=body=>{
+    const booking = request.path === '/v2/orders' && dropNextBooking;
+    const decision = request.path.endsWith('/adjustments/decision') && dropNextDecision;
+    if(request.method==='POST' && body?.id && (booking || decision)) {
+      if (booking) dropNextBooking = false; if (decision) dropNextDecision = false;
+      response.status(503); return json({code:'PROVIDER_OUTCOME_UNKNOWN',message:'Synthetic post-commit response loss',traceId:randomUUID(),retryable:true});
+    } return json(body);
+  }; next(); });
   await app.listen(4499,'127.0.0.1');
   const {createPreviewServer} = await import(pathToFileURL(resolve(root,'tools/verification/serve-web.mjs')).href);
   const preview = await createPreviewServer(resolve(root,'apps/customer/dist'));
   await new Promise(resolve=>preview.listen(4219,'127.0.0.1',resolve));
   console.log('TASK-ONLY synthetic browser fixture ready: http://127.0.0.1:4219; first booking reply intentionally replaced by post-commit 503/unknown. No commercial SMS or production ordering.');
-  return async function shutdown() { await new Promise(resolve=>preview.close(resolve)); await app.close(); await closePool(); };
+  async function shutdown() { await new Promise(resolve=>preview.close(resolve)); await app.close(); await closePool(); }
+  shutdown.proposeAdjustment = async () => {
+    // Synthetic owner provisioning/intake is fixture setup, not physical custody or staff-MFA acceptance.
+    const phone = '+919600000008';
+    await db.query('INSERT INTO identity_staff(id,phone,role,created_at) VALUES($1,$2,$3,$4)', [randomUUID(), phone, 'OPERATOR', clock()]);
+    const challenge = await identity.requestOtp({ phone }, randomUUID(), 'synthetic-fixture-staff');
+    const session = await identity.verifyOtp({ challengeId: challenge.challengeId, code: deliveries.get(challenge.challengeId).code }, randomUUID(), 'synthetic-fixture-staff');
+    const row = (await db.query('SELECT id FROM orders_v2_orders ORDER BY created_at DESC LIMIT 1')).rows[0];
+    const picked = await orders.markPickupPending(session.accessToken, row.id);
+    return orders.recordIntake(session.accessToken, row.id, { expectedVersion: picked.version, lines: [{ orderLineId: picked.lines[0].orderLineId, measuredWeightGrams: 2400, condition: 'GOOD' }], containers: [{ id: randomUUID(), sealed: true, condition: 'GOOD', garmentCount: 12 }], mediaIds: [] }, randomUUID());
+  };
+  return shutdown;
 }
 module.exports = { startFixture };
 if (require.main === module) startFixture().then(shutdown => {

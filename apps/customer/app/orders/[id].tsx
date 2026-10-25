@@ -4,6 +4,7 @@ import { Text } from "react-native";
 import type { v2 } from "@laundry/contracts";
 import { apiV2 } from "../../src/api-v2";
 import { CustomerPrivateScreen } from "../../src/features/booking/CustomerPrivateScreen";
+import { AdjustmentDecisionCard } from "../../src/features/booking/AdjustmentDecisionCard";
 import { describeError } from "../../src/features/booking/presenters";
 import { Card, Loading, NoteCard, Page } from "../../src/features/booking/ui";
 import { formatINR } from "../../src/guards";
@@ -35,9 +36,10 @@ function OwnedDetail({ id }: { id: string }) {
       <Text style={{ color: colors.inkMuted, marginTop: 8 }}>Scheduled pickup: {order.pickupWindow.start} — {order.pickupWindow.end}</Text>
       <Text style={{ color: colors.inkMuted, marginTop: 8 }}>Promised return: {order.promisedReturnWindow.start} — {order.promisedReturnWindow.end}</Text>
     </Card>
+    <AdjustmentDecisionCard key={`${order.id}:${order.version}`} order={order} onUpdated={() => setRevision(value => value + 1)} />
     <Card title="Recorded history">
       {events.length === 0 ? <Text style={{ color: colors.inkMuted }}>No timeline events have been recorded.</Text> : events.map((event, index) => <Text key={`${event.at}:${event.status}:${index}`} style={{ color: colors.ink, marginTop: 12 }}>{event.label}{"\n"}{event.at}{event.reason ? `\n${event.reason}` : ""}</Text>)}
     </Card>
-    <NoteCard kind="note" title="Authoritative order record" body="A scheduled return is not a custody receipt or proof of payment. No rider location is simulated here. Adjustment decisions, rescheduling, cancellation, payment detail and reviews are not yet connected on this screen." actionLabel="Refresh" onAction={() => setRevision(value => value + 1)} />
+    <NoteCard kind="note" title="Authoritative order record" body="A scheduled return is not a custody receipt or proof of payment. No rider location is simulated here. Rescheduling, cancellation, payment detail and reviews are not yet connected on this screen." actionLabel="Refresh" onAction={() => setRevision(value => value + 1)} />
   </>;
 }

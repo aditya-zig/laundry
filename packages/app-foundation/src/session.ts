@@ -8,13 +8,14 @@ export type SessionSnapshot = { state: 'authenticated'; actor: Actor; sessionId:
 type CommandArgs = {
   'orders.book': { body: v2.BookingInput };
   'orders.quote': { body: v2.QuoteInput };
+  'orders.adjustment.decide': { params: { orderId: string }; body: v2.AdjustmentDecision };
   'identity.address.create': { body: v2.AddressInput };
   'logistics.rider.handover': { params: { jobId: string }; body: Omit<v2.RiderHandover, 'jobId'> };
   'billing.manual.confirm': { params: { obligationId: string }; body: v2.ManualPaymentConfirmation };
   'billing.refund.create': { body: v2.RefundRequest };
 };
 type CommandResults = {
-  'orders.book': v2.Order; 'orders.quote': v2.Quote; 'identity.address.create': v2.Address;
+  'orders.book': v2.Order; 'orders.quote': v2.Quote; 'orders.adjustment.decide': v2.Order; 'identity.address.create': v2.Address;
   'logistics.rider.handover': v2.HandoverResult; 'billing.manual.confirm': v2.Receipt; 'billing.refund.create': v2.Refund;
 };
 type CommandRoute = keyof CommandArgs;
@@ -76,6 +77,10 @@ function sendRecord(client: V2Client, record: QueuedMutationRecord): Promise<unk
   switch (record.routeId) {
     case 'orders.book': return client.bookOrder(body, opts);
     case 'orders.quote': return client.createQuote(body, opts);
+    case 'orders.adjustment.decide': {
+      const decision = v2.adjustmentDecisionSchema.parse(body);
+      return client.decideAdjustment(record.params.orderId, decision.adjustmentId, decision.adjustmentVersion, decision.decision, decision.expectedVersion, opts);
+    }
     case 'identity.address.create': return client.createAddress(body, opts);
     case 'logistics.rider.handover': return client.recordHandover(record.params.jobId, body, opts);
     case 'billing.manual.confirm': return client.confirmManualPayment(record.params.obligationId, body, opts);

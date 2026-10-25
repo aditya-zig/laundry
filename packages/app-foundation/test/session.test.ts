@@ -67,6 +67,23 @@ describe('F00 restore, revocation and secure persistence', () => {
   });
 });
 describe('F00 refresh and stable command identities', () => {
+  it.each(['ACCEPT', 'DECLINE'] as const)('replays an explicit %s adjustment decision with the original terms and command key after navigation', async decision => {
+    const h = new Harness(), f = await h.signedIn();
+    const body = v2.adjustmentDecisionSchema.parse({ adjustmentId: fixtures.Order.id, adjustmentVersion: 1, expectedVersion: fixtures.Order.version, decision });
+    const descriptor = { routeId: 'orders.adjustment.decide' as const, params: { orderId: fixtures.Order.id }, body };
+    h.handle = req => { if (req.path.endsWith('/adjustments/decision')) throw new Error('response lost'); return h.defaultHandle(req); };
+    await expect(f.enqueueMutation(descriptor)).rejects.toBeInstanceOf(UnknownOutcomeError);
+    const [pending] = await f.listQueuedMutations();
+    expect(JSON.parse(pending.bodyJson!)).toEqual(body);
+    const reopened = h.build(); await reopened.initialize();
+    h.handle = req => req.path.endsWith('/adjustments/decision') ? response(fixtures.Order) : h.defaultHandle(req);
+    expect((await reopened.flushQueuedMutations()).confirmed).toHaveLength(1);
+    const calls = h.calls.filter(req => req.path.endsWith('/adjustments/decision'));
+    expect(calls).toHaveLength(2);
+    expect(calls[0].body).toEqual(calls[1].body);
+    expect(calls[0].headers.get('idempotency-key')).toBe(calls[1].headers.get('idempotency-key'));
+    expect(await reopened.listQueuedMutations()).toEqual([]);
+  });
   it('SES-05 concurrent expiry launches exactly one refresh', async () => {
     const h = new Harness(), f = await h.signedIn(); h.now += 960_000;
     await Promise.all([f.ensureAuthenticated(), f.ensureAuthenticated(), f.ensureAuthenticated()]);
