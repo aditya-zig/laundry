@@ -2,6 +2,7 @@ import { createCipheriv, createDecipheriv, createHmac, randomBytes, randomInt, r
 import type { Pool, PoolClient } from 'pg';
 import { v2 } from '@laundry/contracts';
 import { IdentityFault } from './errors';
+import { totpMatches, base32, provisioningUri } from './totp';
 
 export interface OtpDelivery {
   readonly mode: 'FAKE' | 'LIVE';
@@ -22,10 +23,11 @@ const denied = (code: v2.ErrorCode, message: string): Failure => ({ ok: false, c
 const invalidSession = () => new IdentityFault('UNAUTHENTICATED', 'Sign in again to continue');
 const validToken = (token: string) => typeof token === 'string' && token.length === 43 && /^[A-Za-z0-9_-]{43}$/.test(token);
 const ACCESS_MS = 15 * 60_000, REFRESH_MS = 7 * 24 * 60 * 60_000, FAMILY_MS = 30 * 24 * 60 * 60_000;
+const INVITATION_MS = 7 * 24 * 60 * 60_000, MFA_ENROLLMENT_MS = 10 * 60_000, MFA_SECRET_BYTES = 20, MFA_ATTEMPTS = 5;
 interface SessionRecord {
   id: string; family_id: string; profile_id: string; issuer_mode: string;
   access_expires_at: Date; refresh_expires_at: Date; rotated_at: Date | null;
-  revoked_at: Date | null; absolute_expires_at: Date; active: boolean;
+  revoked_at: Date | null; absolute_expires_at: Date; active: boolean; phone?: string;
 }
 
 export class IdentityService {
@@ -60,7 +62,20 @@ export class IdentityService {
       const [iv, body, tag] = sealed.split('.').map(value => Buffer.from(value, 'base64url'));
       const decipher = createDecipheriv('aes-256-gcm', this.encryptionKey, iv);
       decipher.setAAD(Buffer.from(aad)); decipher.setAuthTag(tag);
-      return JSON.parse(Buffer.concat([decipher.update(body), decipher.final()]).toString('utf8'));
+      const value: unknown = JSON.parse(Buffer.concat([decipher.update(body), decipher.final()]).toString('utf8'));
+      const candidate = value as { ok?: unknown; code?: unknown };
+      if (typeof candidate.ok !== 'boolean' || (candidate.ok === false && typeof candidate.code !== 'string')) throw new Error('Cached outcome failed validation');
+      return value as Outcome<T>;
+    } catch { throw new IdentityFault('PROVIDER_UNAVAILABLE', 'Identity recovery data is unavailable'); }
+  }
+  private revealSecret(sealed: string, aad: string): string {
+    try {
+      const [iv, body, tag] = sealed.split('.').map(value => Buffer.from(value, 'base64url'));
+      const decipher = createDecipheriv('aes-256-gcm', this.encryptionKey, iv);
+      decipher.setAAD(Buffer.from(aad)); decipher.setAuthTag(tag);
+      const value: unknown = JSON.parse(Buffer.concat([decipher.update(body), decipher.final()]).toString('utf8'));
+      if (typeof value !== 'string' || !value) throw new Error('Stored secret failed validation');
+      return value;
     } catch { throw new IdentityFault('PROVIDER_UNAVAILABLE', 'Identity recovery data is unavailable'); }
   }
   private async tx<T>(work: (tx: PoolClient) => Promise<T>): Promise<T> {
@@ -92,9 +107,19 @@ export class IdentityService {
   private async audit(tx: PoolClient, action: string, profileId?: string, resourceId?: string) {
     await tx.query('INSERT INTO identity_audit (id,profile_id,action,resource_id,created_at) VALUES ($1,$2,$3,$4,$5)', [randomUUID(), profileId ?? null, action, resourceId ?? null, this.clock()]);
   }
-  private actor(profileId: string): v2.Actor {
+  private async staffBinding(tx: Pool | PoolClient, phone: string): Promise<{ staff_id: string; staff_role: string } | undefined> {
+    return (await tx.query<{ staff_id: string; staff_role: string }>(
+      'SELECT id AS staff_id, role AS staff_role FROM identity_staff WHERE phone=$1 AND active=$2', [phone, true])).rows[0];
+  }
+  private async actor(tx: Pool | PoolClient, profileId: string, phone: string | undefined): Promise<v2.Actor> {
     // No invitation or claimed body role can promote a phone signup to staff.
-    return { id: profileId, role: 'CUSTOMER', facilityIds: [], scope: { facilityIds: [] } };
+    // Only provisioning-created active staff rows bind roles and facility scope.
+    if (!phone) return { id: profileId, role: 'CUSTOMER', facilityIds: [], scope: { facilityIds: [] } };
+    const staff = await this.staffBinding(tx, phone);
+    if (!staff) return { id: profileId, role: 'CUSTOMER', facilityIds: [], scope: { facilityIds: [] } };
+    const facilityIds = (await tx.query<{ facility_id: string }>(
+      'SELECT facility_id FROM identity_staff_facilities WHERE staff_id=$1 ORDER BY facility_id LIMIT 100', [staff.staff_id])).rows.map(row => row.facility_id);
+    return { id: profileId, role: staff.staff_role as v2.Actor['role'], facilityIds, scope: { facilityIds } };
   }
   private current(record: SessionRecord | undefined, refresh = false): record is SessionRecord {
     return !!record && record.active && record.issuer_mode === this.options.provider.mode &&
@@ -104,7 +129,7 @@ export class IdentityService {
   }
   private async sessionRecord(tx: Pool | PoolClient, kind: 'access' | 'refresh', token: string, lock = false): Promise<SessionRecord | undefined> {
     if (!validToken(token)) return undefined;
-    const result = await tx.query<SessionRecord>(`SELECT s.*,f.profile_id,f.issuer_mode,f.revoked_at,f.absolute_expires_at,p.active
+    const result = await tx.query<SessionRecord>(`SELECT s.*,f.profile_id,f.issuer_mode,f.revoked_at,f.absolute_expires_at,p.active,p.phone
       FROM identity_sessions s JOIN identity_session_families f ON f.id=s.family_id
       JOIN identity_profiles p ON p.id=f.profile_id WHERE s.${kind}_hash=$1${lock ? ' FOR UPDATE OF f FOR SHARE OF p' : ''}`, [this.hash(kind, token)]);
     return result.rows[0];
@@ -112,7 +137,7 @@ export class IdentityService {
   private async authenticated(tx: Pool | PoolClient, token: string, lock = false) {
     const row = await this.sessionRecord(tx, 'access', token, lock);
     if (!this.current(row)) throw invalidSession();
-    return { sessionId: row.id, actor: this.actor(row.profile_id), familyId: row.family_id };
+    return { sessionId: row.id, actor: await this.actor(tx, row.profile_id, row.phone), familyId: row.family_id, phone: row.phone };
   }
   async authenticate(token: string): Promise<{ sessionId: string; actor: v2.Actor }> {
     const { sessionId, actor } = await this.authenticated(this.options.db, token);
@@ -195,7 +220,7 @@ export class IdentityService {
       throw new IdentityFault(knownFailure ? 'PROVIDER_UNAVAILABLE' : 'PROVIDER_OUTCOME_UNKNOWN', 'Code delivery could not be confirmed');
     }
   }
-  private async issueSession(tx: PoolClient, profileId: string, familyId?: string): Promise<v2.Session> {
+  private async issueSession(tx: PoolClient, profileId: string, familyId?: string, phone?: string): Promise<v2.Session> {
     const now = this.clock(), id = randomUUID();
     const family = familyId ?? randomUUID();
     if (!familyId) await tx.query('INSERT INTO identity_session_families (id,profile_id,issuer_mode,created_at,absolute_expires_at) VALUES ($1,$2,$3,$4,$5)', [family, profileId, this.options.provider.mode, now, new Date(now.getTime() + FAMILY_MS)]);
@@ -204,7 +229,7 @@ export class IdentityService {
     const expiresAt = new Date(Math.min(now.getTime() + ACCESS_MS, familyExpiry.getTime()));
     await tx.query(`INSERT INTO identity_sessions (id,family_id,access_hash,refresh_hash,created_at,access_expires_at,refresh_expires_at)
       VALUES ($1,$2,$3,$4,$5,$6,$7)`, [id, family, this.hash('access', accessToken), this.hash('refresh', refreshToken), now, expiresAt, new Date(Math.min(now.getTime() + REFRESH_MS, familyExpiry.getTime()))]);
-    return v2.sessionSchema.parse({ sessionId: id, accessToken, refreshToken, expiresAt: expiresAt.toISOString(), actor: this.actor(profileId) });
+    return v2.sessionSchema.parse({ sessionId: id, accessToken, refreshToken, expiresAt: expiresAt.toISOString(), actor: await this.actor(tx, profileId, phone) });
   }
   async verifyOtp(input: v2.OtpVerify, key: string, peer: string): Promise<v2.Session> {
     const parsed = v2.otpVerifySchema.parse(input);
@@ -218,7 +243,7 @@ export class IdentityService {
         ON CONFLICT (phone) DO UPDATE SET phone=EXCLUDED.phone RETURNING id,active`, [randomUUID(), challenge.phone, this.clock()])).rows[0];
       if (!profile.active) return denied('UNAUTHENTICATED', 'Sign in is unavailable');
       await tx.query("UPDATE identity_otp_challenges SET status='USED' WHERE id=$1", [challenge.id]);
-      const session = await this.issueSession(tx, profile.id);
+      const session = await this.issueSession(tx, profile.id, undefined, challenge.phone);
       await this.audit(tx, 'SESSION_CREATED', profile.id, session.sessionId);
       return { ok: true, value: session, sessionId: session.sessionId };
     });
@@ -240,7 +265,7 @@ export class IdentityService {
       }
       if (!this.current(row, true)) return denied('UNAUTHENTICATED', 'Sign in again to continue');
       await tx.query('UPDATE identity_sessions SET rotated_at=$2 WHERE id=$1', [row.id, this.clock()]);
-      const session = await this.issueSession(tx, row.profile_id, row.family_id);
+      const session = await this.issueSession(tx, row.profile_id, row.family_id, row.phone);
       await this.audit(tx, 'SESSION_ROTATED', row.profile_id, session.sessionId);
       return { ok: true, value: session, sessionId: session.sessionId };
     });
@@ -312,5 +337,94 @@ export class IdentityService {
       await this.audit(tx, 'ADDRESS_DELETED', current.actor.id, id);
       return success({ id, deleted: true });
     }, tx => this.authenticated(tx, token, true));
+  }
+
+  private async requireActiveStaff(tx: Pool | PoolClient, phone: string | undefined): Promise<{ id: string; role: string }> {
+    if (!phone) throw invalidSession();
+    const staff = (await tx.query<{ id: string; role: string }>(
+      'SELECT id, role FROM identity_staff WHERE phone=$1 AND active=$2', [phone, true])).rows[0];
+    if (!staff) throw invalidSession();
+    return staff;
+  }
+
+  async inviteStaff(token: string, input: v2.StaffInvitation, key: string): Promise<v2.StaffInvitationResult> {
+    const current = await this.authenticate(token);
+    if (!['OPERATOR', 'ADMIN'].includes(current.actor.role)) throw new IdentityFault('FORBIDDEN', 'Only operations staff may invite staff members');
+    return this.command<v2.StaffInvitationResult>(`staff-invite:${current.actor.id}`, key, input, async tx => {
+      const caller = await this.requireActiveStaff(tx, (await this.authenticated(tx, token, true)).phone);
+      await this.lock(tx, `staff-invite-phone:${this.hash('phone', input.phone)}`);
+      // Stale pending intents expire lazily on trusted server time; an
+      // explicit revocation stays blocking until provisioning resolves it.
+      await tx.query("UPDATE identity_staff_invitations SET status='EXPIRED' WHERE phone=$2 AND status='PENDING' AND expires_at <= $1", [this.clock(), input.phone]);
+      if ((await tx.query('SELECT id FROM identity_staff WHERE phone=$1 FOR UPDATE', [input.phone])).rowCount) return denied('FORBIDDEN', 'This phone already holds a staff role');
+      if ((await tx.query("SELECT id FROM identity_staff_invitations WHERE phone=$1 AND status='PENDING' FOR UPDATE", [input.phone])).rowCount) return denied('FORBIDDEN', 'A pending invitation already exists for this phone');
+      const id = randomUUID(), now = this.clock();
+      const expiresAt = new Date(now.getTime() + INVITATION_MS);
+      await tx.query(`INSERT INTO identity_staff_invitations (id,phone,role,facility_ids,reason,created_by,status,created_at,expires_at)
+        VALUES ($1,$2,$3,$4,$5,$6,'PENDING',$7,$8)`, [id, input.phone, input.role, JSON.stringify(Array.from(new Set(input.facilityIds))), input.reason, caller.id, now, expiresAt]);
+      await this.audit(tx, 'STAFF_INVITATION_CREATED', current.actor.id, id);
+      return success(v2.staffInvitationResultSchema.parse({ invitationId: id, expiresAt: expiresAt.toISOString() }));
+    }, async tx => { await this.lock(tx, `staff-inviter:${current.actor.id}`); return this.authenticated(tx, token, true); });
+  }
+
+  async configureStaffMfa(token: string, input: v2.StaffMfaSetup, key: string): Promise<v2.StaffMfaResult> {
+    const current = await this.authenticate(token);
+    if (!['FACILITY', 'OPERATOR', 'ADMIN', 'SUPPORT'].includes(current.actor.role)) throw new IdentityFault('FORBIDDEN', 'MFA is configured for staff sessions');
+    return this.command<v2.StaffMfaResult>(`staff-mfa:${current.actor.id}`, key, input, async tx => {
+      const staff = await this.requireActiveStaff(tx, (await this.authenticated(tx, token, true)).phone);
+      if (input.action === 'ENROLL') {
+        const enabled = (await tx.query("SELECT 1 FROM identity_staff_mfa WHERE staff_id=$1 AND status='ENABLED'", [staff.id])).rowCount;
+        if (enabled) return denied('FORBIDDEN', 'Disable MFA before enrolling again');
+        const pending = (await tx.query("SELECT id,expires_at FROM identity_staff_mfa_enrollments WHERE staff_id=$1 AND completed_at IS NULL AND attempts < $2 AND expires_at > $3 FOR UPDATE", [staff.id, MFA_ATTEMPTS, this.clock()])).rows[0];
+        if (pending) return success(v2.staffMfaResultSchema.parse({ status: 'CHALLENGE', challengeId: pending.id, expiresAt: pending.expires_at.toISOString() }));
+        await tx.query('DELETE FROM identity_staff_mfa_enrollments WHERE staff_id=$1 AND completed_at IS NULL', [staff.id]);
+        const id = randomUUID(), now = this.clock();
+        const expiresAt = new Date(now.getTime() + MFA_ENROLLMENT_MS);
+        const cipher = this.seal(randomBytes(MFA_SECRET_BYTES).toString('base64url'), `staff-mfa-enroll:${id}`);
+        await tx.query('INSERT INTO identity_staff_mfa_enrollments (id,staff_id,secret_cipher,attempts,created_at,expires_at) VALUES ($1,$2,$3,0,$4,$5)', [id, staff.id, cipher, now, expiresAt]);
+        await tx.query(`INSERT INTO identity_staff_mfa (staff_id,secret_cipher,status,version,created_at,updated_at) VALUES ($1,$2,'ENROLLING',1,$3,$3)
+          ON CONFLICT (staff_id) DO UPDATE SET status='ENROLLING',secret_cipher=$2,updated_at=$3`, [staff.id, cipher, now]);
+        await this.audit(tx, 'STAFF_MFA_ENROLLMENT_CREATED', current.actor.id, id);
+        return success(v2.staffMfaResultSchema.parse({ status: 'CHALLENGE', challengeId: id, expiresAt: expiresAt.toISOString() }));
+      }
+      if (!await this.rate(tx, `staff-mfa-verify:${staff.id}`, 20)) return denied('RATE_LIMITED', 'Too many verification attempts');
+      if (input.action === 'VERIFY') {
+        const enrollment = (await tx.query('SELECT id,secret_cipher,attempts,expires_at FROM identity_staff_mfa_enrollments WHERE id=$1 AND staff_id=$2 AND completed_at IS NULL FOR UPDATE', [input.challengeId, staff.id])).rows[0];
+        if (!enrollment || enrollment.attempts >= MFA_ATTEMPTS || enrollment.expires_at.getTime() <= this.clock().getTime()) return denied('UNAUTHENTICATED', 'Enrollment is invalid, expired or locked');
+        await tx.query('UPDATE identity_staff_mfa_enrollments SET attempts=attempts+1 WHERE id=$1 AND attempts < $2', [enrollment.id, MFA_ATTEMPTS]);
+        const secret = this.revealSecret(enrollment.secret_cipher, `staff-mfa-enroll:${enrollment.id}`);
+        if (!totpMatches(Buffer.from(secret, 'base64url'), input.code, this.clock().getTime())) return denied('UNAUTHENTICATED', 'Code is invalid or expired');
+        // The enabled record is sealed under a stable identity AAD so a later
+        // disable can verify the code without referencing the enrollment row.
+        const row = (await tx.query("UPDATE identity_staff_mfa SET status='ENABLED',version=version+1,secret_cipher=$1,updated_at=$2 WHERE staff_id=$3 RETURNING version", [this.seal(secret, `staff-mfa:${staff.id}`), this.clock(), staff.id])).rows[0];
+        await tx.query("UPDATE identity_staff_mfa_enrollments SET completed_at=$2 WHERE id=$1", [enrollment.id, this.clock()]);
+        await this.audit(tx, 'STAFF_MFA_ENABLED', current.actor.id, staff.id);
+        return success(v2.staffMfaResultSchema.parse({ status: 'ENABLED', version: row.version }));
+      }
+      const row = (await tx.query("SELECT version,secret_cipher FROM identity_staff_mfa WHERE staff_id=$1 AND status='ENABLED' FOR UPDATE", [staff.id])).rows[0];
+      if (!row) return denied('UNAUTHENTICATED', 'MFA is not enabled');
+      if (row.version !== input.expectedVersion) {
+        // The published route lists FORBIDDEN/UNAUTHENTICATED only, so the
+        // conflict carries the safe currentVersion in its envelope instead
+        // of leaving the frozen candidate error code set.
+        return { ...denied('FORBIDDEN', 'MFA changed; reread the current version before disabling'), currentVersion: row.version };
+      }
+      const secret = this.revealSecret(row.secret_cipher, `staff-mfa:${staff.id}`);
+      if (!totpMatches(Buffer.from(secret, 'base64url'), input.code, this.clock().getTime())) return denied('UNAUTHENTICATED', 'Code is invalid or expired');
+      const result = (await tx.query("UPDATE identity_staff_mfa SET status='DISABLED',version=version+1,updated_at=$1 WHERE staff_id=$2 AND status='ENABLED' RETURNING version", [this.clock(), staff.id])).rows[0];
+      await this.audit(tx, 'STAFF_MFA_DISABLED', current.actor.id, staff.id);
+      return success(v2.staffMfaResultSchema.parse({ status: 'DISABLED', version: result.version }));
+    }, async tx => { await this.lock(tx, `staff-mfa-owner:${current.actor.id}`); return this.authenticated(tx, token, true); });
+  }
+
+  // Deployment-owner provisioning helper. No HTTP route exposes it: only the
+  // owner path may hand the enrollment URI to the intended staff device.
+  async mfaProvisioningUri(challengeId: string): Promise<string | undefined> {
+    const row = (await this.options.db.query<{ staff_phone: string; secret_cipher: string }>(
+      `SELECT st.phone AS staff_phone, e.secret_cipher FROM identity_staff_mfa_enrollments e
+        JOIN identity_staff st ON st.id=e.staff_id WHERE e.id=$1 AND e.completed_at IS NULL`, [challengeId])).rows[0];
+    if (!row) return undefined;
+    const secret = this.revealSecret(row.secret_cipher, `staff-mfa-enroll:${challengeId}`);
+    return provisioningUri(row.staff_phone, base32(Buffer.from(secret, 'base64url')));
   }
 }

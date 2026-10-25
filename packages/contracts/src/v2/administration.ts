@@ -12,6 +12,7 @@ export const staffInvitationSchema = z.object({
 }).strict();
 export type StaffInvitation = z.infer<typeof staffInvitationSchema>;
 export const staffInvitationResultSchema = z.object({ invitationId: idSchema, expiresAt: instantSchema }).strict();
+export type StaffInvitationResult = z.infer<typeof staffInvitationResultSchema>;
 export const staffMfaSetupSchema = z.discriminatedUnion("action", [
   z.object({ action: z.literal("ENROLL") }).strict(),
   z.object({ action: z.literal("VERIFY"), challengeId: idSchema, code: z.string().regex(/^\d{6}$/) }).strict(),
@@ -23,6 +24,7 @@ export const staffMfaResultSchema = z.discriminatedUnion("status", [
   z.object({ status: z.literal("ENABLED"), version: expectedVersionSchema }).strict(),
   z.object({ status: z.literal("DISABLED"), version: expectedVersionSchema }).strict(),
 ]);
+export type StaffMfaResult = z.infer<typeof staffMfaResultSchema>;
 export const whatsAppLinkSchema = z.object({ challengeId: idSchema, code: z.string().regex(/^\d{6}$/) }).strict();
 export type WhatsAppLink = z.infer<typeof whatsAppLinkSchema>;
 export const whatsAppLinkResultSchema = z.object({ linked: z.literal(true), linkedAt: instantSchema }).strict();

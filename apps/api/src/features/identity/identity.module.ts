@@ -89,6 +89,19 @@ export class IdentityController {
     noStore(response);
     return this.identity.revoke(token(authorization), id, key);
   }
+  @Post('staff/invitations')
+  @HttpCode(200)
+  inviteStaff(@Body() input: unknown, @Headers('authorization') authorization: string | undefined, @Headers('idempotency-key') key: string, @Res({ passthrough: true }) response: Response) {
+    noStore(response);
+    return this.identity.inviteStaff(token(authorization), v2.staffInvitationSchema.parse(input), key);
+  }
+
+  @Post('staff/mfa')
+  @HttpCode(200)
+  staffMfa(@Body() input: unknown, @Headers('authorization') authorization: string | undefined, @Headers('idempotency-key') key: string, @Res({ passthrough: true }) response: Response) {
+    noStore(response);
+    return this.identity.configureStaffMfa(token(authorization), v2.staffMfaSetupSchema.parse(input), key);
+  }
   @Get('addresses')
   addresses(@Headers('authorization') authorization: string | undefined, @Res({ passthrough: true }) response: Response) {
     noStore(response);
