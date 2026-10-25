@@ -4,6 +4,7 @@ import { randomBytes } from 'node:crypto';
 import { access, appendFile, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { createTaskPostgres } from './postgres.mjs';
+import pg from 'pg';
 
 const git = (...args) => execFileSync('git', args, { encoding: 'utf8' }).trim();
 async function exists(path) { try { await access(path); return true; } catch { return false; } }
@@ -59,9 +60,29 @@ async function main() {
     assert.equal(invalidProduction.includes('listening on'), false);
     database = await createTaskPostgres({ runtime: 'docker', label: 'container-runtime' });
     const url = new URL(database.databaseUrl); url.port = '5432';
+    const migrationEnv = join(directory, 'migration.env');
+    await writeFile(migrationEnv, `NODE_ENV=test\nDEMO_MODE=false\nLAUNDRY_ALLOW_MIGRATIONS=true\nDATABASE_URL=${url}\nDATABASE_URL_UNPOOLED=${url}\n`, { mode: 0o600 });
+    await docker(['run', '--rm', '--network', `container:${database.describe().container}`, '--env-file', migrationEnv, image, 'node', '/app/api/dist/apps/api/src/migrate.js', '--apply'], 'Apply migrations in the separate explicit deployment job');
+    const rejectedOwner = await docker(['run', '--rm', '--network', `container:${database.describe().container}`, '--env-file', migrationEnv, '--env', 'LAUNDRY_DATABASE_MODE=runtime', image], 'Verify actual API rejects owner credentials even when schemas already exist', 1, true);
+    assert.match(rejectedOwner, /Runtime database role/);
+    assert.equal(rejectedOwner.includes('listening on'), false);
+    const owner = new pg.Pool({ connectionString: database.databaseUrl, max: 1 });
+    const runtimeRole = `laundry_runtime_${suffix}`, runtimePassword = randomBytes(24).toString('hex');
+    try {
+      await owner.query(`CREATE ROLE ${runtimeRole} LOGIN PASSWORD '${runtimePassword}' NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS`);
+      await owner.query(`GRANT CONNECT ON DATABASE "${database.describe().database}" TO ${runtimeRole}`);
+      await owner.query(`GRANT USAGE ON SCHEMA public TO ${runtimeRole}`);
+      const tables = (await owner.query("SELECT tablename FROM pg_tables WHERE schemaname='public' AND left(tablename,9)='identity_'")).rows;
+      for (const { tablename } of tables) {
+        if (!/^identity_[a-z_]+$/.test(tablename)) throw new Error('Unexpected runtime grant target');
+        await owner.query(`GRANT SELECT,INSERT,UPDATE,DELETE ON TABLE public."${tablename}" TO ${runtimeRole}`);
+      }
+      assert.equal((await owner.query('SELECT count(*)::int AS n FROM users')).rows[0].n, 0, 'Deployment job seeded a demo user');
+    } finally { await owner.end(); }
+    url.username = runtimeRole; url.password = runtimePassword;
     const envFile = join(directory, 'runtime.env');
-    await writeFile(envFile, `NODE_ENV=test\nDEMO_MODE=false\nDATABASE_URL=${url}\nDATABASE_URL_UNPOOLED=${url}\n`, { mode: 0o600 });
-    await docker(['run', '--detach', '--rm', '--name', container, '--network', `container:${database.describe().container}`, '--env-file', envFile, image], 'Start compiled artifact against isolated PostgreSQL without demo credentials');
+    await writeFile(envFile, `NODE_ENV=test\nDEMO_MODE=false\nLAUNDRY_DATABASE_MODE=runtime\nDATABASE_URL=${url}\n`, { mode: 0o600 });
+    await docker(['run', '--detach', '--rm', '--name', container, '--network', `container:${database.describe().container}`, '--env-file', envFile, image], 'Start compiled artifact using a separate non-owner runtime database role');
     running = true;
     let ready = false;
     for (let i = 0; i < 60; i++) {
@@ -94,8 +115,12 @@ async function main() {
         const auth=await fetch('http://127.0.0.1:4100/v2/identity/otp',{method:'POST',headers:{'content-type':'application/json','idempotency-key':'synthetic-container-check'},body:JSON.stringify({phone:'+919000019876'})});
         assert.equal(auth.status,503);assert.equal((await auth.json()).code,'PROVIDER_UNAVAILABLE');
         const db=new (appRequire('pg').Pool)({connectionString:process.env.DATABASE_URL});
-        try{assert.equal((await db.query('SELECT count(*)::int AS n FROM identity_otp_challenges')).rows[0].n,0);}finally{await db.end();}
-        console.log(JSON.stringify({node:process.version,uid:process.getuid(),compiledStartup:true,developmentLoadersAbsent:true,productionDependenciesOnly:true,privateContextExcluded:true,legacyDemoPublicRoutesClosed:true,unconfiguredIdentityClosed:true,productReady:false}));
+        try{
+          assert.equal((await db.query('SELECT count(*)::int AS n FROM identity_otp_challenges')).rows[0].n,0);
+          await assert.rejects(db.query('CREATE TABLE public.forbidden_runtime_ddl (id int)'),e=>e.code==='42501');
+          await assert.rejects(db.query('SELECT * FROM users'),e=>e.code==='42501');
+        }finally{await db.end();}
+        console.log(JSON.stringify({node:process.version,uid:process.getuid(),compiledStartup:true,developmentLoadersAbsent:true,productionDependenciesOnly:true,nonOwnerRuntimeDatabase:true,separateMigrations:true,privateContextExcluded:true,legacyDemoPublicRoutesClosed:true,unconfiguredIdentityClosed:true,productReady:false}));
       })().catch(()=>process.exit(1));
     `], 'Inspect the actual non-root, production-only runtime and fail-closed API'));
     proof = { testedSha: revision, dirty: false, checkedAt: new Date().toISOString(), imageId, runtime, legacyWorkerProductionClosed: true, compiledIdentityMaintenance: maintenance,

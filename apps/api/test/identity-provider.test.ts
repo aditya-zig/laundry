@@ -63,7 +63,7 @@ describe('SMS adapter contract; all network responses are fixtures, no commercia
   it('actual production bootstrap refuses missing identity before migrating or listening', () => {
     const database = 'postgres://synthetic:private-test-value@identity.invalid/laundry_production?sslmode=verify-full';
     const result = spawnSync(process.execPath, [fileURLToPath(new URL('../dist/apps/api/src/main.js', import.meta.url))], {
-      env: { ...process.env, NODE_ENV: 'production', DEMO_MODE: 'false', DATABASE_URL: database, DATABASE_URL_UNPOOLED: database,
+      env: { ...process.env, NODE_ENV: 'production', DEMO_MODE: 'false', DATABASE_URL: database, DATABASE_URL_UNPOOLED: '', LAUNDRY_ALLOW_MIGRATIONS: '',
         WHATSAPP_APP_SECRET: 'synthetic-only', WHATSAPP_VERIFY_TOKEN: 'synthetic-only', WHATSAPP_TOKEN: 'synthetic-only', WHATSAPP_PHONE_NUMBER_ID: 'synthetic-only',
         LAUNDRY_IDENTITY_PROVIDER: '', LAUNDRY_IDENTITY_HASH_KEY: '', LAUNDRY_IDENTITY_ENCRYPTION_KEY: '', CORS_ORIGIN: 'https://laundry.example.invalid' },
       encoding: 'utf8', timeout: 15_000,

@@ -9,8 +9,8 @@ production identity boundary: `modules/identity/**`,
 `apps/api/src/features/identity/**`, identity composition in AppModule,
 `apps/api/test/identity*.test.ts`, canonical migrations 007–008, narrow compiled
 `apps/worker/src/identity-maintenance.ts` and legacy-worker production refusal,
-and the associated
-shared contracts/configuration documentation. No concurrent worker lease is
+non-owner runtime verification, the separate compiled deployment migration job,
+and the associated shared contracts/configuration documentation. No concurrent worker lease is
 created, no local child agent is substituted for a cloud worker, and root/lockfile
 changes remain serialized. Verification runs locally and in fresh GitHub jobs;
 local execution is never called a cloud-worker implementation receipt.

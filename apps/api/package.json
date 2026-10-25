@@ -7,6 +7,7 @@
   "scripts": {
     "dev": "tsx watch --tsconfig tsconfig.json src/main.ts",
     "start": "node dist/apps/api/src/main.js",
+    "migrate": "node dist/apps/api/src/migrate.js",
     "build": "tsc -p tsconfig.build.json && node ../../tools/build-node.mjs api",
     "test": "pnpm build && vitest run",
     "test:integration": "pnpm test",

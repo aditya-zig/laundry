@@ -25,6 +25,11 @@ describe('production runtime boundaries', () => {
     try { assertProductionConfig({ ...production, DATABASE_URL: database }); throw new Error('Expected rejection'); }
     catch (error) { expect(error).toBeInstanceOf(Error); if (error instanceof Error) { expect(error.message).toContain('PostgreSQL'); expect(error.message).not.toContain('private'); } }
   });
+  it('does not permit migration credentials or migration authority inside the production API', () => {
+    expect(() => assertProductionConfig({ ...production, DATABASE_URL_UNPOOLED: production.DATABASE_URL })).toThrow(/Migration credentials/);
+    expect(() => assertProductionConfig({ ...production, LAUNDRY_ALLOW_MIGRATIONS: 'true' })).toThrow(/Migration credentials/);
+  });
+
   it('requires explicit non-demo operation and configured production messaging', () => {
     expect(() => assertProductionConfig({ ...production, DEMO_MODE: 'true' })).toThrow(/DEMO_MODE/);
     expect(() => assertProductionConfig({ ...production, WHATSAPP_TOKEN: '' })).toThrow(/WHATSAPP_TOKEN/);

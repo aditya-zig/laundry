@@ -19,6 +19,7 @@ export function assertProductionConfig(env: NodeJS.ProcessEnv = process.env): vo
   if (env.NODE_ENV !== 'production') return;
   const problems: string[] = [];
   if (env.DEMO_MODE !== 'false') problems.push("DEMO_MODE must be 'false' in production");
+  if (env.DATABASE_URL_UNPOOLED || env.LAUNDRY_ALLOW_MIGRATIONS === 'true') problems.push('Migration credentials/permission must not be supplied to the production API runtime');
   let database: URL | undefined;
   try { database = new URL(env.DATABASE_URL ?? ''); } catch { /* Report no secret values. */ }
   if (!database || !['postgres:', 'postgresql:'].includes(database.protocol) || loopback(database.hostname) || database.pathname === '/' || database.searchParams.get('sslmode') !== 'verify-full') {

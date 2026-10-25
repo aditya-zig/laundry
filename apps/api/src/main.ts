@@ -9,6 +9,7 @@ import { getPool, initializeDb } from "../../../modules/shared/src/db";
 import { identityFromEnvironment } from "../../../modules/identity/src";
 import { assertProductionConfig, resolveCorsOrigins } from "./runtime-config";
 import { configureHttpBody } from "./http-body";
+import { verifyRuntimeDatabase } from '../../../modules/shared/src/runtime-database';
 
 function resolveServiceAssets(): string {
   // Walk up from both cwd (which differs under pnpm --filter) and this
@@ -32,7 +33,8 @@ async function bootstrap() {
   assertProductionConfig();
   // Check configured identity before migrations/listening; no provider send.
   if (process.env.NODE_ENV === 'production') identityFromEnvironment(getPool());
-  await initializeDb();
+  if (process.env.NODE_ENV === 'production' || process.env.LAUNDRY_DATABASE_MODE === 'runtime') await verifyRuntimeDatabase(getPool());
+  else await initializeDb();
   const app = await NestFactory.create<NestExpressApplication>(AppModule, { rawBody: true });
   app.enableShutdownHooks(["SIGINT", "SIGTERM"]);
   app.enableCors({
@@ -61,6 +63,10 @@ async function bootstrap() {
 
 bootstrap().catch((e) => {
   // eslint-disable-next-line no-console
-  console.error("[laundry-api] fatal", e);
+  const message = e instanceof Error ? e.message : '';
+  // DB/provider exceptions may carry connection or request details. Only our
+  // enumerated configuration failures are safe to reflect at startup.
+  const configuration = /^(Refusing production start:|Production requires a configured Laundry identity provider|Unsupported Laundry identity provider|Invalid Laundry SMS provider configuration|Identity requires independent random|Identity hashing and encryption keys|Set an explicit bounded LAUNDRY_SMS_HOURLY_BUDGET|Runtime database role|Runtime identity table grants|Required identity migration)/.test(message);
+  console.error("[laundry-api] fatal", { code: 'STARTUP_FAILED', detail: configuration ? message : 'Database/provider startup failed; inspect redacted configuration and health' });
   process.exit(1);
 });
