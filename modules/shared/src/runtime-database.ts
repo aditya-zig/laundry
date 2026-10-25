@@ -1,6 +1,7 @@
 import type { Pool } from 'pg';
 
-const identityTables = ['identity_profiles', 'identity_otp_challenges', 'identity_rate_buckets', 'identity_session_families', 'identity_sessions', 'identity_command_results', 'identity_addresses', 'identity_audit'];
+const identityTables = ['identity_profiles', 'identity_otp_challenges', 'identity_rate_buckets', 'identity_session_families', 'identity_sessions', 'identity_command_results', 'identity_addresses', 'identity_audit', 'identity_staff', 'identity_staff_facilities', 'identity_staff_invitations', 'identity_staff_mfa', 'identity_staff_mfa_enrollments', 'identity_whatsapp_links', 'identity_session_staff_bindings', 'identity_staff_mfa_steps'];
+const provisioningTables = new Set(['identity_staff', 'identity_staff_facilities']);
 
 /** Runtime credentials must not also be migration/owner credentials. This checks
  * effective owner memberships as well as role flags, so NOINHERIT or an alias
@@ -27,8 +28,12 @@ export async function verifyRuntimeDatabase(db: Pool): Promise<void> {
         has_table_privilege($1::oid,'TRIGGER') AS triggers`, [oid])).rows[0];
       // has_table_privilege with a list is true for ANY listed privilege; prove
       // every necessary grant separately rather than trusting the aggregate.
-      for (const privilege of ['SELECT', 'INSERT', 'UPDATE', 'DELETE']) {
+      const ownerProvisioned = provisioningTables.has(table);
+      for (const privilege of ownerProvisioned ? ['SELECT'] : ['SELECT', 'INSERT', 'UPDATE', 'DELETE']) {
         if (!(await tx.query('SELECT has_table_privilege($1::oid,$2) AS allowed', [oid, privilege])).rows[0].allowed) throw new Error('Runtime identity table grants are incomplete');
+      }
+      if (ownerProvisioned) for (const privilege of ['INSERT', 'UPDATE', 'DELETE']) {
+        if ((await tx.query('SELECT has_table_privilege($1::oid,$2) AS allowed', [oid, privilege])).rows[0].allowed) throw new Error('Runtime identity table grants must not permit staff provisioning');
       }
       if (access.truncation || access.triggers) throw new Error('Runtime identity table grants must exclude destructive/DDL privileges');
     }

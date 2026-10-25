@@ -15,7 +15,10 @@ beforeAll(async () => {
   await getPool().query(`GRANT CONNECT ON DATABASE "${url.pathname.slice(1)}" TO ${role}`);
   await getPool().query(`GRANT USAGE ON SCHEMA public TO ${role}`);
   const tables = (await getPool().query("SELECT tablename FROM pg_tables WHERE schemaname='public' AND tablename LIKE 'identity\\_%' ESCAPE '\\'")).rows;
-  for (const table of tables) await getPool().query(`GRANT SELECT,INSERT,UPDATE,DELETE ON TABLE public."${table.tablename}" TO ${role}`);
+  for (const table of tables) {
+    const privileges = ['identity_staff', 'identity_staff_facilities'].includes(table.tablename) ? 'SELECT' : 'SELECT,INSERT,UPDATE,DELETE';
+    await getPool().query(`GRANT ${privileges} ON TABLE public."${table.tablename}" TO ${role}`);
+  }
   url.username = role; url.password = password;
   runtime = new pg.Pool({ connectionString: url.toString(), max: 2 });
 });
@@ -30,6 +33,19 @@ it('accepts real non-owner runtime credentials with complete DML-only identity g
   expect((await runtime.query('SELECT current_user AS name')).rows[0].name).toBe(role);
   await expect(runtime.query('CREATE TABLE public.should_never_exist (id int)')).rejects.toMatchObject({ code: '42501' });
   await expect(runtime.query('SELECT * FROM users')).rejects.toMatchObject({ code: '42501' });
+});
+
+it('cannot create or modify staff provisioning and refuses credentials that can', async () => {
+  await expect(runtime.query("INSERT INTO identity_staff (id,phone,role,created_at) VALUES (gen_random_uuid(),'+919000099991','ADMIN',now())")).rejects.toMatchObject({ code: '42501' });
+  await getPool().query(`GRANT INSERT ON identity_staff TO ${role}`);
+  try { await expect(verifyRuntimeDatabase(runtime)).rejects.toThrow(/must not permit staff provisioning/); }
+  finally { await getPool().query(`REVOKE INSERT ON identity_staff FROM ${role}`); }
+});
+
+it('checks grants on the actual session binding and MFA replay tables', async () => {
+  await getPool().query(`REVOKE INSERT ON identity_staff_mfa_steps FROM ${role}`);
+  try { await expect(verifyRuntimeDatabase(runtime)).rejects.toThrow(/grants are incomplete/); }
+  finally { await getPool().query(`GRANT INSERT ON identity_staff_mfa_steps TO ${role}`); }
 });
 
 it('rejects owner/migration credentials instead of reusing them for the live API', async () => {

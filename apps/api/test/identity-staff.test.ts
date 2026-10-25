@@ -3,6 +3,7 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from
 import { NestFactory } from '@nestjs/core';
 import type { NestExpressApplication } from '@nestjs/platform-express';
 import { randomBytes, randomUUID } from 'node:crypto';
+import { readFileSync } from 'node:fs';
 import { v2 } from '@laundry/contracts';
 import { IdentityModule } from '../src/features/identity/identity.module';
 import { configureHttpBody } from '../src/http-body';
@@ -23,7 +24,8 @@ let now: Date;
 let service: IdentityService;
 let deliveries: { phone: string; code: string; challengeId: string }[];
 let provider: OtpDelivery;
-const TRUNCATE = 'TRUNCATE identity_profiles, identity_otp_challenges, identity_rate_buckets, identity_session_families, identity_sessions, identity_command_results, identity_addresses, identity_audit, identity_staff, identity_staff_facilities, identity_staff_invitations, identity_staff_mfa, identity_staff_mfa_enrollments CASCADE';
+const PROPOSAL = readFileSync(new URL('../../../modules/schema/proposals/B01-staff-sessions.sql', import.meta.url), 'utf8');
+const TRUNCATE = 'TRUNCATE identity_profiles, identity_otp_challenges, identity_rate_buckets, identity_session_families, identity_sessions, identity_command_results, identity_addresses, identity_audit, identity_staff, identity_staff_facilities, identity_staff_invitations, identity_staff_mfa, identity_staff_mfa_enrollments, identity_session_staff_bindings, identity_staff_mfa_steps CASCADE';
 function nextTime(ms: number) { now = new Date(now.getTime() + ms); }
 async function signin(number: string) {
   const challenge = await service.requestOtp({ phone: number }, key(), 'test-peer');
@@ -52,6 +54,7 @@ beforeAll(async () => {
   const url = new URL(process.env.DATABASE_URL!);
   if (!['127.0.0.1', 'localhost'].includes(url.hostname) || !url.pathname.startsWith('/laundry_verify_')) throw new Error('Disposable local PostgreSQL required');
   await initializeDb();
+  await getPool().query(PROPOSAL);
 });
 beforeEach(async () => {
   await getPool().query(TRUNCATE);
@@ -121,7 +124,10 @@ describe('B01 staff invitation lifecycle (provisioning vs runtime separation)', 
     expect(refreshed.actor.facilityIds).toEqual(facilityIds);
     await getPool().query('UPDATE identity_staff SET active=false,deactivated_at=$2 WHERE phone=$1', [operatorPhone, now]);
     nextTime(60_000);
-    expect((await service.authenticate(refreshed.accessToken)).actor.role).toBe('CUSTOMER');
+    // A privileged token never falls back to a customer actor: the bound
+    // family is revoked and every held token fails.
+    await expect(service.authenticate(refreshed.accessToken)).rejects.toMatchObject({ code: 'UNAUTHENTICATED' });
+    await expect(service.refresh({ refreshToken: staff.refreshToken }, key(), 'test-peer')).rejects.toMatchObject({ code: 'UNAUTHENTICATED' });
     const plain = await signin(operatorPhone);
     expect(plain.actor.role).toBe('CUSTOMER');
     expect(plain.actor.facilityIds).toEqual([]);

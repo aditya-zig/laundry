@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "@laundry/api-client": "workspace:*",
+    "@laundry/app-foundation": "workspace:*",
     "@laundry/contracts": "workspace:*",
     "@laundry/design-tokens": "workspace:*",
     "react": "18.3.1",

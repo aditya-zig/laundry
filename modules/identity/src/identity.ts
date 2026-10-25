@@ -2,7 +2,7 @@ import { createCipheriv, createDecipheriv, createHmac, randomBytes, randomInt, r
 import type { Pool, PoolClient } from 'pg';
 import { v2 } from '@laundry/contracts';
 import { IdentityFault } from './errors';
-import { totpMatches, base32, provisioningUri } from './totp';
+import { totpMatches, totpCode, base32, provisioningUri, MFA_STEP_MS, MFA_WINDOW } from './totp';
 
 export interface OtpDelivery {
   readonly mode: 'FAKE' | 'LIVE';
@@ -15,6 +15,9 @@ export interface IdentityOptions {
   encryptionKey: string;
   clock?: () => Date;
   maxOtpPerHour?: number;
+  // Focus-mode switch for nonproduction regression suites only. Production
+  // always requires an enrolled current TOTP for staff sign-in.
+  requireStaffMfa?: boolean;
 }
 type Failure = { ok: false; code: v2.ErrorCode; message: string; currentVersion?: number };
 type Outcome<T> = { ok: true; value: T; sessionId?: string } | Failure;
@@ -24,6 +27,7 @@ const invalidSession = () => new IdentityFault('UNAUTHENTICATED', 'Sign in again
 const validToken = (token: string) => typeof token === 'string' && token.length === 43 && /^[A-Za-z0-9_-]{43}$/.test(token);
 const ACCESS_MS = 15 * 60_000, REFRESH_MS = 7 * 24 * 60 * 60_000, FAMILY_MS = 30 * 24 * 60 * 60_000;
 const INVITATION_MS = 7 * 24 * 60 * 60_000, MFA_ENROLLMENT_MS = 10 * 60_000, MFA_SECRET_BYTES = 20, MFA_ATTEMPTS = 5;
+const STAFF_LOGIN_MFA_ATTEMPTS = 10;
 interface SessionRecord {
   id: string; family_id: string; profile_id: string; issuer_mode: string;
   access_expires_at: Date; refresh_expires_at: Date; rotated_at: Date | null;
@@ -35,6 +39,7 @@ export class IdentityService {
   private readonly encryptionKey: Buffer;
   private readonly clock: () => Date;
   private readonly maxOtpPerHour: number;
+  private readonly staffMfaRequired: boolean;
   constructor(private readonly options: IdentityOptions) {
     for (const value of [options.hashKey, options.encryptionKey]) {
       if (!/^[a-f0-9]{64}$/i.test(value) || /^([a-f0-9])\1{63}$/i.test(value)) throw new Error('Identity requires independent random 32-byte keys');
@@ -44,6 +49,7 @@ export class IdentityService {
     this.encryptionKey = Buffer.from(options.encryptionKey, 'hex');
     if (timingSafeEqual(this.hashKey, this.encryptionKey)) throw new Error('Identity hashing and encryption keys must differ');
     this.clock = options.clock ?? (() => new Date());
+    this.staffMfaRequired = options.requireStaffMfa === true || process.env.NODE_ENV === 'production';
     if (process.env.NODE_ENV === 'production' && options.maxOtpPerHour === undefined) throw new Error('Production identity requires an explicit delivery quota');
     this.maxOtpPerHour = options.maxOtpPerHour ?? 100;
     if (!Number.isSafeInteger(this.maxOtpPerHour) || this.maxOtpPerHour < 1 || this.maxOtpPerHour > 100_000) throw new Error('Identity delivery quota must be a bounded positive integer');
@@ -107,19 +113,42 @@ export class IdentityService {
   private async audit(tx: PoolClient, action: string, profileId?: string, resourceId?: string) {
     await tx.query('INSERT INTO identity_audit (id,profile_id,action,resource_id,created_at) VALUES ($1,$2,$3,$4,$5)', [randomUUID(), profileId ?? null, action, resourceId ?? null, this.clock()]);
   }
-  private async staffBinding(tx: Pool | PoolClient, phone: string): Promise<{ staff_id: string; staff_role: string } | undefined> {
-    return (await tx.query<{ staff_id: string; staff_role: string }>(
-      'SELECT id AS staff_id, role AS staff_role FROM identity_staff WHERE phone=$1 AND active=$2', [phone, true])).rows[0];
+  private async staffBindingState(tx: Pool | PoolClient, familyId: string): Promise<{ staffId: string; role: string; valid: boolean } | undefined> {
+    const binding = (await tx.query<{ staff_id: string; role: string; mfa_version: number | null }>(
+      'SELECT staff_id, role, mfa_version FROM identity_session_staff_bindings WHERE family_id=$1', [familyId])).rows[0];
+    if (!binding) return undefined;
+    const staff = (await tx.query<{ role: string; active: boolean }>(
+      'SELECT role, active FROM identity_staff WHERE id=$1', [binding.staff_id])).rows[0];
+    const enabled = (await tx.query<{ version: number }>(
+      "SELECT version FROM identity_staff_mfa WHERE staff_id=$1 AND status='ENABLED'", [binding.staff_id])).rows[0];
+    const valid = !!staff && staff.active && staff.role === binding.role &&
+      (binding.mfa_version === null ? !this.staffMfaRequired : binding.mfa_version === (enabled ? enabled.version : null));
+    return { staffId: binding.staff_id, role: binding.role, valid };
   }
-  private async actor(tx: Pool | PoolClient, profileId: string, phone: string | undefined): Promise<v2.Actor> {
-    // No invitation or claimed body role can promote a phone signup to staff.
-    // Only provisioning-created active staff rows bind roles and facility scope.
-    if (!phone) return { id: profileId, role: 'CUSTOMER', facilityIds: [], scope: { facilityIds: [] } };
-    const staff = await this.staffBinding(tx, phone);
-    if (!staff) return { id: profileId, role: 'CUSTOMER', facilityIds: [], scope: { facilityIds: [] } };
-    const facilityIds = (await tx.query<{ facility_id: string }>(
-      'SELECT facility_id FROM identity_staff_facilities WHERE staff_id=$1 ORDER BY facility_id LIMIT 100', [staff.staff_id])).rows.map(row => row.facility_id);
-    return { id: profileId, role: staff.staff_role as v2.Actor['role'], facilityIds, scope: { facilityIds } };
+  private async revokeUnboundFamily(tx: Pool | PoolClient, familyId: string) {
+    await tx.query("UPDATE identity_session_families SET revoked_at=COALESCE(revoked_at,$2),revoke_reason=COALESCE(revoke_reason,'STAFF_UNBOUND') WHERE id=$1 AND revoked_at IS NULL", [familyId, this.clock()]);
+  }
+  private async actor(tx: Pool | PoolClient, profileId: string, familyId?: string): Promise<v2.Actor> {
+    // A family is bound to the provisioned staff identity, role and MFA
+    // version at issue time. The binding is rechecked on every authenticate,
+    // refresh and cached credential replay: deactivation, a role change or an
+    // MFA reset revokes the family instead of degrading privileges.
+    if (familyId) {
+      const binding = await this.staffBindingState(tx, familyId);
+      if (binding) {
+        if (!binding.valid) {
+          await this.revokeUnboundFamily(tx, familyId);
+          throw invalidSession();
+        }
+        const facilityIds = (await tx.query<{ facility_id: string }>(
+          'SELECT facility_id FROM identity_staff_facilities WHERE staff_id=$1 ORDER BY facility_id LIMIT 100', [binding.staffId])).rows.map(row => row.facility_id);
+        return { id: profileId, role: binding.role as v2.Actor['role'], facilityIds, scope: { facilityIds } };
+      }
+    }
+    // Families without a staff binding stay customer-scoped for their whole
+    // life even if the phone is provisioned later: no session gains staff
+    // privileges it was not issued with.
+    return { id: profileId, role: 'CUSTOMER', facilityIds: [], scope: { facilityIds: [] } };
   }
   private current(record: SessionRecord | undefined, refresh = false): record is SessionRecord {
     return !!record && record.active && record.issuer_mode === this.options.provider.mode &&
@@ -137,7 +166,7 @@ export class IdentityService {
   private async authenticated(tx: Pool | PoolClient, token: string, lock = false) {
     const row = await this.sessionRecord(tx, 'access', token, lock);
     if (!this.current(row)) throw invalidSession();
-    return { sessionId: row.id, actor: await this.actor(tx, row.profile_id, row.phone), familyId: row.family_id, phone: row.phone };
+    return { sessionId: row.id, actor: await this.actor(tx, row.profile_id, row.family_id), familyId: row.family_id, phone: row.phone };
   }
   async authenticate(token: string): Promise<{ sessionId: string; actor: v2.Actor }> {
     const { sessionId, actor } = await this.authenticated(this.options.db, token);
@@ -158,6 +187,14 @@ export class IdentityService {
           const row = (await tx.query<SessionRecord>(`SELECT s.*,f.profile_id,f.issuer_mode,f.revoked_at,f.absolute_expires_at,p.active FROM identity_sessions s
             JOIN identity_session_families f ON f.id=s.family_id JOIN identity_profiles p ON p.id=f.profile_id WHERE s.id=$1 FOR UPDATE OF f FOR SHARE OF p`, [previous.session_id])).rows[0];
           if (!this.current(row)) throw invalidSession();
+          const binding = await this.staffBindingState(tx, row.family_id);
+          if (binding && !binding.valid) {
+            // Return a persisted denial, not a thrown transaction rollback:
+            // old login/refresh results must not revive a revoked staff family.
+            await this.revokeUnboundFamily(tx, row.family_id);
+            await this.audit(tx, 'STAFF_SESSION_UNBOUND', row.profile_id, row.family_id);
+            return denied('UNAUTHENTICATED', 'Sign in again to continue');
+          }
         }
         const value = this.unseal<T>(previous.sealed_result, aad);
         if (value.ok && replayGuard) await replayGuard(tx, value.value);
@@ -220,16 +257,29 @@ export class IdentityService {
       throw new IdentityFault(knownFailure ? 'PROVIDER_UNAVAILABLE' : 'PROVIDER_OUTCOME_UNKNOWN', 'Code delivery could not be confirmed');
     }
   }
-  private async issueSession(tx: PoolClient, profileId: string, familyId?: string, phone?: string): Promise<v2.Session> {
+  private async issueSession(tx: PoolClient, profileId: string, familyId?: string, binding?: { staffId: string; role: string; mfaVersion: number | null }): Promise<v2.Session> {
     const now = this.clock(), id = randomUUID();
     const family = familyId ?? randomUUID();
-    if (!familyId) await tx.query('INSERT INTO identity_session_families (id,profile_id,issuer_mode,created_at,absolute_expires_at) VALUES ($1,$2,$3,$4,$5)', [family, profileId, this.options.provider.mode, now, new Date(now.getTime() + FAMILY_MS)]);
+    if (!familyId) {
+      await tx.query('INSERT INTO identity_session_families (id,profile_id,issuer_mode,created_at,absolute_expires_at) VALUES ($1,$2,$3,$4,$5)', [family, profileId, this.options.provider.mode, now, new Date(now.getTime() + FAMILY_MS)]);
+      if (binding) {
+        await tx.query('INSERT INTO identity_session_staff_bindings (family_id,staff_id,role,mfa_version,created_at) VALUES ($1,$2,$3,$4,$5)', [family, binding.staffId, binding.role, binding.mfaVersion, now]);
+      }
+    }
     const familyExpiry = (await tx.query('SELECT absolute_expires_at FROM identity_session_families WHERE id=$1', [family])).rows[0].absolute_expires_at as Date;
     const accessToken = randomBytes(32).toString('base64url'), refreshToken = randomBytes(32).toString('base64url');
     const expiresAt = new Date(Math.min(now.getTime() + ACCESS_MS, familyExpiry.getTime()));
     await tx.query(`INSERT INTO identity_sessions (id,family_id,access_hash,refresh_hash,created_at,access_expires_at,refresh_expires_at)
       VALUES ($1,$2,$3,$4,$5,$6,$7)`, [id, family, this.hash('access', accessToken), this.hash('refresh', refreshToken), now, expiresAt, new Date(Math.min(now.getTime() + REFRESH_MS, familyExpiry.getTime()))]);
-    return v2.sessionSchema.parse({ sessionId: id, accessToken, refreshToken, expiresAt: expiresAt.toISOString(), actor: await this.actor(tx, profileId, phone) });
+    return v2.sessionSchema.parse({ sessionId: id, accessToken, refreshToken, expiresAt: expiresAt.toISOString(), actor: await this.actor(tx, profileId, family) });
+  }
+  private matchingTotpStep(secret: Buffer, code: string): number | undefined {
+    if (!/^\d{6}$/.test(code)) return undefined;
+    const step = Math.floor(this.clock().getTime() / MFA_STEP_MS);
+    for (let drift = -MFA_WINDOW; drift <= MFA_WINDOW; drift++) {
+      if (timingSafeEqual(Buffer.from(totpCode(secret, step + drift)), Buffer.from(code))) return step + drift;
+    }
+    return undefined;
   }
   async verifyOtp(input: v2.OtpVerify, key: string, peer: string): Promise<v2.Session> {
     const parsed = v2.otpVerifySchema.parse(input);
@@ -242,8 +292,31 @@ export class IdentityService {
       const profile = (await tx.query(`INSERT INTO identity_profiles (id,phone,created_at) VALUES ($1,$2,$3)
         ON CONFLICT (phone) DO UPDATE SET phone=EXCLUDED.phone RETURNING id,active`, [randomUUID(), challenge.phone, this.clock()])).rows[0];
       if (!profile.active) return denied('UNAUTHENTICATED', 'Sign in is unavailable');
+      // A provisioned staff phone must additionally prove its enrolled
+      // authenticator before any privileged session (including RIDER) is
+      // issued. Production cannot skip this; nonproduction suites may opt in
+      // with requireStaffMfa.
+      const staffRow = (await tx.query<{ id: string; role: string }>(
+        'SELECT id, role FROM identity_staff WHERE phone=$1 AND active=$2', [challenge.phone, true])).rows[0];
+      let boundMfaVersion: number | null = null;
+      if (staffRow) {
+        const enabled = (await tx.query<{ version: number; secret_cipher: string }>(
+          "SELECT version, secret_cipher FROM identity_staff_mfa WHERE staff_id=$1 AND status='ENABLED'", [staffRow.id])).rows[0];
+        if (parsed.mfaCode || this.staffMfaRequired) {
+          if (!enabled) return denied('UNAUTHENTICATED', 'Staff sign-in requires the enrolled authenticator');
+          if (!await this.rate(tx, `staff-login-mfa:${staffRow.id}`, STAFF_LOGIN_MFA_ATTEMPTS)) return denied('RATE_LIMITED', 'Too many staff sign-in attempts');
+          const secret = this.revealSecret(enabled.secret_cipher, `staff-mfa:${staffRow.id}`);
+          const usedStep = this.matchingTotpStep(Buffer.from(secret, 'base64url'), parsed.mfaCode ?? '');
+          if (usedStep === undefined) return denied('UNAUTHENTICATED', 'Code is invalid or expired');
+          // One authenticator step authorizes one sign-in: the primary-key
+          // insert rejects a replayed step atomically inside this transaction.
+          const recorded = await tx.query('INSERT INTO identity_staff_mfa_steps (staff_id,step,used_at) VALUES ($1,$2,$3) ON CONFLICT DO NOTHING RETURNING staff_id', [staffRow.id, usedStep, this.clock()]);
+          if (!recorded.rowCount) return denied('UNAUTHENTICATED', 'Code was already used; wait for the next authenticator step');
+          boundMfaVersion = enabled.version;
+        }
+      }
       await tx.query("UPDATE identity_otp_challenges SET status='USED' WHERE id=$1", [challenge.id]);
-      const session = await this.issueSession(tx, profile.id, undefined, challenge.phone);
+      const session = await this.issueSession(tx, profile.id, undefined, staffRow ? { staffId: staffRow.id, role: staffRow.role, mfaVersion: boundMfaVersion } : undefined);
       await this.audit(tx, 'SESSION_CREATED', profile.id, session.sessionId);
       return { ok: true, value: session, sessionId: session.sessionId };
     });
@@ -264,8 +337,17 @@ export class IdentityService {
         return denied('UNAUTHENTICATED', 'Sign in again to continue');
       }
       if (!this.current(row, true)) return denied('UNAUTHENTICATED', 'Sign in again to continue');
+      // Rotation rechecks the staff binding: a deactivated, role-changed or
+      // MFA-reset staff member cannot mint fresh tokens from a held refresh
+      // token.
+      const binding = await this.staffBindingState(tx, row.family_id);
+      if (binding && !binding.valid) {
+        await this.revokeUnboundFamily(tx, row.family_id);
+        await this.audit(tx, 'STAFF_SESSION_UNBOUND', row.profile_id, row.family_id);
+        return denied('UNAUTHENTICATED', 'Sign in again to continue');
+      }
       await tx.query('UPDATE identity_sessions SET rotated_at=$2 WHERE id=$1', [row.id, this.clock()]);
-      const session = await this.issueSession(tx, row.profile_id, row.family_id, row.phone);
+      const session = await this.issueSession(tx, row.profile_id, row.family_id);
       await this.audit(tx, 'SESSION_ROTATED', row.profile_id, session.sessionId);
       return { ok: true, value: session, sessionId: session.sessionId };
     });

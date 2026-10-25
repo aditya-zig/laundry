@@ -134,6 +134,9 @@ importers:
       '@laundry/api-client':
         specifier: workspace:*
         version: link:../../packages/api-client
+      '@laundry/app-foundation':
+        specifier: workspace:*
+        version: link:../../packages/app-foundation
       '@laundry/contracts':
         specifier: workspace:*
         version: link:../../packages/contracts
@@ -198,6 +201,9 @@ importers:
       '@laundry/api-client':
         specifier: workspace:*
         version: link:../../packages/api-client
+      '@laundry/app-foundation':
+        specifier: workspace:*
+        version: link:../../packages/app-foundation
       '@laundry/contracts':
         specifier: workspace:*
         version: link:../../packages/contracts
@@ -238,6 +244,9 @@ importers:
       '@laundry/api-client':
         specifier: workspace:*
         version: link:../../packages/api-client
+      '@laundry/app-foundation':
+        specifier: workspace:*
+        version: link:../../packages/app-foundation
       '@laundry/contracts':
         specifier: workspace:*
         version: link:../../packages/contracts
@@ -364,6 +373,25 @@ importers:
       zod:
         specifier: 4.6.7
         version: 4.6.7
+    devDependencies:
+      '@laundry/test-fixtures':
+        specifier: workspace:*
+        version: link:../test-fixtures
+      typescript:
+        specifier: 5.7.3
+        version: 5.7.3
+      vitest:
+        specifier: 3.2.4
+        version: 3.2.4(@types/node@24.19.2)(jiti@2.7.0)(lightningcss@1.27.0)(terser@5.51.2)(tsx@4.19.2)(yaml@2.9.1)
+
+  packages/app-foundation:
+    dependencies:
+      '@laundry/api-client':
+        specifier: workspace:*
+        version: link:../api-client
+      '@laundry/contracts':
+        specifier: workspace:*
+        version: link:../contracts
     devDependencies:
       '@laundry/test-fixtures':
         specifier: workspace:*

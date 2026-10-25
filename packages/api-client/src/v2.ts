@@ -1,6 +1,9 @@
 import { z } from "zod";
 import { v2 } from "@laundry/contracts";
 
+/** The SDK exposes the authoritative server actor without copying its shape. */
+export type Actor = v2.Actor;
+
 export interface V2ClientOptions {
   baseUrl?: string;
   getToken?: () => string | undefined;

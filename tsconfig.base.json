@@ -17,6 +17,9 @@
       "@laundry/contracts": [
         "packages/contracts/src/index.ts"
       ],
+      "@laundry/app-foundation": [
+        "packages/app-foundation/src/index.ts"
+      ],
       "@laundry/api-client": [
         "packages/api-client/src/index.ts"
       ],

@@ -14,6 +14,7 @@
     "@babel/runtime": "7.26.10",
     "@expo/metro-runtime": "4.0.1",
     "@laundry/api-client": "workspace:*",
+    "@laundry/app-foundation": "workspace:*",
     "@laundry/contracts": "workspace:*",
     "@laundry/design-tokens": "workspace:*",
     "expo": "52.0.0",

@@ -75,7 +75,8 @@ async function main() {
       const tables = (await owner.query("SELECT tablename FROM pg_tables WHERE schemaname='public' AND left(tablename,9)='identity_'")).rows;
       for (const { tablename } of tables) {
         if (!/^identity_[a-z_]+$/.test(tablename)) throw new Error('Unexpected runtime grant target');
-        await owner.query(`GRANT SELECT,INSERT,UPDATE,DELETE ON TABLE public."${tablename}" TO ${runtimeRole}`);
+        const privileges = ['identity_staff', 'identity_staff_facilities'].includes(tablename) ? 'SELECT' : 'SELECT,INSERT,UPDATE,DELETE';
+        await owner.query(`GRANT ${privileges} ON TABLE public."${tablename}" TO ${runtimeRole}`);
       }
       assert.equal((await owner.query('SELECT count(*)::int AS n FROM users')).rows[0].n, 0, 'Deployment job seeded a demo user');
     } finally { await owner.end(); }
