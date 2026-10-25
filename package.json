@@ -39,6 +39,7 @@
     "verify:pilot": "pnpm --filter @laundry/contracts build && pnpm --filter @laundry/api-client build && pnpm --filter @laundry/api build && node tools/verification/run-pilot.mjs",
     "verify:evidence": "node tools/verification/evidence.mjs",
     "platform:deploy": "node tools/cloud/deploy-platform.mjs --deploy",
+    "web:deploy": "node tools/cloud/deploy-web.mjs --deploy",
     "platform:test": "node --test tools/cloud/platform.test.mjs",
     "release:security": "node tools/cloud/release-security.mjs",
     "platform:verify": "node tools/cloud/verify-platform-live.mjs",
