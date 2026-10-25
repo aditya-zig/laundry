@@ -1,11 +1,16 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
+import { readFile } from 'node:fs/promises';
 import web, { apiOrigin } from '../../infra/cloudflare/src/web.mjs';
 const native = 'https://br-fancy-glade-a1tjuotr-api.compute.c-1.ap-southeast-1.aws.neon.tech';
 function env(app = 'customer') {
   return { APP: app, SOURCE_REVISION: 'a'.repeat(40), API_ORIGIN: '', API_ORIGIN_SECRET: 'a1'.repeat(32), ASSETS: { async fetch(request) { return new URL(request.url).pathname === '/index.html' ? new Response('<html>real app bundle</html>', { headers: { 'content-type': 'text/html' } }) : new Response('missing', { status: 404 }); } } };
 }
 const request = (path, options) => new Request('https://laundry-customer.example' + path, options);
+test('deployment clears Metro cache so previous loopback test origins cannot survive the public export', async () => {
+  const source = await readFile(new URL('./deploy-web.mjs', import.meta.url), 'utf8');
+  assert.ok(source.includes("app === 'ops' ? [] : ['--clear']"));
+});
 test('serves known SPA routes with security headers but never converts missing assets or API paths to HTML', async () => {
   for (const path of ['/', '/checkout', '/orders/00000000-0000-4000-8000-000000000001']) {
     const response = await web.fetch(request(path), env());

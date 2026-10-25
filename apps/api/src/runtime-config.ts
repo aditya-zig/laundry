@@ -15,6 +15,16 @@ export function resolveCorsOrigins(env: NodeJS.ProcessEnv = process.env): string
   return [...new Set([...(production ? [] : developmentOrigins), ...origins])];
 }
 
+export function assertManagedDatabaseAliases(env: NodeJS.ProcessEnv = process.env): void {
+  const expected = env.LAUNDRY_RUNTIME_DATABASE_URL;
+  if (!expected || env.DATABASE_URL !== expected || (env.DATABASE_URL_UNPOOLED && env.DATABASE_URL_UNPOOLED !== expected)) {
+    throw new Error('Managed database aliases must match the restricted runtime credential');
+  }
+  // Only discard an identical, non-authoritative alias. Effective database
+  // privileges are independently verified before the application starts.
+  delete env.DATABASE_URL_UNPOOLED;
+}
+
 export function assertProductionConfig(env: NodeJS.ProcessEnv = process.env): void {
   if (env.NODE_ENV !== 'production') return;
   const problems: string[] = [];
@@ -25,10 +35,13 @@ export function assertProductionConfig(env: NodeJS.ProcessEnv = process.env): vo
   if (!database || !['postgres:', 'postgresql:'].includes(database.protocol) || loopback(database.hostname) || database.pathname === '/' || database.searchParams.get('sslmode') !== 'verify-full') {
     problems.push('DATABASE_URL must identify a non-loopback PostgreSQL database with sslmode=verify-full');
   }
-  for (const name of ['WHATSAPP_APP_SECRET', 'WHATSAPP_VERIFY_TOKEN', 'WHATSAPP_TOKEN', 'WHATSAPP_PHONE_NUMBER_ID']) {
-    if (!env[name]) problems.push(`${name} must be configured in production`);
+  if (env.LAUNDRY_WHATSAPP_MODE && !['enabled', 'disabled'].includes(env.LAUNDRY_WHATSAPP_MODE)) problems.push('Unsupported LAUNDRY_WHATSAPP_MODE');
+  if (env.LAUNDRY_WHATSAPP_MODE !== 'disabled') {
+    for (const name of ['WHATSAPP_APP_SECRET', 'WHATSAPP_VERIFY_TOKEN', 'WHATSAPP_TOKEN', 'WHATSAPP_PHONE_NUMBER_ID']) {
+      if (!env[name]) problems.push(`${name} must be configured in production`);
+    }
+    if (env.WHATSAPP_VERIFY_TOKEN === 'demo-verify-token') problems.push('WHATSAPP_VERIFY_TOKEN must not use the demo default');
   }
-  if (env.WHATSAPP_VERIFY_TOKEN === 'demo-verify-token') problems.push('WHATSAPP_VERIFY_TOKEN must not use the demo default');
   if (problems.length) throw new Error(`Refusing production start: ${problems.join('; ')}`);
   resolveCorsOrigins(env);
 }

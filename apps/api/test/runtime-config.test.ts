@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { assertProductionConfig, resolveCorsOrigins } from '../src/runtime-config';
+import { assertManagedDatabaseAliases, assertProductionConfig, resolveCorsOrigins } from '../src/runtime-config';
 
 const production = {
   NODE_ENV: 'production', DEMO_MODE: 'false',
@@ -9,6 +9,25 @@ const production = {
 };
 
 describe('production runtime boundaries', () => {
+  it('permits explicit messaging deferral, not implicitly absent or misspelled configuration', () => {
+    const deferred = { ...production, LAUNDRY_WHATSAPP_MODE: 'disabled', LAUNDRY_IDENTITY_PROVIDER: 'disabled', WHATSAPP_APP_SECRET: '', WHATSAPP_VERIFY_TOKEN: '', WHATSAPP_TOKEN: '', WHATSAPP_PHONE_NUMBER_ID: '' };
+    expect(() => assertProductionConfig(deferred)).not.toThrow();
+    expect(() => assertProductionConfig({ ...deferred, LAUNDRY_WHATSAPP_MODE: '' })).toThrow(/WHATSAPP/);
+    expect(() => assertProductionConfig({ ...deferred, LAUNDRY_WHATSAPP_MODE: 'disbaled' })).toThrow(/Unsupported/);
+  });
+  it('never conceals provider-injected owner credentials behind the restricted runtime URL', () => {
+    const expected = production.DATABASE_URL;
+    const owner = 'postgres://owner:private-value@db.example.invalid/laundry?sslmode=verify-full';
+    for (const supplied of [{ DATABASE_URL: owner, DATABASE_URL_UNPOOLED: expected }, { DATABASE_URL: expected, DATABASE_URL_UNPOOLED: owner }]) {
+      const env = { ...supplied, LAUNDRY_RUNTIME_DATABASE_URL: expected };
+      expect(() => assertManagedDatabaseAliases(env)).toThrow(/must match/);
+      expect(env.DATABASE_URL_UNPOOLED).toEqual(supplied.DATABASE_URL_UNPOOLED);
+    }
+    expect(() => assertManagedDatabaseAliases({ DATABASE_URL: expected })).toThrow(/must match/);
+    const env = { DATABASE_URL: expected, DATABASE_URL_UNPOOLED: expected, LAUNDRY_RUNTIME_DATABASE_URL: expected };
+    assertManagedDatabaseAliases(env); expect(env.DATABASE_URL_UNPOOLED).toBeUndefined();
+    expect(() => assertProductionConfig({ ...production, ...env })).not.toThrow();
+  });
   it('production allows only configured exact HTTPS origins, never inherited localhost defaults', () => {
     expect(resolveCorsOrigins(production)).toEqual(['https://customer.example.invalid', 'https://ops.example.invalid']);
     expect(() => assertProductionConfig(production)).not.toThrow();

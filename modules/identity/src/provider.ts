@@ -51,6 +51,8 @@ export class TwilioSmsDelivery implements OtpDelivery {
 
 export function identityFromEnvironment(db: Pool, env: NodeJS.ProcessEnv = process.env): IdentityService | null {
   const name = env.LAUNDRY_IDENTITY_PROVIDER;
+  // Explicit deferred-messaging deployment: no provider, login or fake identity.
+  if (name === 'disabled') return null;
   if (!name) {
     if (env.NODE_ENV === 'production') throw new Error('Production requires a configured Laundry identity provider');
     return null;

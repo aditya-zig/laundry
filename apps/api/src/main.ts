@@ -29,7 +29,7 @@ function resolveServiceAssets(): string {
   return join(process.cwd(), "assets", "services");
 }
 
-async function bootstrap() {
+export async function createApplication(): Promise<NestExpressApplication> {
   assertProductionConfig();
   // Check configured identity before migrations/listening; no provider send.
   if (process.env.NODE_ENV === 'production') identityFromEnvironment(getPool());
@@ -53,6 +53,11 @@ async function bootstrap() {
     void _res;
     next();
   });
+  return app;
+}
+
+async function bootstrap() {
+  const app = await createApplication();
   const port = Number(process.env.PORT ?? 4100);
   // Loopback by default. A container or LAN demo must opt in with HOST=0.0.0.0.
   const host = process.env.HOST ?? "127.0.0.1";
@@ -61,7 +66,8 @@ async function bootstrap() {
   console.log(`[laundry-api] listening on http://${host}:${port}`);
 }
 
-bootstrap().catch((e) => {
+// Importing the factory into a Fetch host must not launch a second server.
+if (typeof require !== 'undefined' && typeof module !== 'undefined' && require.main === module) bootstrap().catch((e) => {
   // eslint-disable-next-line no-console
   const message = e instanceof Error ? e.message : '';
   // DB/provider exceptions may carry connection or request details. Only our

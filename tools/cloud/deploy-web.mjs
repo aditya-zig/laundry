@@ -34,7 +34,7 @@ async function main() {
     const slug = app === 'partner' ? 'rider' : app;
     const url = `https://laundry-${slug}.aditya-s274adi.workers.dev`;
     console.log(`Building and deploying Laundry ${slug}`);
-    await run(['--filter', `@laundry/${app}`, 'build'], {
+    await run(['--filter', `@laundry/${app}`, 'build', ...(app === 'ops' ? [] : ['--clear'])], {
       EXPO_PUBLIC_API_V2_URL: `${url}/v2`, VITE_API_V2_URL: `${url}/v2`, VITE_DEMO_MODE: 'false', DEMO_MODE: 'false',
     });
     await run(['--filter', '@laundry/gateway', 'exec', 'vite', 'build', '--mode', `web-${app}`]);

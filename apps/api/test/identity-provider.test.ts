@@ -75,6 +75,16 @@ describe('SMS adapter contract; all network responses are fixtures, no commercia
     expect(result.stdout).not.toContain('listening on');
   });
 
+  it('supports explicitly deferred messaging without constructing a provider, fake identity or database command', () => {
+    const db = getPool();
+    const network = vi.spyOn(globalThis, 'fetch').mockRejectedValue(new Error('No sends permitted'));
+    const query = vi.spyOn(db, 'query');
+    try {
+      expect(identityFromEnvironment(db, { NODE_ENV: 'production', LAUNDRY_IDENTITY_PROVIDER: 'disabled' })).toBeNull();
+      expect(network).not.toHaveBeenCalled(); expect(query).not.toHaveBeenCalled();
+    } finally { network.mockRestore(); query.mockRestore(); }
+  });
+
   it('does not pick up unrelated generic provider credentials or allow missing production configuration', () => {
     // Configuration is checked before any database query or provider send.
     const db = getPool();
