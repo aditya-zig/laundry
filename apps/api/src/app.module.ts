@@ -11,7 +11,9 @@ import { Public, AuthGuard } from "./guards/auth.guard";
 import { PilotController } from "./controllers/pilot.controller";
 import { DatabaseLifecycle } from "./database-lifecycle";
 import { IdentityModule } from "./features/identity/identity.module";
-import { identityFromEnvironment } from "../../../modules/identity/src";
+import { CatalogModule } from "./features/catalog/catalog.module";
+import { identityFromEnvironment, type IdentityService } from "../../../modules/identity/src";
+import { CatalogService } from "../../../modules/catalog/src";
 import { getPool } from "../../../modules/shared/src/db";
 import { demoMode } from "../../../modules/shared/src/auth";
 
@@ -48,5 +50,19 @@ class MiscController {
   }
 }
 
-@Module({ imports: [IdentityModule.register(() => identityFromEnvironment(getPool()))], controllers: [MiscController, AuthController, CatalogController, OrdersController, OpsController, PartnerController, BillingController, ConversationController, PilotController], providers: [DatabaseLifecycle] })
+// One identity instance serves both feature modules. Creating it per module
+// would build duplicate providers and split the configured delivery budget.
+let identity: IdentityService | null | undefined;
+function identityService(): IdentityService | null {
+  if (identity === undefined) identity = identityFromEnvironment(getPool());
+  return identity;
+}
+
+@Module({ imports: [
+  IdentityModule.register(identityService),
+  CatalogModule.register(() => {
+    const service = identityService();
+    return new CatalogService({ db: getPool(), authenticate: service ? token => service.authenticate(token) : undefined });
+  }),
+], controllers: [MiscController, AuthController, CatalogController, OrdersController, OpsController, PartnerController, BillingController, ConversationController, PilotController], providers: [DatabaseLifecycle] })
 export class AppModule {}
