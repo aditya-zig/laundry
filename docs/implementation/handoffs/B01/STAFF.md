@@ -76,9 +76,16 @@ changes.
   replay stability, version-gated disable, and the real SDK over HTTP with
   contract envelopes.
 - Full `@laundry/api` suite: 174 tests on an isolated disposable PostgreSQL
-  17 task instance. `pnpm check` and `pnpm contracts:check` pass. Whole
-  workspace run and clean-source receipts are recorded in the follow-up
-  commit receipts.
+  17 task instance. `pnpm check`, `pnpm contracts:check` and the whole
+  workspace run pass on the working tree.
+- Clean committed-source cloud receipts for `261779a`: Wandary checks
+  run `40186614691` passed (6m59s) and Agent verification evidence run
+  `40186614705` passed (4m47s). The Dependency security gate run
+  `40186614628` fails by design: the retained audit artifact lists exactly
+  one high advisory, `node-forge@1.4.0` (GHSA-86w9-cpqp-85rv, CVE-2026-85393)
+  via `apps__customer>expo>@expo/cli`. No patched node-forge release exists
+  in the registry; upstream fix work is tracked in digitalbazaar/forge#1152
+  and expo/expo#51773. The boundary change introduced no new findings.
 
 These results do not claim a deployed product backend, native/staff
 acceptance, approved business configuration or production readiness.
