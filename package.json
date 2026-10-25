@@ -40,7 +40,7 @@
     "verify:evidence": "node tools/verification/evidence.mjs",
     "platform:deploy": "node tools/cloud/deploy-platform.mjs --deploy",
     "platform:test": "node --test tools/cloud/platform.test.mjs",
-    "release:security": "pnpm audit --prod --audit-level moderate",
+    "release:security": "node tools/cloud/release-security.mjs",
     "platform:verify": "node tools/cloud/verify-platform-live.mjs",
     "verify:restore": "node tools/verification/restore-rehearsal.mjs",
     "verify:container": "node tools/cloud/verify-container.mjs",
@@ -94,7 +94,8 @@
     },
     "patchedDependencies": {
       "metro@0.81.5": "patches/metro@0.81.5.patch",
-      "query-string@7.1.3": "patches/query-string@7.1.3.patch"
+      "query-string@7.1.3": "patches/query-string@7.1.3.patch",
+      "node-forge@1.4.0": "patches/node-forge@1.4.0.patch"
     }
   },
   "dependencies": {

@@ -77,7 +77,7 @@ test('malformed URI runs cannot hang the router query decoder', () => {
   assert.equal(result.status, 0, result.stderr);
 });
 
-test('the public security gate preserves audit failures without advisory waivers', async () => {
+test('the public security gate preserves unexpected audit failures without waivers', async () => {
   const manifest = JSON.parse(await readFile(new URL('package.json', root), 'utf8'));
   const directory = await mkdtemp(join(tmpdir(), 'laundry-audit-gate-'));
   try {
@@ -85,14 +85,14 @@ test('the public security gate preserves audit failures without advisory waivers
     await writeFile(executable, `#!${process.execPath}\nrequire('node:fs').writeFileSync(process.env.AUDIT_ARGUMENTS, JSON.stringify(process.argv.slice(2)));\nprocess.exit(37);\n`);
     await chmod(executable, 0o700);
     const result = spawnSync('/bin/sh', ['-c', manifest.scripts['release:security']], {
-      cwd: directory,
+      cwd: root,
       env: { ...process.env, PATH: `${directory}:${process.env.PATH}`, AUDIT_ARGUMENTS: join(directory, 'arguments.json') },
       timeout: 5_000,
       encoding: 'utf8',
     });
     assert.ifError(result.error);
     assert.equal(result.status, 37, result.stderr);
-    assert.deepEqual(JSON.parse(await readFile(join(directory, 'arguments.json'), 'utf8')), ['audit', '--prod', '--audit-level', 'moderate']);
+    assert.deepEqual(JSON.parse(await readFile(join(directory, 'arguments.json'), 'utf8')), ['audit', '--prod', '--audit-level', 'moderate', '--json']);
   } finally {
     await rm(directory, { recursive: true, force: true });
   }

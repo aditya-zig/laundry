@@ -20,8 +20,9 @@ jobs:
           node-version: 24.22.0
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      # Preserve the audit's actual nonzero exit. Do not turn an unpatched
-      # advisory into a passing release check or silently accept it.
+      # Retain the raw version-based audit. The pinned forge backport requires
+      # exact installed-source hashes and real RSA rejection regressions;
+      # unexpected findings, missing patches and audit errors still fail closed.
       - run: |
           mkdir -p .verification
           pnpm release:security --json > .verification/dependency-audit.log 2>&1

@@ -45,7 +45,7 @@ The Docker task harness uses tmpfs. `--keep` preserves its stopped container/wor
 
 Ordinary branch pushes do not deploy Convex or the product backend. CI tests and artifacts do not grant production-promotion approval.
 
-`pnpm release:security` is a separate fail-closed dependency gate; its scheduled/push/PR workflow retains the actual audit result. It currently fails on two high-severity Zod/node-forge advisories. Build/browser success is not security clearance. See `docs/implementation/cloud/dependency-hardening-2026-10-24.md` for compatibility patches, verification and unresolved blockers.
+`pnpm release:security` retains the raw dependency audit and fails on unexpected findings or unavailable audit evidence. The temporary `node-forge@1.4.0` source backport requires exact installed-source hashes across both apps and seven real RSA regression cases; the upstream version advisory remains visible rather than being muted. A published fix invalidates the backport-specific acceptance. See `docs/implementation/cloud/forge-security-backport.md`. Build/browser success alone is not security or production clearance.
 
 Web acceptance serves the exported apps with `tools/verification/serve-web.mjs`, a loopback-only SPA preview. It supports direct/reloaded app routes without treating missing assets or API routes as HTML successes. Production hosting must separately configure and verify its own rewrites; see `docs/implementation/cloud/spa-preview-routing.md`.
 

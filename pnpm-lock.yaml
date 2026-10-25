@@ -25,6 +25,9 @@ patchedDependencies:
   metro@0.81.5:
     hash: f3fc0c463ebc4f474215c37d240c3c0dabb473b3e42ed3d0755c7dd7f0a1348c
     path: patches/metro@0.81.5.patch
+  node-forge@1.4.0:
+    hash: 2656f696d3626360d48e07f5e94fb31d3ef634533819c0800e8d682631a7af95
+    path: patches/node-forge@1.4.0.patch
   query-string@7.1.3:
     hash: fbecc53a8809f23059ed4f17315f8562ac82aeffa359463c2a4d315b36a63d6f
     path: patches/query-string@7.1.3.patch
@@ -7583,7 +7586,7 @@ snapshots:
       is-wsl: 2.2.0
       lodash.debounce: 4.0.8
       minimatch: 3.1.5
-      node-forge: 1.4.0
+      node-forge: 1.4.0(patch_hash=2656f696d3626360d48e07f5e94fb31d3ef634533819c0800e8d682631a7af95)
       npm-package-arg: 11.0.3
       ora: 3.4.0
       picomatch: 3.0.2
@@ -7620,7 +7623,7 @@ snapshots:
 
   '@expo/code-signing-certificates@0.0.5':
     dependencies:
-      node-forge: 1.4.0
+      node-forge: 1.4.0(patch_hash=2656f696d3626360d48e07f5e94fb31d3ef634533819c0800e8d682631a7af95)
       nullthrows: 1.1.1
 
   '@expo/config-plugins@9.0.17':
@@ -11069,7 +11072,7 @@ snapshots:
     dependencies:
       whatwg-url: 5.0.0
 
-  node-forge@1.4.0: {}
+  node-forge@1.4.0(patch_hash=2656f696d3626360d48e07f5e94fb31d3ef634533819c0800e8d682631a7af95): {}
 
   node-gyp-build@4.8.4: {}
 
@@ -11749,7 +11752,7 @@ snapshots:
   selfsigned@2.4.1:
     dependencies:
       '@types/node-forge': 1.3.14
-      node-forge: 1.4.0
+      node-forge: 1.4.0(patch_hash=2656f696d3626360d48e07f5e94fb31d3ef634533819c0800e8d682631a7af95)
 
   semver@5.7.2: {}
 
