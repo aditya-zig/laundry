@@ -35,6 +35,7 @@
     "cloud:submit": "node tools/agents/workflow.mjs submit",
     "test:tooling": "pnpm --filter @laundry/contracts build && node --test tools/agents/*.test.mjs tools/verification/*.test.mjs tools/cloud/*.test.mjs tools/contracts/*.test.mjs",
     "verify:browser": "node tools/verification/run.mjs",
+    "verify:pilot": "pnpm --filter @laundry/contracts build && pnpm --filter @laundry/api-client build && pnpm --filter @laundry/api build && node tools/verification/run-pilot.mjs",
     "verify:evidence": "node tools/verification/evidence.mjs",
     "platform:deploy": "node tools/cloud/deploy-platform.mjs --deploy",
     "platform:test": "node --test tools/cloud/platform.test.mjs",

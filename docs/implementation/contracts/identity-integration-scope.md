@@ -7,7 +7,9 @@ launch dependent workers. P01 has actual fresh-cloud PostgreSQL/browser receipts
 The current coordinator serially owns the following integration paths for the
 production identity boundary: `modules/identity/**`,
 `apps/api/src/features/identity/**`, identity composition in AppModule,
-`apps/api/test/identity-v2.test.ts`, canonical migration 007, and the associated
+`apps/api/test/identity*.test.ts`, canonical migrations 007–008, narrow compiled
+`apps/worker/src/identity-maintenance.ts` and legacy-worker production refusal,
+and the associated
 shared contracts/configuration documentation. No concurrent worker lease is
 created, no local child agent is substituted for a cloud worker, and root/lockfile
 changes remain serialized. Verification runs locally and in fresh GitHub jobs;

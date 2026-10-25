@@ -17,6 +17,10 @@ Production API startup requires `DEMO_MODE=false`, a PostgreSQL URL with `sslmod
 
 `pnpm verify:restore` additionally restores synthetic v2 identity sessions/addresses and encrypted refresh replay. Independent deployment keys remain in process memory, not in the archive/receipt; missing keys fail closed. Production secret-vault/key recovery is a separate gate.
 
+`pnpm --filter @laundry/worker start:identity-maintenance` runs the narrow compiled privacy worker; `--once` runs one bounded batch. It skips locked rows across replicas, logs only counts, and never sends provider messages. Run reviewed migrations first. Challenge PII and encrypted response secrets are redacted after expiry while hash-only replay tombstones persist. Families cannot rotate past their original 30-day security deadline. The legacy notification worker refuses production. See `docs/implementation/handoffs/B01/RETENTION.md`; whole-product B10 jobs are not completed by this worker.
+
+`pnpm verify:pilot` builds contracts, SDK and the compiled API before the synthetic kilogram browser/restart journey. It does not depend on a retained developer dist directory.
+
 Details and remaining scope: `docs/implementation/handoffs/B01/HANDOFF.md`.
 
 ## Cloudflare + Neon release-candidate preflight

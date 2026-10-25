@@ -7,6 +7,7 @@
   "scripts": {
     "dev": "tsx watch src/main.ts",
     "start": "node dist/apps/worker/src/main.js",
+    "start:identity-maintenance": "node dist/apps/worker/src/identity-maintenance.js",
     "build": "tsc -p tsconfig.build.json && node ../../tools/build-node.mjs worker",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },

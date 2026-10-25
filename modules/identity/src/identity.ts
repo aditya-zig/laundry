@@ -21,11 +21,11 @@ const success = <T>(value: T): Outcome<T> => ({ ok: true, value });
 const denied = (code: v2.ErrorCode, message: string): Failure => ({ ok: false, code, message });
 const invalidSession = () => new IdentityFault('UNAUTHENTICATED', 'Sign in again to continue');
 const validToken = (token: string) => typeof token === 'string' && token.length === 43 && /^[A-Za-z0-9_-]{43}$/.test(token);
-const ACCESS_MS = 15 * 60_000, REFRESH_MS = 7 * 24 * 60 * 60_000;
+const ACCESS_MS = 15 * 60_000, REFRESH_MS = 7 * 24 * 60 * 60_000, FAMILY_MS = 30 * 24 * 60 * 60_000;
 interface SessionRecord {
   id: string; family_id: string; profile_id: string; issuer_mode: string;
   access_expires_at: Date; refresh_expires_at: Date; rotated_at: Date | null;
-  revoked_at: Date | null; active: boolean;
+  revoked_at: Date | null; absolute_expires_at: Date; active: boolean;
 }
 
 export class IdentityService {
@@ -68,6 +68,8 @@ export class IdentityService {
     let discard = false;
     try {
       await tx.query('BEGIN');
+      await tx.query("SET LOCAL statement_timeout='10s'");
+      await tx.query("SET LOCAL lock_timeout='3s'");
       const value = await work(tx);
       await tx.query('COMMIT');
       return value;
@@ -97,12 +99,12 @@ export class IdentityService {
   private current(record: SessionRecord | undefined, refresh = false): record is SessionRecord {
     return !!record && record.active && record.issuer_mode === this.options.provider.mode &&
       !(process.env.NODE_ENV === 'production' && record.issuer_mode !== 'LIVE') &&
-      !record.revoked_at && !record.rotated_at &&
+      !record.revoked_at && !record.rotated_at && record.absolute_expires_at.getTime() > this.clock().getTime() &&
       (refresh ? record.refresh_expires_at : record.access_expires_at).getTime() > this.clock().getTime();
   }
   private async sessionRecord(tx: Pool | PoolClient, kind: 'access' | 'refresh', token: string, lock = false): Promise<SessionRecord | undefined> {
     if (!validToken(token)) return undefined;
-    const result = await tx.query<SessionRecord>(`SELECT s.*,f.profile_id,f.issuer_mode,f.revoked_at,p.active
+    const result = await tx.query<SessionRecord>(`SELECT s.*,f.profile_id,f.issuer_mode,f.revoked_at,f.absolute_expires_at,p.active
       FROM identity_sessions s JOIN identity_session_families f ON f.id=s.family_id
       JOIN identity_profiles p ON p.id=f.profile_id WHERE s.${kind}_hash=$1${lock ? ' FOR UPDATE OF f FOR SHARE OF p' : ''}`, [this.hash(kind, token)]);
     return result.rows[0];
@@ -128,7 +130,7 @@ export class IdentityService {
         if (previous.intent_hash !== intentHash) throw new IdentityFault('IDEMPOTENCY_CONFLICT', 'This key belongs to a different request');
         if (previous.expires_at.getTime() <= this.clock().getTime()) throw invalidSession();
         if (previous.session_id) {
-          const row = (await tx.query<SessionRecord>(`SELECT s.*,f.profile_id,f.issuer_mode,f.revoked_at,p.active FROM identity_sessions s
+          const row = (await tx.query<SessionRecord>(`SELECT s.*,f.profile_id,f.issuer_mode,f.revoked_at,f.absolute_expires_at,p.active FROM identity_sessions s
             JOIN identity_session_families f ON f.id=s.family_id JOIN identity_profiles p ON p.id=f.profile_id WHERE s.id=$1 FOR UPDATE OF f FOR SHARE OF p`, [previous.session_id])).rows[0];
           if (!this.current(row)) throw invalidSession();
         }
@@ -137,6 +139,9 @@ export class IdentityService {
         return value;
       }
       const outcome = await work(tx);
+      // Do not grow one encrypted cache row for every distinct rate-limited
+      // attacker key after the persisted quota is exhausted.
+      if (!outcome.ok && outcome.code === 'RATE_LIMITED') return outcome;
       await tx.query(`INSERT INTO identity_command_results (scope,key_hash,intent_hash,sealed_result,session_id,created_at,expires_at)
         VALUES ($1,$2,$3,$4,$5,$6,$7)`, [scope, keyHash, intentHash, this.seal(outcome, aad), outcome.ok ? outcome.sessionId ?? null : null, this.clock(), new Date(this.clock().getTime() + REFRESH_MS)]);
       return outcome;
@@ -174,6 +179,7 @@ export class IdentityService {
     if (!prepared.fresh) {
       if (prepared.row.status === 'FAILED') throw new IdentityFault('PROVIDER_UNAVAILABLE', 'Code delivery could not be confirmed');
       if (['SENDING', 'UNKNOWN'].includes(prepared.row.status)) throw new IdentityFault('PROVIDER_OUTCOME_UNKNOWN', 'Code delivery is being reconciled');
+      if (prepared.row.redacted_at || prepared.row.expires_at.getTime() <= this.clock().getTime()) throw new IdentityFault('UNAUTHENTICATED', 'Code is invalid or expired');
       return this.challenge(prepared.row);
     }
     // Provider I/O happens after the transaction commits. A crashed/unknown
@@ -192,11 +198,12 @@ export class IdentityService {
   private async issueSession(tx: PoolClient, profileId: string, familyId?: string): Promise<v2.Session> {
     const now = this.clock(), id = randomUUID();
     const family = familyId ?? randomUUID();
-    if (!familyId) await tx.query('INSERT INTO identity_session_families (id,profile_id,issuer_mode,created_at) VALUES ($1,$2,$3,$4)', [family, profileId, this.options.provider.mode, now]);
+    if (!familyId) await tx.query('INSERT INTO identity_session_families (id,profile_id,issuer_mode,created_at,absolute_expires_at) VALUES ($1,$2,$3,$4,$5)', [family, profileId, this.options.provider.mode, now, new Date(now.getTime() + FAMILY_MS)]);
+    const familyExpiry = (await tx.query('SELECT absolute_expires_at FROM identity_session_families WHERE id=$1', [family])).rows[0].absolute_expires_at as Date;
     const accessToken = randomBytes(32).toString('base64url'), refreshToken = randomBytes(32).toString('base64url');
-    const expiresAt = new Date(now.getTime() + ACCESS_MS);
+    const expiresAt = new Date(Math.min(now.getTime() + ACCESS_MS, familyExpiry.getTime()));
     await tx.query(`INSERT INTO identity_sessions (id,family_id,access_hash,refresh_hash,created_at,access_expires_at,refresh_expires_at)
-      VALUES ($1,$2,$3,$4,$5,$6,$7)`, [id, family, this.hash('access', accessToken), this.hash('refresh', refreshToken), now, expiresAt, new Date(now.getTime() + REFRESH_MS)]);
+      VALUES ($1,$2,$3,$4,$5,$6,$7)`, [id, family, this.hash('access', accessToken), this.hash('refresh', refreshToken), now, expiresAt, new Date(Math.min(now.getTime() + REFRESH_MS, familyExpiry.getTime()))]);
     return v2.sessionSchema.parse({ sessionId: id, accessToken, refreshToken, expiresAt: expiresAt.toISOString(), actor: this.actor(profileId) });
   }
   async verifyOtp(input: v2.OtpVerify, key: string, peer: string): Promise<v2.Session> {

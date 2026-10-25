@@ -127,6 +127,9 @@ process.on("SIGINT", stop);
 
 async function main(): Promise<void> {
   try {
+    // This dispatcher still consumes historical demo events; it must not run
+    // as a live v2 worker or send commercial notifications by implication.
+    if (process.env.NODE_ENV === 'production' || process.env.DEMO_MODE !== 'true') throw new Error('Legacy dispatcher requires explicit nonproduction DEMO_MODE=true');
     await initializeDb();
     console.log("[laundry-worker] started");
     while (!stopping) {

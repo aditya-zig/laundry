@@ -41,9 +41,8 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm exec playwright install --with-deps chromium
-      - run: pnpm --filter @laundry/contracts build && pnpm --filter @laundry/api-client build
       - name: Pilot browser journey, video, trace and restart persistence
-        run: node tools/verification/run-pilot.mjs
+        run: pnpm verify:pilot
       - name: Retain pilot success and failure evidence
         if: always()
         uses: actions/upload-artifact@v4

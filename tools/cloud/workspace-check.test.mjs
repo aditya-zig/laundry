@@ -18,7 +18,7 @@ import { appendFileSync, existsSync, writeFileSync } from 'node:fs';
 import { basename, join } from 'node:path';
 const args = process.argv.slice(2);
 const name = basename(process.argv[1]);
-const kind = name === 'node' ? 'tooling' : name === 'tsc' ? 'root' : args.includes('--filter') ? 'contracts' : args.at(-1);
+const kind = name === 'node' ? 'tooling' : name === 'tsc' ? 'root' : args.includes('--filter') ? args[1].replace('@laundry/', '') : args.at(-1);
 appendFileSync(join(process.env.PROBE_ROOT, 'calls'), kind + '\\n');
 if (process.env.FAIL_ON === kind) process.exit(23);
 const marker = join(process.env.PROBE_ROOT, 'contracts-built');
@@ -86,6 +86,18 @@ test('failed Node tooling tests cannot be hidden by a successful build', async (
   const result = await runCheck('tooling', 'test:tooling');
   assert.equal(result.code, 23);
   assert.deepEqual(result.calls, ['contracts', 'tooling']);
+});
+
+test('public pilot verification builds the actual compiled API before launching it', async () => {
+  const result = await runCheck(undefined, 'verify:pilot');
+  assert.equal(result.code, 0, result.stderr);
+  assert.deepEqual(result.calls, ['contracts', 'api-client', 'api', 'tooling']);
+});
+
+test('failed pilot API builds preserve their exit without starting browser evidence', async () => {
+  const result = await runCheck('api', 'verify:pilot');
+  assert.equal(result.code, 23);
+  assert.deepEqual(result.calls, ['contracts', 'api-client', 'api']);
 });
 
 test('shared package checks include their test TypeScript projects', async () => {

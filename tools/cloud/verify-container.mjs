@@ -70,13 +70,20 @@ async function main() {
       await new Promise(resolve => setTimeout(resolve, 500));
     }
     assert.equal(ready, true, 'Compiled container did not actually become live');
+    const legacyWorker = await docker(['exec', '--env', 'NODE_ENV=production', '--env', 'DEMO_MODE=false', container, 'node', '/app/worker/dist/apps/worker/src/main.js'], 'Verify legacy worker refuses production dispatch', 1, true);
+    assert.match(legacyWorker, /Legacy dispatcher requires explicit nonproduction/);
+    const maintenance = JSON.parse(await docker(['exec', container, 'node', '/app/worker/dist/apps/worker/src/identity-maintenance.js', '--once'], 'Run actual compiled bounded identity privacy maintenance'));
+    assert.equal(maintenance.service, 'identity-maintenance');
+    assert.equal(maintenance.challengesRedacted, 0);
     const runtime = JSON.parse(await docker(['exec', container, 'node', '-e', `
       const assert=require('node:assert/strict'),fs=require('node:fs');
       const appRequire=require('node:module').createRequire('/app/api/package.json');
       assert.notEqual(process.getuid(),0);
       for(const name of ['tsx','typescript'])assert.throws(()=>appRequire.resolve(name));
-      const store=fs.readdirSync('/app/api/node_modules/.pnpm');
-      assert.equal(store.some(name=>/^(tsx|typescript|node-forge)@/.test(name)),false);
+      for(const app of ['api','worker']){
+        const store=fs.readdirSync('/app/'+app+'/node_modules/.pnpm');
+        assert.equal(store.some(name=>/^(tsx|typescript|node-forge)@/.test(name)),false);
+      }
       for(const path of ['/app/.env','/app/.data','/app/.git','/app/api/src/main.ts'])assert.equal(fs.existsSync(path),false);
       (async()=>{
         const live=await fetch('http://127.0.0.1:4100/health');assert.equal(live.status,200);
@@ -88,7 +95,7 @@ async function main() {
         console.log(JSON.stringify({node:process.version,uid:process.getuid(),compiledStartup:true,developmentLoadersAbsent:true,productionDependenciesOnly:true,privateContextExcluded:true,unconfiguredIdentityClosed:true,productReady:false}));
       })().catch(()=>process.exit(1));
     `], 'Inspect the actual non-root, production-only runtime and fail-closed API'));
-    proof = { testedSha: revision, dirty: false, checkedAt: new Date().toISOString(), imageId, runtime,
+    proof = { testedSha: revision, dirty: false, checkedAt: new Date().toISOString(), imageId, runtime, legacyWorkerProductionClosed: true, compiledIdentityMaintenance: maintenance,
       scope: 'Compiled API container and isolated PostgreSQL; no SMS/provider calls; not whole-product production or native acceptance', productionReady: false };
   } finally {
     const failures = [];
