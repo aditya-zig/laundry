@@ -221,7 +221,7 @@ export function createClient(options: ClientOptions = {}) {
         opts?.obligationId === undefined
           ? { orderId, paymentId, amountMinor, reason }
           : { orderId, paymentId, amountMinor, reason, obligationId: opts.obligationId },
-        z.record(z.unknown()),
+        z.record(z.string(), z.unknown()),
         opts,
       ) as Promise<unknown>,
     postConversationMessage: (text: string, opts: { receivedAt?: string; draftId?: string; idempotencyKey?: string } = {}) =>

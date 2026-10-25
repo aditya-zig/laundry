@@ -1,5 +1,6 @@
 import { Controller, Get, Post, Put, Patch, Param, Body, Req, UseGuards } from "@nestjs/common";
 import { z } from "zod";
+import { idSchema } from "@laundry/contracts";
 import { getPool } from "../../../../modules/shared/src/db";
 import { recordIntake, advanceCare } from "../../../../modules/orders/src/fulfillment";
 import { postSupportMessage } from "../../../../modules/orders/src/support";
@@ -28,7 +29,7 @@ export class OpsController {
     requireOps(req.actor.role);
     const parsed = z.object({
       expectedVersion: z.number().int().min(1),
-      measuredLines: z.array(z.object({ orderLineId: z.string().uuid(), quantity: z.number().int().min(0).max(100), weightGrams: z.number().int().optional() })).min(1),
+      measuredLines: z.array(z.object({ orderLineId: idSchema, quantity: z.number().int().min(0).max(100), weightGrams: z.number().int().optional() })).min(1),
       bagIds: z.array(z.string().min(1)).default([]),
     }).parse(body);
     return recordIntake(getPool(), req.actor, id, parsed.expectedVersion, parsed.measuredLines, parsed.bagIds);

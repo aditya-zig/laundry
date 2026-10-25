@@ -1,6 +1,7 @@
 import { z } from "zod";
 
-export const idSchema = z.string().uuid();
+// Preserve the v1 UUID-like ID boundary across the validator upgrade.
+export const idSchema = z.guid();
 export const instantSchema = z.string().datetime();
 export const currencySchema = z.literal("INR");
 
@@ -226,7 +227,7 @@ export const errorEnvelopeSchema = z.object({
   message: z.string().min(1),
   traceId: z.string().min(1),
   retryable: z.boolean(),
-  fieldErrors: z.record(z.string()).optional(),
+  fieldErrors: z.record(z.string(), z.string()).optional(),
 });
 
 export const reviewInputSchema = z.object({

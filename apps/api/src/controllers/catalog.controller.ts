@@ -3,7 +3,7 @@ import { z } from "zod";
 import { getPool } from "../../../../modules/shared/src/db";
 import { listServices, getService } from "../../../../modules/catalog/src/catalog";
 import { submitReview, listServiceReviews, moderateReview } from "../../../../modules/orders/src/support";
-import { reviewInputSchema } from "@laundry/contracts";
+import { idSchema, reviewInputSchema } from "@laundry/contracts";
 import { AuthGuard, Public } from "../guards/auth.guard";
 import { ApiError } from "../../../../modules/shared/src/errors";
 
@@ -45,7 +45,7 @@ export class CatalogController {
   async upsertService(@Req() req: { actor: { role: string } }, @Body() body: unknown) {
     if (req.actor.role !== "operator" && req.actor.role !== "admin") throw new ApiError("FORBIDDEN", "Ops only", { status: 403 });
     const parsed = z.object({
-      id: z.string().uuid().optional(), code: z.enum(["WASH_FOLD", "WASH_PRESS", "PRESS_ONLY", "DRY_CLEAN"]),
+      id: idSchema.optional(), code: z.enum(["WASH_FOLD", "WASH_PRESS", "PRESS_ONLY", "DRY_CLEAN"]),
       name: z.string().min(1), description: z.string().min(1), imageUrl: z.string().url(),
       priceMinor: z.number().int().min(0), priceUnit: z.string().min(1), turnaroundHours: z.number().int().positive(),
       features: z.array(z.string()).default([]),

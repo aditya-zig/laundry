@@ -5,7 +5,7 @@ import { createQuote } from "../../../../modules/orders/src/quotes";
 import { createCheckout, capturePayment, getOrder, listOrders, cancelOrder } from "../../../../modules/orders/src/orders";
 import { decideAdjustment, rescheduleOrder } from "../../../../modules/orders/src/fulfillment";
 import { createSupportIncident, getSupportIncident, postSupportMessage } from "../../../../modules/orders/src/support";
-import { quoteInputSchema, cancelOrderSchema, demoHandoverCodesSchema } from "@laundry/contracts";
+import { idSchema, quoteInputSchema, cancelOrderSchema, demoHandoverCodesSchema } from "@laundry/contracts";
 import { demoMode } from "../../../../modules/shared/src/auth";
 import { ApiError } from "../../../../modules/shared/src/errors";
 import { AuthGuard } from "../guards/auth.guard";
@@ -26,7 +26,7 @@ export class OrdersController {
 
   @Post("v1/checkouts")
   async checkout(@Req() req: { actor: { id: string; role: string; scopes: string[] } }, @Body() body: unknown, @Headers() headers: Record<string, unknown>) {
-    const parsed = z.object({ quoteId: z.string().uuid(), expectedVersion: z.number().int().min(1).optional() }).parse(body);
+    const parsed = z.object({ quoteId: idSchema, expectedVersion: z.number().int().min(1).optional() }).parse(body);
     return createCheckout(getPool(), req.actor, parsed.quoteId, parsed.expectedVersion, { idempotencyKey: keyOf(headers) });
   }
 
@@ -69,7 +69,7 @@ export class OrdersController {
 
   @Post("v1/orders/:id/reschedule")
   async reschedule(@Req() req: { actor: { id: string; role: string; scopes: string[] } }, @Param("id") id: string, @Body() body: unknown) {
-    const parsed = z.object({ newQuoteId: z.string().uuid(), expectedVersion: z.number().int().min(1) }).parse(body);
+    const parsed = z.object({ newQuoteId: idSchema, expectedVersion: z.number().int().min(1) }).parse(body);
     return rescheduleOrder(getPool(), req.actor, id, parsed.newQuoteId, parsed.expectedVersion);
   }
 

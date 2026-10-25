@@ -2,7 +2,7 @@ import { Controller, Get, Post, Param, Body, Req, UseGuards, Headers } from "@ne
 import { z } from "zod";
 import { getPool } from "../../../../modules/shared/src/db";
 import { listPartnerJobs, acceptJob, recordHandover, reportException, opsDispatch, opsCancelDelivery } from "../../../../modules/logistics/src/logistics";
-import { handoverInputSchema } from "@laundry/contracts";
+import { idSchema, handoverInputSchema } from "@laundry/contracts";
 import { AuthGuard } from "../guards/auth.guard";
 import { ApiError } from "../../../../modules/shared/src/errors";
 
@@ -56,8 +56,8 @@ export class PartnerController {
     @Req() req: { actor: { id: string; role: string; scopes: string[] } }, @Param("id") id: string,
     @Body() body: unknown, @Headers() headers: Record<string, unknown>,
   ) {
-    const parsed = z.object({ assignedTo: z.string().uuid(), expectedVersion: z.number().int().min(1) }).strict().parse(body);
-    const idempotencyKey = z.string().uuid().parse(headers["idempotency-key"]);
+    const parsed = z.object({ assignedTo: idSchema, expectedVersion: z.number().int().min(1) }).strict().parse(body);
+    const idempotencyKey = idSchema.parse(headers["idempotency-key"]);
     return opsDispatch(getPool(), req.actor, id, { ...parsed, idempotencyKey });
   }
 

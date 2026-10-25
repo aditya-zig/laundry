@@ -1,6 +1,7 @@
 import { z } from "zod";
 
-export const idSchema = z.string().uuid();
+// Existing wire IDs used Zod 3's UUID-like syntax, not RFC variant checks.
+export const idSchema = z.guid();
 export type Id = z.infer<typeof idSchema>;
 
 export const currencySchema = z.literal("INR");

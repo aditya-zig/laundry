@@ -56,10 +56,10 @@ describe("Laundry project naming", () => {
     // The workflow is the machine-consumed policy contract. Parse its meaning;
     // never require an old deployment string to appear in source or comments.
     const workflow = z.object({
-      on: z.record(z.unknown()),
+      on: z.record(z.string(), z.unknown()),
       permissions: z.object({ contents: z.literal("read") }).strict(),
-      jobs: z.record(z.object({
-        env: z.record(z.string()),
+      jobs: z.record(z.string(), z.object({
+        env: z.record(z.string(), z.string()),
         steps: z.array(z.object({ run: z.string().optional(), uses: z.string().optional() }).passthrough()),
       }).passthrough()),
     }).parse(parse(read(".github/workflows/ci.yml")));

@@ -59,7 +59,7 @@ export type RefundRequest = z.infer<typeof refundRequestSchema>;
 export const reconciliationRequestSchema = z.object({ period: z.string().regex(/^\d{4}-(?:0[1-9]|1[0-2])$/) }).strict();
 
 // A rider cannot select provider verification or operator exceptions.
-export const riderHandoverSchema = handoverProofSchema.innerType().omit({ method: true }).extend({
+export const riderHandoverSchema = z.object(handoverProofSchema.shape).omit({ method: true }).extend({
   jobId: idSchema,
   expectedVersion: expectedVersionSchema,
   actionId: idSchema,

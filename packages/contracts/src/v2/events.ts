@@ -27,7 +27,7 @@ export const eventEnvelopeSchema = z.object({
   aggregateVersion: z.number().int().positive(),
   occurredAt: instantSchema,
   traceId: idSchema,
-  payload: z.record(z.unknown()),
+  payload: z.record(z.string(), z.unknown()),
 });
 export type EventEnvelope = z.infer<typeof eventEnvelopeSchema>;
 
@@ -160,7 +160,7 @@ export const domainEventSchema = z.discriminatedUnion("eventType", [
 });
 export type DomainEvent = z.infer<typeof domainEventSchema>;
 
-export const eventConsumersSchema = z.record(
+export const eventConsumersSchema = z.partialRecord(
   eventTypeSchema,
   z.array(z.string().trim().min(1)),
 );

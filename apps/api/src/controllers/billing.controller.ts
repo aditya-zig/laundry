@@ -1,5 +1,6 @@
 import { Controller, Get, Post, Param, Body, Req, UseGuards, Headers } from "@nestjs/common";
 import { z } from "zod";
+import { idSchema } from "@laundry/contracts";
 import { getPool } from "../../../../modules/shared/src/db";
 import { getPayment, listReceipts, requestRefund, reconciliation } from "../../../../modules/billing/src/billing";
 import { AuthGuard, Public } from "../guards/auth.guard";
@@ -24,8 +25,8 @@ export class BillingController {
   async refund(@Req() req: { actor: { id: string; role: string; scopes: string[] } }, @Body() body: unknown, @Headers() headers: Record<string, unknown>) {
     void headers;
     const parsed = z.object({
-      orderId: z.string().uuid(), paymentId: z.string().uuid(), amountMinor: z.number().int().positive(),
-      reason: z.string().min(1).max(500), obligationId: z.string().uuid().optional(),
+      orderId: idSchema, paymentId: idSchema, amountMinor: z.number().int().positive(),
+      reason: z.string().min(1).max(500), obligationId: idSchema.optional(),
     }).parse(body);
     return requestRefund(getPool(), req.actor, parsed);
   }

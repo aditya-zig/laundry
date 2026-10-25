@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { idSchema } from "./schemas.js";
 
 export const pilotPointSchema = z.object({ lat: z.number().min(-90).max(90), lng: z.number().min(-180).max(180) }).strict();
 export const pilotServiceCodeSchema = z.enum(["WASH_FOLD", "WASH_PRESS"]);
@@ -9,7 +10,7 @@ export const pilotTimeZoneSchema = z.literal(PILOT_TIME_ZONE);
 const pilotInstantSchema = z.string().datetime({ offset: true });
 
 export const pilotSlotSchema = z.object({
-  id: z.string().uuid(),
+  id: idSchema,
   timeZone: pilotTimeZoneSchema,
   pickupStart: pilotInstantSchema,
   pickupEnd: pilotInstantSchema,
@@ -33,7 +34,7 @@ export type PilotConfig = z.infer<typeof pilotConfigSchema>;
 export const pilotBookingSchema = z.object({
   serviceCode: pilotServiceCodeSchema,
   estimatedWeightGrams: z.number().int().min(1).max(50_000),
-  slotId: z.string().uuid(),
+  slotId: idSchema,
   address: pilotPointSchema.extend({ line: z.string().trim().min(5).max(240) }),
 }).strict();
 
@@ -64,12 +65,12 @@ export const pilotLocationSchema = z.object({
 }).strict();
 export type PilotLocation = z.infer<typeof pilotLocationSchema>;
 
-export const pilotRiderSchema = z.object({ id: z.string().uuid(), name: z.string() }).strict();
+export const pilotRiderSchema = z.object({ id: idSchema, name: z.string() }).strict();
 export type PilotRider = z.infer<typeof pilotRiderSchema>;
 
 export const pilotOrderSchema = z.object({
-  id: z.string().uuid(), version: z.number().int().positive(), customerId: z.string().uuid(),
-  riderId: z.string().uuid().nullable(), slotId: z.string().uuid(), serviceCode: pilotServiceCodeSchema,
+  id: idSchema, version: z.number().int().positive(), customerId: idSchema,
+  riderId: idSchema.nullable(), slotId: idSchema, serviceCode: pilotServiceCodeSchema,
   status: z.enum(["BOOKED", "PICKED_UP", "AWAITING_APPROVAL", "INTAKE_COMPLETE", "IN_CARE", "QUALITY_CHECK", "READY_FOR_RETURN", "RETURNING", "DELIVERED", "ON_HOLD", "CANCELLED"]),
   pickupStatus: z.enum(["PENDING", "ASSIGNED", "COMPLETED"]),
   returnStatus: z.enum(["PENDING", "READY", "ASSIGNED", "COMPLETED"]),
@@ -92,7 +93,7 @@ export type PilotOrder = z.infer<typeof pilotOrderSchema>;
 
 const command = z.object({ expectedVersion: z.number().int().positive() });
 export const pilotActionSchema = z.discriminatedUnion("action", [
-  command.extend({ action: z.literal("ASSIGN"), riderId: z.string().uuid() }).strict(),
+  command.extend({ action: z.literal("ASSIGN"), riderId: idSchema }).strict(),
   command.extend({ action: z.literal("PICKUP"), code: z.string().regex(/^\d{6}$/) }).strict(),
   command.extend({ action: z.literal("INTAKE"), measuredWeightGrams: z.number().int().min(1).max(50_000), bagCount: z.number().int().min(1).max(20) }).strict(),
   command.extend({ action: z.literal("APPROVE_PRICE") }).strict(),

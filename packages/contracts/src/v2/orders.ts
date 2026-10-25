@@ -89,8 +89,7 @@ export const quoteInputSchema = z.object({
 });
 export type QuoteInput = z.infer<typeof quoteInputSchema>;
 
-export const quoteLineSchema = requestedLineSchema
-  .innerType()
+export const quoteLineSchema = requestedLineBaseSchema
   .extend({
     unitPriceMinor: moneySchema,
     lineTotalMinor: moneySchema,
@@ -248,8 +247,7 @@ export type AdjustmentDecision = z.infer<
   typeof adjustmentDecisionSchema
 >;
 
-export const orderLineSchema = quoteLineSchema
-  .innerType()
+export const orderLineSchema = z.object(quoteLineSchema.shape)
   .extend({
     orderLineId: idSchema,
     declaredGarmentCount: nonNegativeIntegerSchema.optional(),

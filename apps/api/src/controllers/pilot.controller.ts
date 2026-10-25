@@ -1,6 +1,6 @@
 import { Controller, Get, Post, Put, Body, Param, Req, Headers, UseGuards } from "@nestjs/common";
 import { z } from "zod";
-import { pilotBookingSchema, pilotActionSchema, pilotLocationReportSchema } from "@laundry/contracts";
+import { idSchema, pilotBookingSchema, pilotActionSchema, pilotLocationReportSchema } from "@laundry/contracts";
 import { pilotAction } from "../../../../modules/pilot/src/actions";
 import { reportPilotLocation, getPilotLocation } from "../../../../modules/pilot/src/location";
 import type { Actor } from "../../../../modules/shared/src/auth";
@@ -19,30 +19,30 @@ export class PilotController {
 
   @Post("orders")
   book(@Req() req: { actor: Actor }, @Body() body: unknown, @Headers("idempotency-key") key: string) {
-    return createPilotOrder(getPool(), req.actor, pilotBookingSchema.parse(body), z.string().uuid().parse(key));
+    return createPilotOrder(getPool(), req.actor, pilotBookingSchema.parse(body), idSchema.parse(key));
   }
   @Get("orders")
   list(@Req() req: { actor: Actor }) { return listPilotOrders(getPool(), req.actor); }
   @Get("orders/:id")
-  order(@Req() req: { actor: Actor }, @Param("id") id: string) { return getPilotOrder(getPool(), req.actor, z.string().uuid().parse(id)); }
+  order(@Req() req: { actor: Actor }, @Param("id") id: string) { return getPilotOrder(getPool(), req.actor, idSchema.parse(id)); }
   @Post("orders/:id/actions")
   action(@Req() req: { actor: Actor }, @Param("id") id: string, @Body() body: unknown, @Headers("idempotency-key") key: string) {
-    return pilotAction(getPool(), req.actor, z.string().uuid().parse(id), pilotActionSchema.parse(body), z.string().uuid().parse(key));
+    return pilotAction(getPool(), req.actor, idSchema.parse(id), pilotActionSchema.parse(body), idSchema.parse(key));
   }
   @Post("orders/:id/location")
   location(
     @Req() req: { actor: Actor }, @Param("id") id: string, @Body() body: unknown, @Headers("idempotency-key") key: string,
   ) {
     const report = pilotLocationReportSchema.parse(body);
-    return reportPilotLocation(getPool(), req.actor, z.string().uuid().parse(id), report, z.string().uuid().parse(key));
+    return reportPilotLocation(getPool(), req.actor, idSchema.parse(id), report, idSchema.parse(key));
   }
   @Get("orders/:id/location")
   readLocation(@Req() req: { actor: Actor }, @Param("id") id: string) {
-    return getPilotLocation(getPool(), req.actor, z.string().uuid().parse(id));
+    return getPilotLocation(getPool(), req.actor, idSchema.parse(id));
   }
   @Put("slots/:id")
   capacity(@Req() req: { actor: Actor }, @Param("id") id: string, @Body() body: unknown, @Headers("idempotency-key") key: string) {
     const input = z.object({ capacity: z.number().int().min(0).max(100) }).strict().parse(body);
-    return setPilotCapacity(getPool(), req.actor, z.string().uuid().parse(id), input.capacity, z.string().uuid().parse(key));
+    return setPilotCapacity(getPool(), req.actor, idSchema.parse(id), input.capacity, idSchema.parse(key));
   }
 }

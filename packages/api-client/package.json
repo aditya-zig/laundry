@@ -6,7 +6,7 @@
   "types": "./dist/index.d.ts",
   "exports": { ".": { "types": "./dist/index.d.ts", "default": "./dist/index.js" } },
   "scripts": { "check": "tsc --noEmit -p tsconfig.json", "test": "vitest run", "build": "tsc -p tsconfig.build.json" },
-  "dependencies": { "@laundry/contracts": "workspace:*", "zod": "3.23.8" },
+  "dependencies": { "@laundry/contracts": "workspace:*", "zod": "4.6.7" },
   "devDependencies": {
     "@laundry/test-fixtures": "workspace:*",
     "typescript": "5.7.3",

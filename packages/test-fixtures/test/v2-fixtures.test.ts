@@ -11,6 +11,9 @@ describe("deterministic synthetic v2 fixtures", () => {
     it(`${name} validates against its published schema`, () => {
       const result = v2.getWireSchema(name).safeParse(fixture);
       expect(result.success, result.success ? name : `${name}: ${result.error.message}`).toBe(true);
+      // These versioned wire examples are already normalized. Library upgrades
+      // must preserve their public output, not merely continue accepting them.
+      if (result.success) expect(result.data).toEqual(fixture);
     });
   }
 

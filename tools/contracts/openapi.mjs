@@ -2,68 +2,15 @@ import { writeFile, readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { v2 } from '../../packages/contracts/dist/index.js';
+import { z } from 'zod';
 
-/** Convert only the Zod constructs actually published by Laundry. Unknown
- * constructs fail the build rather than becoming permissive object schemas.
- * Cross-field refinements and UTC normalization remain executable in Zod. */
+/** Publish accepted JSON inputs through Zod's supported converter, not private
+ * validator internals. Runtime refinements/normalization still run in the SDK
+ * and API; JSON Schema alone is never a substitute for those checks.
+ * Unrepresentable inputs throw by default instead of silently becoming {}. */
 export function jsonSchema(schema) {
-  const def = schema._def;
-  let output;
-  switch (def.typeName) {
-    case 'ZodString': {
-      output = { type: 'string' };
-      for (const check of def.checks) {
-        if (check.kind === 'min') output.minLength = check.value;
-        else if (check.kind === 'max') output.maxLength = check.value;
-        else if (check.kind === 'uuid') output.format = 'uuid';
-        else if (check.kind === 'url') output.format = 'uri';
-        else if (check.kind === 'email') output.format = 'email';
-        else if (check.kind === 'regex') output.pattern = check.regex.source;
-        else if (check.kind === 'trim') output['x-laundry-trim'] = true;
-        else throw new Error(`Unmapped string check ${check.kind}`);
-      }
-      break;
-    }
-    case 'ZodNumber': {
-      output = { type: 'number' };
-      for (const check of def.checks) {
-        if (check.kind === 'int') output.type = 'integer';
-        else if (check.kind === 'min') output[check.inclusive ? 'minimum' : 'exclusiveMinimum'] = check.value;
-        else if (check.kind === 'max') output[check.inclusive ? 'maximum' : 'exclusiveMaximum'] = check.value;
-        else if (check.kind === 'finite') output['x-laundry-finite'] = true;
-        else throw new Error(`Unmapped number check ${check.kind}`);
-      }
-      break;
-    }
-    case 'ZodBoolean': output = { type: 'boolean' }; break;
-    case 'ZodLiteral': output = { const: def.value, type: typeof def.value }; break;
-    case 'ZodEnum': output = { type: 'string', enum: def.values }; break;
-    case 'ZodNull': output = { type: 'null' }; break;
-    case 'ZodUnknown': output = {}; break;
-    case 'ZodArray':
-      output = { type: 'array', items: jsonSchema(def.type) };
-      if (def.minLength) output.minItems = def.minLength.value;
-      if (def.maxLength) output.maxItems = def.maxLength.value;
-      break;
-    case 'ZodRecord': output = { type: 'object', additionalProperties: jsonSchema(def.valueType) }; break;
-    case 'ZodObject': {
-      const shape = def.shape();
-      output = { type: 'object', properties: Object.fromEntries(Object.entries(shape).map(([key, value]) => [key, jsonSchema(value)])) };
-      const required = Object.entries(shape).filter(([, value]) => !value.isOptional()).map(([key]) => key);
-      if (required.length) output.required = required;
-      output.additionalProperties = def.unknownKeys === 'passthrough';
-      break;
-    }
-    case 'ZodOptional': output = jsonSchema(def.innerType); break;
-    case 'ZodNullable': output = { anyOf: [jsonSchema(def.innerType), { type: 'null' }] }; break;
-    case 'ZodDefault': output = { ...jsonSchema(def.innerType), default: def.defaultValue() }; break;
-    case 'ZodUnion': output = { anyOf: def.options.map(jsonSchema) }; break;
-    case 'ZodDiscriminatedUnion': output = { oneOf: def.options.map(jsonSchema), discriminator: { propertyName: def.discriminator } }; break;
-    case 'ZodEffects': output = { ...jsonSchema(def.schema), 'x-laundry-runtime-validation': true }; break;
-    default: throw new Error(`Unmapped Zod schema ${def.typeName}`);
-  }
-  if (schema.description) output.description = schema.description;
-  return output;
+  const { $schema, ...output } = z.toJSONSchema(schema, { io: 'input', cycles: 'throw' });
+  return { ...output, 'x-laundry-runtime-validation': true };
 }
 
 export function buildOpenApi() {
@@ -103,7 +50,7 @@ export function buildOpenApi() {
       );
     }
     const responseSchema = v2.getWireSchema(route.responseSchema);
-    if (route.method === 'GET' && responseSchema._def.typeName === 'ZodObject' && responseSchema.shape.pageInfo) {
+    if (route.method === 'GET' && responseSchema instanceof z.ZodObject && responseSchema.shape.pageInfo) {
       operation.parameters.push(
         { name: 'cursor', in: 'query', required: false, schema: { type: 'string', minLength: 1 } },
         { name: 'limit', in: 'query', required: false, schema: { type: 'integer', minimum: 1, maximum: 100, default: 50 } },
