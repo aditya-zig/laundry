@@ -146,6 +146,31 @@ export class CatalogService {
     return (await this.garments()).map(garment);
   }
 
+  /** Minimal published facts B04 needs; unpublished services are absent. */
+  async serviceById(serviceId: string): Promise<{ id: string; code: v2.ServiceCode; billingUnit: v2.Service['billingUnit']; turnaroundHours: number; active: boolean } | null> {
+    v2.idSchema.parse(serviceId);
+    const row = (await this.rows<ServiceRow>("SELECT * FROM catalog_services WHERE id=$1", [serviceId]))[0];
+    if (!row || !row.active) return null;
+    return { id: row.id, code: row.code as v2.ServiceCode, billingUnit: row.billing_unit, turnaroundHours: row.turnaround_hours, active: row.active };
+  }
+
+  async garmentById(garmentId: string): Promise<{ id: string; eligibleServiceCodes: v2.ServiceCode[]; active: boolean } | null> {
+    v2.idSchema.parse(garmentId);
+    const row = (await this.rows<GarmentRow>("SELECT * FROM catalog_garments WHERE id=$1", [garmentId]))[0];
+    if (!row) return null;
+    return { id: row.id, eligibleServiceCodes: row.eligible_service_codes, active: row.active };
+  }
+
+  /** Full approved, activated, already-effective document for one service. */
+  async effectiveRateCard(serviceCode: v2.ServiceCode): Promise<v2.RateCard | null> {
+    v2.serviceCodeSchema.parse(serviceCode);
+    const card = (await this.rows<RateCardRow>(`SELECT * FROM catalog_rate_cards
+      WHERE approved_at IS NOT NULL AND activated_at IS NOT NULL
+        AND activated_at <= $1 AND effective_from <= $1 AND service_codes ? $2::text
+      ORDER BY version DESC LIMIT 1`, [this.clock(), serviceCode]))[0];
+    return card ? rateCard(card) : null;
+  }
+
   /** Effective means published service, approved card, already activated and
    * already effective. Unpriced services are omitted rather than fabricated;
    * ordering by version means exactly one card wins per service. */

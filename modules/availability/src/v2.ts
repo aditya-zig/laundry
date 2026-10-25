@@ -174,6 +174,29 @@ export class AvailabilityService {
     return pairs;
   }
 
+  /** Resolve the return window a quote may promise for one pickup slot. The
+   * result is exactly what the public slot list would publish, including the
+   * closed and no-capacity cases, so a quote cannot promise an unbookable pair. */
+  async resolvePair(
+    areaId: string,
+    serviceIds: string[],
+    pickup: { start: string; end: string },
+  ): Promise<{ available: boolean; reason?: v2.SlotPair['unavailableReason']; returnWindow: v2.ScheduleWindow } | null> {
+    const pairs = await this.listSlots({
+      areaId,
+      serviceIds,
+      from: pickup.start,
+      to: pickup.end,
+    } as v2.SlotQuery);
+    const pair = pairs.find(item => item.pickupWindow.start === new Date(pickup.start).toISOString());
+    if (!pair) return null;
+    return {
+      available: pair.available,
+      ...(pair.unavailableReason === undefined ? {} : { reason: pair.unavailableReason }),
+      returnWindow: pair.returnWindow,
+    };
+  }
+
   private async staff(token: string, allowed: Set<string>): Promise<v2.Actor> {
     if (!this.options.authenticate) throw new AvailabilityFault('UNAUTHENTICATED', 'Sign in again to continue');
     const { actor } = await this.options.authenticate(token);
@@ -239,13 +262,16 @@ export class AvailabilityService {
   }
 
   /** Reserve one unit for the exact published window. The conditional bucket
-   * update is what makes two concurrent last-slot holds resolve to one. */
-  async hold(areaId: string, window: v2.ScheduleWindow): Promise<{ holdId: string; expiresAt: string }> {
+   * update is what makes two concurrent last-slot holds resolve to one.
+   *
+   * `client` lets a caller that already owns a transaction (quote and booking)
+   * take the hold atomically with its own writes. */
+  async hold(areaId: string, window: v2.ScheduleWindow, client?: PoolClient): Promise<{ holdId: string; expiresAt: string }> {
     v2.idSchema.parse(areaId);
     const parsed = v2.windowSchema.parse(window);
     const from = new Date(parsed.start), to = new Date(parsed.end);
     if (from.getTime() <= this.clock().getTime()) throw new AvailabilityFault('INVALID_INPUT', 'Pickup window has already started');
-    return this.tx(async tx => {
+    const work = async (tx: PoolClient) => {
       const candidates = (await tx.query<BucketRow>(`SELECT * FROM availability_buckets
         WHERE area_id=$1 AND starts_at=$2 AND ends_at=$3 AND reserved < capacity
         ORDER BY facility_id, id FOR UPDATE`, [areaId, from, to])).rows;
@@ -257,13 +283,14 @@ export class AvailabilityService {
       await tx.query(`INSERT INTO availability_holds (id,bucket_id,status,expires_at,created_at)
         VALUES ($1,$2,'HELD',$3,$4)`, [holdId, row.id, expiresAt, this.clock()]);
       return { holdId, expiresAt: expiresAt.toISOString() };
-    });
+    };
+    return client ? work(client) : this.tx(work);
   }
 
-  async reserve(holdId: string, orderId: string): Promise<{ reservationId: string }> {
+  async reserve(holdId: string, orderId: string, client?: PoolClient): Promise<{ reservationId: string }> {
     v2.idSchema.parse(holdId);
     v2.idSchema.parse(orderId);
-    return this.tx(async tx => {
+    const work = async (tx: PoolClient) => {
       const hold = (await tx.query<{ id: string; bucket_id: string; order_id: string | null; status: string; expires_at: Date }>(
         'SELECT id,bucket_id,order_id,status,expires_at FROM availability_holds WHERE id=$1 FOR UPDATE', [holdId])).rows[0];
       if (!hold) throw new AvailabilityFault('NOT_FOUND', 'Hold not found');
@@ -285,19 +312,21 @@ export class AvailabilityService {
         throw error;
       }
       return { reservationId: hold.id };
-    });
+    };
+    return client ? work(client) : this.tx(work);
   }
 
-  async release(holdId: string, reason: string): Promise<{ released: boolean }> {
+  async release(holdId: string, reason: string, client?: PoolClient): Promise<{ released: boolean }> {
     v2.idSchema.parse(holdId);
     if (!reason.trim()) throw new AvailabilityFault('INVALID_INPUT', 'A release reason is required');
-    return this.tx(async tx => {
+    const work = async (tx: PoolClient) => {
       const hold = (await tx.query<{ id: string; bucket_id: string; status: string }>(
         'SELECT id,bucket_id,status FROM availability_holds WHERE id=$1 FOR UPDATE', [holdId])).rows[0];
       if (!hold || (hold.status !== 'HELD' && hold.status !== 'RESERVED')) return { released: false };
       await this.settle(tx, hold.id, hold.bucket_id, 'RELEASED');
       return { released: true };
-    });
+    };
+    return client ? work(client) : this.tx(work);
   }
 
   /** Idempotent sweep. Capacity returns only for the row that was HELD, so a

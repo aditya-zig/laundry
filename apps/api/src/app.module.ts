@@ -13,9 +13,11 @@ import { DatabaseLifecycle } from "./database-lifecycle";
 import { IdentityModule } from "./features/identity/identity.module";
 import { CatalogModule } from "./features/catalog/catalog.module";
 import { AvailabilityModule } from "./features/availability/availability.module";
+import { OrdersModule } from "./features/orders/orders.module";
 import { identityFromEnvironment, type IdentityService } from "../../../modules/identity/src";
 import { CatalogService } from "../../../modules/catalog/src";
 import { AvailabilityService } from "../../../modules/availability/src";
+import { OrdersService } from "../../../modules/orders/src";
 import { getPool } from "../../../modules/shared/src/db";
 import { demoMode } from "../../../modules/shared/src/auth";
 
@@ -60,15 +62,27 @@ function identityService(): IdentityService | null {
   return identity;
 }
 
+function authenticate() {
+  const service = identityService();
+  return service ? (token: string) => service.authenticate(token) : undefined;
+}
+let catalog: CatalogService | undefined;
+function catalogService(): CatalogService {
+  return (catalog ??= new CatalogService({ db: getPool(), authenticate: authenticate() }));
+}
+let availability: AvailabilityService | undefined;
+function availabilityService(): AvailabilityService {
+  return (availability ??= new AvailabilityService({ db: getPool(), authenticate: authenticate() }));
+}
+let orders: OrdersService | undefined;
+function ordersService(): OrdersService {
+  return (orders ??= new OrdersService({ db: getPool(), authenticate: authenticate(), catalog: catalogService(), availability: availabilityService() }));
+}
+
 @Module({ imports: [
   IdentityModule.register(identityService),
-  CatalogModule.register(() => {
-    const service = identityService();
-    return new CatalogService({ db: getPool(), authenticate: service ? token => service.authenticate(token) : undefined });
-  }),
-  AvailabilityModule.register(() => {
-    const service = identityService();
-    return new AvailabilityService({ db: getPool(), authenticate: service ? token => service.authenticate(token) : undefined });
-  }),
+  CatalogModule.register(catalogService),
+  AvailabilityModule.register(availabilityService),
+  OrdersModule.register(ordersService),
 ], controllers: [MiscController, AuthController, CatalogController, OrdersController, OpsController, PartnerController, BillingController, ConversationController, PilotController], providers: [DatabaseLifecycle] })
 export class AppModule {}

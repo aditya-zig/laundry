@@ -9,6 +9,7 @@ const mediaIdsSchema = z.array(idSchema).max(20);
 export const versionedCommandSchema = z.object({ expectedVersion: expectedVersionSchema }).strict();
 export type VersionedCommand = z.infer<typeof versionedCommandSchema>;
 export const orderCancellationSchema = versionedCommandSchema.extend({ reason: reasonSchema });
+export type OrderCancellation = z.infer<typeof orderCancellationSchema>;
 export const orderRescheduleSchema = versionedCommandSchema.extend({ newQuoteId: idSchema, quoteVersion: expectedVersionSchema });
 export type OrderReschedule = z.infer<typeof orderRescheduleSchema>;
 export const intakeRecordSchema = versionedCommandSchema.extend({
@@ -32,6 +33,7 @@ export const qualityCheckSchema = versionedCommandSchema.extend({
 }).refine(v => v.passed || v.note !== undefined, { path: ["note"], message: "Failed quality checks require a reason." });
 export type QualityCheck = z.infer<typeof qualityCheckSchema>;
 export const orderHoldSchema = orderCancellationSchema;
+export type OrderHold = z.infer<typeof orderHoldSchema>;
 // Resuming care and exceptional unpaid returns are different audited commands.
 export const exceptionResolutionSchema = versionedCommandSchema.extend({
   action: z.enum(["RESUME", "AGREED_RETURN", "CANCEL", "ESCALATE"]),

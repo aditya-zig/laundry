@@ -38,6 +38,7 @@ export type VersionedReason = z.infer<typeof versionedReasonSchema>;
 export const conversationOptOutSchema = z.object({ channel: z.literal("WHATSAPP") }).strict();
 export type ConversationOptOut = z.infer<typeof conversationOptOutSchema>;
 export const optOutResultSchema = z.object({ optedOut: z.literal(true) }).strict();
+export type OptOutResult = z.infer<typeof optOutResultSchema>;
 export const conversationHandoffSchema = z.object({ expectedRevision: z.number().int().nonnegative(), assignedTo: idSchema, reason: z.string().trim().min(1).max(2000) }).strict();
 export type ConversationHandoff = z.infer<typeof conversationHandoffSchema>;
 
@@ -60,3 +61,4 @@ export const logisticsWebhookSchema = z.object({
   proofReference: z.string().trim().min(1).optional(),
 }).strict();
 export const webhookResultSchema = z.object({ accepted: z.boolean(), duplicate: z.boolean() }).strict();
+export type WebhookResult = z.infer<typeof webhookResultSchema>;
