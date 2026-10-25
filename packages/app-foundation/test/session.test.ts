@@ -96,6 +96,14 @@ describe('F00 refresh and stable command identities', () => {
     expect(h.books()[0].headers.get('idempotency-key')).toBe(h.books()[1].headers.get('idempotency-key'));
     expect(h.books()[0].body).toEqual(h.books()[1].body);
   });
+  it.each(['VERSION_CONFLICT', 'QUOTE_EXPIRED'])('retires definitively rejected versioned terms: %s', async code => {
+    const h = new Harness(), f = await h.signedIn();
+    h.handle = req => req.path.endsWith('/orders') ? response({ code, retryable: true, message: 'New terms required', traceId: 'synthetic' }, 409) : h.defaultHandle(req);
+    await expect(f.enqueueMutation(booking())).rejects.toBeInstanceOf(V2ApiError);
+    expect(await f.listQueuedMutations()).toEqual([]);
+    expect((await f.flushQueuedMutations()).confirmed).toEqual([]);
+    expect(h.books()).toHaveLength(1);
+  });
   it('SES-08 persisted intent survives a new foundation instance; unknown replay is never confirmed', async () => {
     const h = new Harness(), f = await h.signedIn(); h.handle = req => { if (req.path.endsWith('/orders')) throw new Error('offline'); return h.defaultHandle(req); };
     await expect(f.enqueueMutation(booking())).rejects.toBeInstanceOf(UnknownOutcomeError);

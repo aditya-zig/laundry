@@ -35,6 +35,7 @@
     "cloud:submit": "node tools/agents/workflow.mjs submit",
     "test:tooling": "pnpm --filter @laundry/contracts build && node --test tools/agents/*.test.mjs tools/verification/*.test.mjs tools/cloud/*.test.mjs tools/contracts/*.test.mjs",
     "verify:browser": "node tools/verification/run.mjs",
+    "verify:customer-v2": "pnpm --filter @laundry/contracts --filter @laundry/api-client --filter @laundry/app-foundation --filter @laundry/api build && EXPO_PUBLIC_API_V2_URL=http://127.0.0.1:4499/v2 pnpm --filter @laundry/customer build && LAUNDRY_SYNTHETIC_ACCEPTANCE=true node tools/cloud/postgres.mjs exec --runtime docker --label customer-v2 -- node tools/verification/customer-v2-browser.cjs",
     "verify:pilot": "pnpm --filter @laundry/contracts build && pnpm --filter @laundry/api-client build && pnpm --filter @laundry/api build && node tools/verification/run-pilot.mjs",
     "verify:evidence": "node tools/verification/evidence.mjs",
     "platform:deploy": "node tools/cloud/deploy-platform.mjs --deploy",

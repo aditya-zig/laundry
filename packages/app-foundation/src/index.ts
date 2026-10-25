@@ -33,4 +33,7 @@ export {
 
 export { createBrowserSessionFoundation, createAppSessionBinding, resolveApiV2BaseUrl, type BrowserFoundationOptions, type PlatformSessionStores } from "./app-helpers.js";
 
+export { isMutationOutcomePending } from "./mutations.js";
+export { logoutNotice } from "./logout.js";
+
 export { UnknownOutcomeError, V2ApiError } from "@laundry/api-client";

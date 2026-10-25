@@ -154,6 +154,16 @@ function sessionOf(actor: v2.Actor): v2.Session {
 }
 
 describe("sign-in controller (OTP + optional TOTP)", () => {
+  it("keeps failed local credential erasure visible instead of announcing successful logout", async () => {
+    const wire = harness();
+    const real = newFoundation(wire);
+    const foundation = { ...real, logout: async () => ({ localCredsCleared: false, serverRevocationConfirmed: true, revocationError: null }) };
+    const controller = new SignInController({ foundation, publicClient: () => real.getPlainV2Client() });
+    await controller.signOut();
+    expect(controller.getState().phase).toBe("collectPhone");
+    expect(controller.lastError()).toMatchObject({ code: "LOGOUT_INCOMPLETE" });
+    expect(controller.lastError()?.message).toContain("could not be erased");
+  });
   it("requests an OTP with only the phone, then verifies with code and TOTP second factor", async () => {
     const h = harness();
     const foundation = newFoundation(h);

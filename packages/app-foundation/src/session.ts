@@ -1,5 +1,6 @@
 import { UnknownOutcomeError, V2ApiError, type Actor, type V2Client } from '@laundry/api-client';
 import { v2 } from '@laundry/contracts';
+import { isMutationOutcomePending } from './mutations.js';
 import { StorageError, asSecureTokenStore, asPendingMutationStore, type SecureTokenStore, type PendingMutationStore, type QueuedMutationRecord } from './ports.js';
 export { StorageError, asPendingMutationStore, asSecureTokenStore, createMemoryPendingMutationStore, createMemorySecureTokenStore } from './ports.js';
 export type { PendingMutationStore, QueuedMutationRecord, SecureTokenStore } from './ports.js';
@@ -220,7 +221,7 @@ export function createSessionFoundation(options: SessionFoundationOptions): Sess
           const result = await foundation.authorized(c => sendRecord(c, record));
           await queue.remove(record.idempotencyKey); return result as CommandResults[K];
         } catch (error) {
-          if (error instanceof V2ApiError && error.status < 500 && ![401, 408, 429].includes(error.status) && !error.retryable && error.code !== 'PROVIDER_OUTCOME_UNKNOWN') await queue.remove(record.idempotencyKey);
+          if (!isMutationOutcomePending(error)) await queue.remove(record.idempotencyKey);
           throw error;
         }
       })().finally(() => { if (activeCommands.get(fingerprint) === work) activeCommands.delete(fingerprint); });

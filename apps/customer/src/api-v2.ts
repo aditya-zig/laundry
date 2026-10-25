@@ -1,7 +1,7 @@
 // Product adapter. All requests use the first-party SDK; browser session and
 // pending-intent defaults are memory-only, not durable/device storage claims.
 import type { v2 } from '@laundry/contracts';
-import { getFoundation, getV2Client } from './foundation/session.js';
+import { getFoundation, getV2Client } from './foundation/session';
 export const apiV2 = {
   async verifyAndAdoptSession(args: { challengeId: string; code: string; mfaCode?: string; idempotencyKey?: string }) {
     // OTP verification is public: requiring an existing session here prevents login.

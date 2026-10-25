@@ -43,6 +43,8 @@ export interface OrdersOptions {
   onReady?: (order: v2.Order, transaction: PoolClient) => Promise<v2.Obligation>;
   clock?: () => Date;
   adjustmentMinutes?: number;
+  /** Trusted composition gate; defaults closed in production. Cached reads/replays remain available. */
+  newOrdersEnabled?: boolean;
 }
 
 interface QuoteRow {
@@ -260,14 +262,21 @@ export class OrdersService {
   private readonly clock: () => Date;
   private readonly adjustmentMinutes: number;
   private readonly reconciliation: OrdersReconciliation;
+  private readonly newOrdersEnabled: boolean;
   constructor(private readonly options: OrdersOptions) {
     this.executor = createPostgresCommandExecutor(options.db);
     this.clock = options.clock ?? (() => new Date());
     this.adjustmentMinutes = options.adjustmentMinutes ?? 30;
     this.reconciliation = options.reconciliation ?? defaultReconciliation;
+    if (options.newOrdersEnabled !== undefined && typeof options.newOrdersEnabled !== 'boolean') throw new Error('Ordering gate must be boolean');
+    this.newOrdersEnabled = options.newOrdersEnabled ?? (process.env.NODE_ENV !== 'production');
     if (!Number.isSafeInteger(this.adjustmentMinutes) || this.adjustmentMinutes < 1 || this.adjustmentMinutes > 2880) {
       throw new Error('Adjustment lifetime must be between 1 and 2880 minutes');
     }
+  }
+
+  private assertNewOrdersEnabled(): void {
+    if (!this.newOrdersEnabled) throw new OrdersFault('PROVIDER_UNAVAILABLE', 'New ordering is not enabled for this deployment');
   }
 
   /** Sweeps and reads that are not customer commands still need one
@@ -425,6 +434,7 @@ export class OrdersService {
       async () => { await this.actor(token); },
       async scope => {
         const tx: PoolClient = scope.handle;
+        this.assertNewOrdersEnabled();
         const owned = (await tx.query('SELECT id FROM identity_addresses WHERE id=$1 AND owner_id=$2 AND deleted_at IS NULL', [prepared.parsed.addressId, customer.id])).rows[0];
         if (!owned) throw new OrdersFault('NOT_FOUND', 'Address not found');
         const hold = await this.options.availability.hold(prepared.area.id, prepared.parsed.pickupWindow, tx);
@@ -478,6 +488,7 @@ export class OrdersService {
       async () => { await this.actor(token); },
       async scope => {
         const tx: PoolClient = scope.handle;
+        this.assertNewOrdersEnabled();
         const quoteRow = (await tx.query<QuoteRow>(
           'SELECT * FROM orders_v2_quotes WHERE id=$1 AND customer_id=$2 FOR UPDATE', [parsed.quoteId, customer.id])).rows[0];
         if (!quoteRow) throw new OrdersFault('NOT_FOUND', 'Quote not found');

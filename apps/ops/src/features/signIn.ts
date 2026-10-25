@@ -4,7 +4,7 @@
 // session is adopted through the session foundation so access tokens stay in
 // memory and refresh rotation keeps one key per attempt.
 import { type V2Client } from "@laundry/api-client";
-import type { SessionFoundation } from "@laundry/app-foundation";
+import { logoutNotice, type SessionFoundation } from "@laundry/app-foundation";
 import { v2 } from "@laundry/contracts";
 import { describeError, type PresentableError } from "./errors";
 
@@ -162,8 +162,11 @@ export class SignInController {
   }
 
   async signOut(): Promise<void> {
-    await this.deps.foundation.logout();
-    this.error = null;
+    const report = await this.deps.foundation.logout();
+    this.error = report.localCredsCleared && report.serverRevocationConfirmed ? null : {
+      code: "LOGOUT_INCOMPLETE", message: logoutNotice(report), traceId: undefined,
+      retryable: false, currentVersion: undefined, unknownOutcome: false,
+    };
     this.set({ phase: "collectPhone" });
   }
 }

@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { ScrollView, StyleSheet, Text, View } from "react-native";
-import { useRouter } from "expo-router";
+import { logoutNotice } from "@laundry/app-foundation";
 import { getFoundation } from "../src/foundation/session";
 import { createPartnerApi, pendingHandoverReceipts, type PendingHandoverReceipt } from "../src/features/session/partner-api";
 import { usePartnerSession } from "../src/features/session/use-partner-session";
@@ -18,15 +18,13 @@ import {
   spacing,
 } from "../src/theme";
 
-function AccountPanel() {
+function AccountPanel({ onSignOut }: { onSignOut: (notice: string) => void }) {
   const session = usePartnerSession();
-  const router = useRouter();
   const api = createPartnerApi({ foundation: getFoundation() });
   const actor = session.state === "AUTHENTICATED" ? session.actor : null;
   const [pending, setPending] = useState<PendingHandoverReceipt[]>([]);
   const [flushResult, setFlushResult] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const [signOutNote, setSignOutNote] = useState<string | null>(null);
 
   async function loadQueue() {
     try {
@@ -76,17 +74,11 @@ function AccountPanel() {
 
   async function signOut() {
     setBusy(true);
-    setSignOutNote(null);
     try {
       const report = await api.signOut();
-      setSignOutNote(
-        report.serverRevocationConfirmed
-          ? "Signed out. The server session was revoked and private task data was cleared from view."
-          : "Signed out locally. The server revocation could not be confirmed; local task data was cleared from view.",
-      );
-      router.replace("/");
-    } catch (err) {
-      setSignOutNote(err instanceof Error ? `Sign-out failed: ${err.message}` : "Sign-out failed.");
+      onSignOut(logoutNotice(report));
+    } catch {
+      onSignOut("Sign-out failed. Server revocation and local credential erasure were not confirmed.");
     } finally {
       setBusy(false);
     }
@@ -147,7 +139,6 @@ function AccountPanel() {
 
       <Card>
         <PrimaryButton label="Sign out" tone="quiet" onPress={signOut} busy={busy} />
-        {signOutNote ? <NoticeBox title="Sign-out status" body={signOutNote} tone="warning" /> : null}
       </Card>
     </View>
   );
@@ -155,6 +146,7 @@ function AccountPanel() {
 
 export default function AccountScreen() {
   const session = usePartnerSession();
+  const [signOutNote, setSignOutNote] = useState<string | null>(null);
   return (
     <ScrollView
       style={styles.screen}
@@ -162,7 +154,7 @@ export default function AccountScreen() {
     >
       <View style={styles.centerWrapper}>
         {session.state === "AUTHENTICATED" ? (
-          <AccountPanel />
+          <AccountPanel onSignOut={setSignOutNote} />
         ) : session.state === "LOADING" ? (
           <LoadingState label="Checking sign-in…" />
         ) : session.state === "CONFIG_ERROR" ? (
@@ -173,6 +165,7 @@ export default function AccountScreen() {
             body="Account details are private. Sign in from the task list first."
           />
         )}
+        {signOutNote ? <NoticeBox title="Sign-out status" body={signOutNote} tone="warning" /> : null}
       </View>
     </ScrollView>
   );

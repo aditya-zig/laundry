@@ -1,227 +1,251 @@
-import { useEffect, useState, useSyncExternalStore } from "react";
+import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
-import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
-import type { Service } from "@laundry/contracts";
-import { getClient } from "../src/api";
-import { getBasketLines, resetBasket, subscribeBasket } from "../src/cart-store";
-import { estimateSubtotalMinor, MAX_GARMENTS, removeLine, totalGarments, updateQuantity } from "../src/cart";
-import { defaultSchedule, formatINR, scheduleBlockReason } from "../src/guards";
-import { fromISTFields, toISTFields } from "../src/schedule-input";
-import { colors, spacing, minTouchTarget, radius, typography, maxContentWidth } from "../src/theme";
+import { Ionicons } from "@expo/vector-icons";
+import type { v2 } from "@laundry/contracts";
+import { getV2Client } from "../src/foundation/session";
+import {
+  removeBagLine,
+  setKgWeightGrams,
+  setPieceQuantity,
+  type BagLine,
+  type InvalidLineReason,
+} from "../src/features/booking/lines";
+import { bagHeadline, describeError } from "../src/features/booking/presenters";
+import { bagTotals, staleLabel, viewBagLines } from "../src/features/booking/view";
+import { bagStore } from "../src/features/booking/basket-store";
+import { Loading, NoteCard } from "../src/features/booking/ui";
+import { colors, minTouchTarget, radius, spacing } from "../src/theme";
+
+// Product bag. Lines are reconciled against the live server catalog: stale
+// lines are labelled honestly, excluded from the quote, and removable. No
+// authoritative price is computed here — the server quote does that.
+
+interface BagRow {
+  line: BagLine;
+  status: "ok" | InvalidLineReason;
+  service?: v2.Service;
+  garment?: v2.GarmentEligibility;
+}
 
 export default function Basket() {
   const router = useRouter();
-  const lines = useSyncExternalStore(subscribeBasket, getBasketLines, getBasketLines);
-  const [services, setServices] = useState<Service[] | null>(null);
-  const [catalogError, setCatalogError] = useState(false);
-  const [initialSchedule] = useState(defaultSchedule);
-  const [pickupDay, setPickupDay] = useState(() => toISTFields(initialSchedule.pickupStart).date);
-  const [pickupTime, setPickupTime] = useState(() => toISTFields(initialSchedule.pickupStart).time);
-  const [pickupEndTime, setPickupEndTime] = useState(() => toISTFields(initialSchedule.pickupEnd).time);
-  const [returnDay, setReturnDay] = useState(() => toISTFields(initialSchedule.returnBy).date);
-  const [returnTime, setReturnTime] = useState(() => toISTFields(initialSchedule.returnBy).time);
-  const [scheduleError, setScheduleError] = useState<string | null>(null);
-  const [basketError, setBasketError] = useState<string | null>(null);
+  const bag = bagStore();
+  const lines = useSyncExternalStore(bag.subscribe, bag.getLines, bag.getLines);
+  const [services, setServices] = useState<v2.Service[] | null>(null);
+  const [catalogError, setCatalogError] = useState<unknown>(null);
+  const [loading, setLoading] = useState(true);
+  const [notice, setNotice] = useState<string | null>(null);
 
-  useEffect(() => {
-    let active = true;
-    getClient().listServices().then((all) => {
-      if (active) {
-        setServices(all);
-        setCatalogError(false);
-      }
-    }).catch(() => { if (active) setCatalogError(true); });
-    return () => { active = false; };
+  const loadProducts = useCallback(async () => {
+    setLoading(true);
+    setCatalogError(null);
+    try {
+      setServices(await getV2Client().listServices());
+    } catch (caught) {
+      setCatalogError(caught);
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
-  const priceByGarmentId: Record<string, number> = {};
-  for (const service of services ?? []) {
-    for (const garment of service.garments) priceByGarmentId[garment.id] = garment.priceMinor;
-  }
-  const estimate = services ? estimateSubtotalMinor(lines, priceByGarmentId) : null;
-  const garmentCount = totalGarments(lines);
+  useEffect(() => {
+    void loadProducts();
+  }, [loadProducts]);
 
-  function changeQuantity(index: number, quantity: number) {
+  const rows: BagRow[] = services
+    ? viewBagLines(lines, services)
+    : lines.map((line) => ({ line, status: "ok" as const }));
+  const validCount = bagTotals(rows);
+
+  function mutate(update: (current: BagLine[]) => BagLine[]) {
     try {
-      resetBasket(quantity === 0 ? removeLine(lines, index) : updateQuantity(lines, index, quantity));
-      setBasketError(null);
-    } catch (e) {
-      setBasketError(e instanceof Error ? e.message : "Could not update the bag.");
+      bag.setLines(update(lines));
+      setNotice(null);
+    } catch (caught) {
+      setNotice(caught instanceof Error ? caught.message : "Could not update the bag");
     }
   }
 
-  function continueToCheckout() {
-    const pickupStart = fromISTFields(pickupDay, pickupTime);
-    const pickupEnd = fromISTFields(pickupDay, pickupEndTime);
-    const returnBy = fromISTFields(returnDay, returnTime);
-    if (!pickupStart || !pickupEnd || !returnBy) {
-      setScheduleError("Enter real dates (YYYY-MM-DD) and 24-hour times (HH:mm).");
-      return;
+  const rowsMeta = rows;
+
+  function lineTitle(row: BagRow): string {
+    if (row.line.kind === "KG") return "By weight";
+    return row.garment?.name ?? "Item";
+  }
+
+  function lineSub(row: (typeof rows)[number]): string {
+    const service = row.service?.name ?? "Service";
+    if (row.line.kind === "KG") {
+      const grams = row.line.weightGrams >= 1000 ? `${(row.line.weightGrams / 1000).toLocaleString("en-GB")} kg` : `${row.line.weightGrams} g`;
+      const custody = row.line.custodyCount === undefined ? "" : ` · ${row.line.custodyCount} item${row.line.custodyCount === 1 ? "" : "s"} declared`;
+      return `${service} · about ${grams}${custody}`;
     }
-    const reason = scheduleBlockReason({ pickupStart, pickupEnd, returnBy });
-    setScheduleError(reason);
-    if (!reason && lines.length > 0) {
-      router.push({ pathname: "/checkout", params: { pickupStart, pickupEnd, returnBy } });
-    }
+    return `${service} · ${row.line.pieceQuantity} item${row.line.pieceQuantity === 1 ? "" : "s"}`;
+  }
+
+  if (lines.length === 0) {
+    return (
+      <View style={styles.screen}>
+        <ScrollView contentContainerStyle={styles.content}>
+          <Text style={styles.title} accessibilityRole="header">
+            Your bag
+          </Text>
+          <NoteCard
+            kind="note"
+            title="Your bag is empty"
+            body="Pick a service on the home screen to start filling it."
+            actionLabel="Browse services"
+            onAction={() => router.push("/")}
+          />
+        </ScrollView>
+      </View>
+    );
   }
 
   return (
-    <ScrollView style={styles.screen} contentContainerStyle={styles.center}>
-      <View style={styles.content}>
-        <View style={styles.topRow}>
-          <Pressable onPress={() => router.push("/")} style={styles.back} accessibilityRole="button" accessibilityLabel="Back to services">
-            <Ionicons name="arrow-back" color={colors.action} size={20} />
-            <Text style={styles.backText}>Services</Text>
-          </Pressable>
-          <Text style={styles.demo}>DEMO</Text>
+    <View style={styles.screen}>
+      <ScrollView contentContainerStyle={styles.content}>
+        <View style={styles.titleRow}>
+          <Text style={styles.title} accessibilityRole="header">
+            Your bag
+          </Text>
+          <Text style={styles.counter}>{bagHeadline(validCount.units)}</Text>
         </View>
-        <Text style={styles.title} accessibilityRole="header">Your bag</Text>
-        <Text style={styles.subtitle}>Review your clothes and request a pickup time.</Text>
 
-        {lines.length === 0 ? (
-          <View style={styles.emptyCard}>
-            <View style={styles.emptyIcon}><Ionicons name="bag-outline" size={30} color={colors.action} /></View>
-            <Text style={styles.cardTitle}>Your bag is empty</Text>
-            <Text style={styles.muted}>Add clothes from the services page to get started.</Text>
-            <Pressable onPress={() => router.push("/")} style={styles.outlineButton} accessibilityRole="button" accessibilityLabel="Browse services">
-              <Text style={styles.outlineText}>Browse services</Text>
-            </Pressable>
-          </View>
-        ) : (
-          <>
-            <View style={styles.sectionHeading}>
-              <Text style={styles.sectionTitle} accessibilityRole="header">Clothes</Text>
-              <Text style={styles.counter}>{garmentCount} garment{garmentCount === 1 ? "" : "s"}</Text>
-            </View>
-            {lines.map((line, index) => {
-              const service = services?.find((s) => s.id === line.serviceId);
-              const garment = service?.garments.find((g) => g.id === line.garmentTypeId);
-              const name = garment?.name ?? "Garment";
-              return (
-                <View key={line.serviceId + "-" + line.garmentTypeId + "-" + index} style={styles.card}>
-                  <View style={styles.lineRow}>
-                    <View style={styles.garmentIcon}><Ionicons name="shirt-outline" size={25} color={colors.action} /></View>
-                    <View style={styles.lineCopy}>
-                      <Text style={styles.garmentName}>{name}</Text>
-                      <Text style={styles.muted}>{service?.name ?? "Service details unavailable"}</Text>
-                      {garment && <Text style={styles.rate}>{formatINR(garment.priceMinor)} / garment</Text>}
-                    </View>
-                  </View>
-                  <View style={styles.lineActions}>
-                    <View style={styles.stepper}>
-                      <Pressable onPress={() => changeQuantity(index, line.quantity - 1)} style={styles.step} accessibilityRole="button" accessibilityLabel={"Remove one " + name}>
-                        <Ionicons name="remove" size={20} color={colors.action} />
-                      </Pressable>
-                      <Text style={styles.count} accessibilityLabel={line.quantity + " " + name}>{line.quantity}</Text>
-                      <Pressable disabled={garmentCount >= MAX_GARMENTS || line.quantity >= 100} onPress={() => changeQuantity(index, line.quantity + 1)} style={styles.step} accessibilityRole="button" accessibilityLabel={"Add one " + name}>
-                        <Ionicons name="add" size={20} color={colors.action} />
-                      </Pressable>
-                    </View>
-                    <Pressable onPress={() => changeQuantity(index, 0)} style={styles.remove} accessibilityRole="button" accessibilityLabel={"Remove " + name + " from bag"}>
-                      <Text style={styles.removeText}>Remove</Text>
-                    </Pressable>
-                  </View>
+        {loading ? <Loading label="Checking the live catalog" /> : null}
+        {catalogError !== null ? (
+          <NoteCard
+            kind="error"
+            title={describeError(catalogError).title}
+            body={`${describeError(catalogError).body} The bag still holds your lines, but the live catalog is needed to reconcile them.`}
+            actionLabel="Retry"
+            onAction={() => void loadProducts()}
+          />
+        ) : null}
+
+        {rowsMeta.map((row, index) => {
+          const piece = row.status === "ok" && row.line.kind === "PIECE" ? row.line : null;
+          const kg = row.status === "ok" && row.line.kind === "KG" ? row.line : null;
+          return (
+            <View key={`${row.line.serviceId}-${index}`} style={styles.lineCard}>
+              <View style={styles.lineTop}>
+                <View style={styles.lineCopy}>
+                  <Text style={[styles.lineTitle, row.status !== "ok" && styles.staleTitle]}>{lineTitle(row)}</Text>
+                  <Text style={styles.lineSub}>{lineSub(row)}</Text>
+                  {row.line.kind === "KG" && row.line.custodyCount !== undefined ? (
+                    <Text style={styles.lineMeta}>Count (custody) is separate from billed weight.</Text>
+                  ) : null}
                 </View>
-              );
-            })}
-            {basketError && <Text accessibilityRole="alert" style={styles.error}>{basketError}</Text>}
-            <View style={styles.estimateCard}>
-              <View style={styles.summaryRow}>
-                <Text style={styles.summaryLabel}>Estimated subtotal</Text>
-                <Text style={styles.summaryAmount}>{estimate === null ? "At checkout" : formatINR(estimate)}</Text>
+                <Pressable
+                  onPress={() => mutate((current) => removeBagLine(current, index))}
+                  style={styles.remove}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Remove ${lineTitle(row)} from bag`}
+                >
+                  <Text style={styles.removeText}>Remove</Text>
+                </Pressable>
               </View>
-              <Text style={styles.finePrint}>{catalogError ? "Catalog unavailable. " : ""}Taxes, fees and final prices are confirmed in the server quote.</Text>
+              {row.status !== "ok" ? (
+                <Text style={styles.staleNote} accessibilityRole="alert">
+                  {staleLabel(row.status)} It will be excluded from the server quote.
+                </Text>
+              ) : null}
+              {row.status === "ok" && row.line.kind === "PIECE" ? (
+                <View style={styles.qtyRow}>
+                  <Text style={styles.qtyLabel}>Count</Text>
+                  <TextInput
+                    value={String(row.line.pieceQuantity)}
+                    keyboardType="number-pad"
+                    onChangeText={(raw) => {
+                      if (!piece) return;
+                      const next = Number.parseInt(raw, 10);
+                      if (Number.isInteger(next) && next >= 0) mutate((current) => setPieceQuantity(current, piece.serviceId, piece.garmentTypeId, next));
+                    }}
+                    style={styles.qtyInput}
+                    accessibilityLabel={`Count for ${lineTitle(row)}`}
+                  />
+                </View>
+              ) : null}
+              {row.status === "ok" && row.line.kind === "KG" ? (
+                <View style={styles.qtyRow}>
+                  <Text style={styles.qtyLabel}>Billed weight (kg)</Text>
+                  <TextInput
+                    value={String(row.line.weightGrams / 1000)}
+                    keyboardType="decimal-pad"
+                    onEndEditing={(event) => {
+                      if (!kg) return;
+                      const grams = Math.round(Number.parseFloat(event.nativeEvent.text.replace(",", ".")) * 1000);
+                      if (Number.isFinite(grams) && grams > 0) mutate((current) => setKgWeightGrams(current, kg.serviceId, grams));
+                      else setNotice("Enter a weight greater than 0 kg.");
+                    }}
+                    style={styles.qtyInput}
+                    accessibilityLabel={`Billed weight in kilograms for ${lineTitle(row)}`}
+                  />
+                </View>
+              ) : null}
             </View>
-          </>
-        )}
+          );
+        })}
+        {notice ? <NoteCard kind="error" title={notice} /> : null}
 
-        {lines.length > 0 && (
-          <View style={styles.scheduleCard}>
-            <View style={styles.sectionHeading}>
-              <Text style={styles.sectionTitle} accessibilityRole="header">Pickup & return</Text>
-              <Text style={styles.timezone}>IST (India)</Text>
-            </View>
-            <Text style={styles.muted}>Request a time. Available slots and delivery estimates are confirmed at checkout.</Text>
-            <Text style={styles.fieldLabel}>Pickup date</Text>
-            <TextInput value={pickupDay} onChangeText={(v) => { setPickupDay(v); setScheduleError(null); }} placeholder="YYYY-MM-DD" style={styles.input} accessibilityLabel="Pickup date in India" autoCapitalize="none" />
-            <View style={styles.fieldsRow}>
-              <View style={styles.field}>
-                <Text style={styles.fieldLabel}>From (24h)</Text>
-                <TextInput value={pickupTime} onChangeText={(v) => { setPickupTime(v); setScheduleError(null); }} placeholder="09:00" style={styles.input} accessibilityLabel="Pickup start time in India" />
-              </View>
-              <View style={styles.field}>
-                <Text style={styles.fieldLabel}>To (24h)</Text>
-                <TextInput value={pickupEndTime} onChangeText={(v) => { setPickupEndTime(v); setScheduleError(null); }} placeholder="10:00" style={styles.input} accessibilityLabel="Pickup end time in India" />
-              </View>
-            </View>
-            <View style={styles.separator} />
-            <Text style={styles.fieldLabel}>Requested return date</Text>
-            <TextInput value={returnDay} onChangeText={(v) => { setReturnDay(v); setScheduleError(null); }} placeholder="YYYY-MM-DD" style={styles.input} accessibilityLabel="Requested return date in India" />
-            <Text style={styles.fieldLabel}>Return before (24h)</Text>
-            <TextInput value={returnTime} onChangeText={(v) => { setReturnTime(v); setScheduleError(null); }} placeholder="18:00" style={styles.input} accessibilityLabel="Requested return time in India" />
-            {scheduleError && <Text accessibilityRole="alert" style={styles.error}>{scheduleError}</Text>}
-          </View>
-        )}
+        <NoteCard
+          kind="note"
+          title="What happens next"
+          body="You pick a server-published pickup slot and an owned address, the server returns an explicit quote, and booking is confirmed only after you press Confirm. Payment is due when your clothes are returned."
+        />
 
-        {lines.length > 0 && (
-          <Pressable onPress={continueToCheckout} style={({ pressed }) => [styles.primaryButton, pressed && styles.pressed]} accessibilityRole="button" accessibilityLabel="Get server quote and continue">
-            <Text style={styles.primaryText}>Get quote & continue</Text>
-            <Ionicons name="arrow-forward" color={colors.surface} size={19} />
-          </Pressable>
-        )}
-        <Text style={styles.footer}>Demo checkout only. No real payment or delivery booking.</Text>
-      </View>
-    </ScrollView>
+        <Pressable
+          onPress={() => router.push("/checkout")}
+          disabled={validCount.units === 0}
+          style={({ pressed }) => [styles.continue, validCount.units === 0 && styles.disabled, pressed && styles.pressed]}
+          accessibilityRole="button"
+          accessibilityLabel="Continue to booking"
+        >
+          <Text style={styles.continueText}>Continue to booking</Text>
+          <Ionicons name="arrow-forward" size={18} color={colors.surface} />
+        </Pressable>
+        {validCount.units === 0 ? (
+          <Text style={styles.finePrint}>Every line is out of date or disabled. Remove them and add current services.</Text>
+        ) : null}
+      </ScrollView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.surfaceTint },
-  center: { alignItems: "center" },
-  content: { width: "100%", maxWidth: maxContentWidth, padding: spacing.md, paddingBottom: 64 },
-  topRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 16 },
-  back: { minHeight: minTouchTarget, flexDirection: "row", alignItems: "center", gap: 8 },
-  backText: { color: colors.action, fontSize: 16, fontWeight: "700" },
-  demo: { color: colors.warning, backgroundColor: colors.warningSoft, overflow: "hidden", borderRadius: radius.pill, paddingHorizontal: 10, paddingVertical: 5, fontSize: 12, fontWeight: "700" },
-  title: { color: colors.ink, fontSize: typography.sizes.display, fontWeight: "800" },
-  subtitle: { color: colors.inkMuted, fontSize: 16, lineHeight: 23, marginTop: 5, marginBottom: 14 },
-  sectionHeading: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", gap: 10, marginTop: 8, marginBottom: 12 },
-  sectionTitle: { color: colors.ink, fontSize: 20, fontWeight: "700" },
-  counter: { color: colors.action, backgroundColor: colors.actionSoft, paddingHorizontal: 10, paddingVertical: 5, overflow: "hidden", borderRadius: radius.pill, fontSize: 13, fontWeight: "700" },
-  card: { backgroundColor: colors.surface, borderColor: colors.border, borderWidth: 1, borderRadius: radius.lg, padding: 14, marginBottom: 10 },
-  lineRow: { flexDirection: "row", alignItems: "center", gap: 12 },
-  garmentIcon: { height: 56, width: 56, backgroundColor: colors.surfaceTint, alignItems: "center", justifyContent: "center", borderRadius: radius.md },
+  content: { padding: spacing.md, paddingBottom: 64, maxWidth: 560, width: "100%", alignSelf: "center" },
+  titleRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 8 },
+  title: { color: colors.ink, fontSize: 26, fontWeight: "700" },
+  counter: { color: colors.inkMuted, fontSize: 13, fontWeight: "600", textAlign: "right", flexShrink: 1 },
+  lineCard: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, padding: spacing.md, marginTop: spacing.md },
+  lineTop: { flexDirection: "row", alignItems: "flex-start", gap: 8 },
   lineCopy: { flex: 1, minWidth: 0 },
-  garmentName: { fontSize: 17, fontWeight: "700", color: colors.ink },
-  muted: { color: colors.inkMuted, fontSize: 14, lineHeight: 20, marginTop: 3 },
-  rate: { color: colors.action, fontSize: 14, fontWeight: "700", marginTop: 4 },
-  lineActions: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginTop: 14, gap: 8 },
-  stepper: { flexDirection: "row", alignItems: "center", borderRadius: radius.md, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surfaceCard },
-  step: { width: minTouchTarget, height: minTouchTarget, justifyContent: "center", alignItems: "center" },
-  count: { color: colors.ink, fontSize: 16, fontWeight: "700", textAlign: "center", minWidth: 28 },
-  remove: { minHeight: minTouchTarget, paddingHorizontal: 10, justifyContent: "center" },
+  lineTitle: { color: colors.ink, fontSize: 16, fontWeight: "700" },
+  staleTitle: { color: colors.warning },
+  lineSub: { color: colors.inkMuted, fontSize: 13, lineHeight: 19, marginTop: 2 },
+  lineMeta: { color: colors.inkMuted, fontSize: 12, marginTop: 4 },
+  remove: { minHeight: minTouchTarget, justifyContent: "center", paddingHorizontal: 8 },
   removeText: { color: colors.danger, fontSize: 14, fontWeight: "700" },
-  estimateCard: { backgroundColor: colors.actionSoft, borderRadius: radius.lg, padding: spacing.md, marginTop: 4 },
-  summaryRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 10 },
-  summaryLabel: { color: colors.ink, fontSize: 15, fontWeight: "600", flexShrink: 1 },
-  summaryAmount: { color: colors.ink, fontSize: 20, fontWeight: "800" },
-  finePrint: { color: colors.inkMuted, fontSize: 13, lineHeight: 19, marginTop: 8 },
-  scheduleCard: { backgroundColor: colors.surface, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.border, padding: spacing.md, marginTop: spacing.lg },
-  timezone: { color: colors.action, fontSize: 13, fontWeight: "700", backgroundColor: colors.actionSoft, paddingHorizontal: 9, paddingVertical: 5, overflow: "hidden", borderRadius: radius.pill },
-  fieldLabel: { color: colors.ink, fontWeight: "700", fontSize: 14, marginTop: 14, marginBottom: 6 },
-  input: { color: colors.ink, backgroundColor: colors.surfaceCard, borderColor: colors.border, borderWidth: 1, borderRadius: radius.sm, fontSize: 16, paddingHorizontal: 12, minHeight: 48, width: "100%" },
-  fieldsRow: { flexDirection: "row", gap: 12 },
-  field: { flex: 1, minWidth: 0 },
-  separator: { height: 1, backgroundColor: colors.border, marginTop: 20 },
-  error: { color: colors.danger, fontSize: 14, lineHeight: 20, marginTop: 10 },
-  primaryButton: { backgroundColor: colors.action, minHeight: 54, marginTop: spacing.lg, borderRadius: radius.md, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 10 },
+  staleNote: { color: colors.warning, fontSize: 13, lineHeight: 19, marginTop: 8 },
+  qtyRow: { flexDirection: "row", alignItems: "center", gap: 10, marginTop: 10 },
+  qtyLabel: { color: colors.inkMuted, fontSize: 13, flex: 1 },
+  qtyInput: {
+    color: colors.ink,
+    backgroundColor: colors.surfaceCard,
+    borderColor: colors.border,
+    borderWidth: 1,
+    borderRadius: radius.sm,
+    fontSize: 16,
+    paddingHorizontal: 10,
+    minHeight: 44,
+    width: 96,
+    textAlign: "center",
+  },
+  continue: { backgroundColor: colors.action, minHeight: minTouchTarget + 10, borderRadius: radius.md, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 10, marginTop: spacing.md, padding: 12 },
   pressed: { backgroundColor: colors.actionPressed },
-  primaryText: { color: colors.surface, fontSize: 16, fontWeight: "700" },
-  footer: { color: colors.inkMuted, textAlign: "center", fontSize: 12, lineHeight: 18, marginTop: 15 },
-  emptyCard: { backgroundColor: colors.surface, borderRadius: radius.lg, borderColor: colors.border, borderWidth: 1, padding: spacing.lg, alignItems: "center", marginTop: 18 },
-  emptyIcon: { backgroundColor: colors.actionSoft, padding: 16, borderRadius: radius.pill, marginBottom: 12 },
-  cardTitle: { color: colors.ink, fontSize: 20, fontWeight: "700" },
-  outlineButton: { minHeight: minTouchTarget, borderRadius: radius.md, borderColor: colors.action, borderWidth: 1, paddingHorizontal: 22, justifyContent: "center", marginTop: 20 },
-  outlineText: { color: colors.action, fontSize: 16, fontWeight: "700" },
+  disabled: { opacity: 0.5 },
+  continueText: { color: colors.surface, fontSize: 16, fontWeight: "700" },
+  finePrint: { color: colors.inkMuted, fontSize: 12, lineHeight: 18, marginTop: 10, textAlign: "center" },
 });

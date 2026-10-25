@@ -1,150 +1,43 @@
 import { useEffect, useState } from "react";
-import { ActivityIndicator, Pressable, ScrollView, Text, TextInput, View } from "react-native";
 import { useLocalSearchParams } from "expo-router";
-import type { Order } from "@laundry/contracts";
-import { getClient } from "../../src/api";
-import { formatINR, paymentStatusLabel } from "../../src/guards";
-import { canOfferCancellation, trackingProgress } from "../../src/tracking";
-import { colors, spacing, minTouchTarget } from "../../src/theme";
+import { Text } from "react-native";
+import type { v2 } from "@laundry/contracts";
+import { apiV2 } from "../../src/api-v2";
+import { CustomerPrivateScreen } from "../../src/features/booking/CustomerPrivateScreen";
+import { describeError } from "../../src/features/booking/presenters";
+import { Card, Loading, NoteCard, Page } from "../../src/features/booking/ui";
+import { formatINR } from "../../src/guards";
+import { colors } from "../../src/theme";
 
-export default function OrderDetail() {
-  const { id, paymentId } = useLocalSearchParams<{ id: string; paymentId?: string }>();
-  const [order, setOrder] = useState<Order | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [review, setReview] = useState("");
-  const [score, setScore] = useState("5");
-  const [notice, setNotice] = useState<string | null>(null);
-  const [capturing, setCapturing] = useState(false);
-  const [codes, setCodes] = useState<{ pickupOtp?: string; returnOtp?: string } | null>(null);
+export default function OrderDetails() {
+  const params = useLocalSearchParams<{ id?: string | string[] }>();
+  const id = typeof params.id === "string" ? params.id : "";
+  return <Page title="Order details"><CustomerPrivateScreen><OwnedDetail key={id} id={id} /></CustomerPrivateScreen></Page>;
+}
 
-  function load() {
-    getClient().getOrder(id).then(setOrder).catch((e) => setError(e instanceof Error ? e.message : "Failed"));
-  }
-  useEffect(load, [id]);
-
-  if (error) return <Text style={{ color: colors.danger, padding: spacing.md }}>{error}</Text>;
-  if (!order) return <ActivityIndicator style={{ marginTop: 48 }} />;
-
-  async function submitReview() {
-    setNotice(null);
-    try {
-      await getClient().createReview({
-        orderId: order!.id,
-        overall: Math.min(5, Math.max(1, Number(score))),
-        comment: review || undefined,
-        publishConsent: true,
-      });
-      setNotice("Review submitted. It appears after moderation.");
-    } catch (e) {
-      setNotice(e instanceof Error ? e.message : "Review failed. Only delivered orders accept one review each.");
-    }
-  }
-
-  async function captureDemo() {
-    if (typeof paymentId !== "string" || paymentId.length === 0) return;
-    setNotice(null);
-    setCapturing(true);
-    try {
-      const next = await getClient().captureDemoPayment(paymentId);
-      setOrder(next);
-      setNotice("DEMO capture recorded. The authoritative order status is shown above.");
-    } catch (e) {
-      setNotice(e instanceof Error ? e.message : "DEMO capture failed");
-    } finally {
-      setCapturing(false);
-    }
-  }
-
-  async function revealDemoCodes() {
-    setNotice(null);
-    setCodes(null);
-    try {
-      const latest = await getClient().getOrder(id);
-      setOrder(latest);
-      setCodes(await getClient().getDemoHandoverCodes(id));
-    } catch (e) {
-      setNotice(e instanceof Error ? e.message : "Demo handover codes unavailable");
-    }
-  }
-
-  async function cancel() {
-    setNotice(null);
-    try {
-      const next = await getClient().cancelOrder(order!.id, "Customer requested cancellation", order!.version);
-      setOrder(next);
-    } catch (e) {
-      setNotice(e instanceof Error ? e.message : "Cancel failed");
-    }
-  }
-
-  return (
-    <ScrollView style={{ padding: spacing.md }}>
-      <Text style={{ color: colors.ink, fontSize: 24, fontWeight: "700" }}>Order {order.id.slice(0, 8)}</Text>
-      <Text style={{ color: colors.ink, marginTop: 8 }}>Status: {order.status}</Text>
-      <Text style={{ color: colors.ink, marginTop: 4 }}>{paymentStatusLabel(order.paymentStatus)}</Text>
-      <Text style={{ color: colors.ink, marginTop: 4 }}>Total {formatINR(order.totalMinor)}</Text>
-      <Text style={{ color: colors.inkMuted, marginTop: 4 }}>
-        Pickup {order.pickupWindow.start} to {order.pickupWindow.end}
-      </Text>
-      <Text style={{ color: colors.inkMuted, marginTop: 4 }}>
-        Return {order.promisedReturnWindow.start} to {order.promisedReturnWindow.end}
-      </Text>
-      <Pressable onPress={load} accessibilityRole="button" style={{ marginTop: 12, minHeight: minTouchTarget, justifyContent: "center" }}>
-        <Text style={{ color: colors.action, fontWeight: "700" }}>Refresh order</Text>
-      </Pressable>
-      {order.paymentStatus === "CAPTURED" && !["CANCELLED", "DELIVERED"].includes(order.status) && (
-        <View>
-          <Pressable onPress={revealDemoCodes} accessibilityRole="button" style={{ minHeight: minTouchTarget, justifyContent: "center" }}>
-            <Text style={{ color: colors.action, fontWeight: "700" }}>Show handover codes (DEMO only)</Text>
-          </Pressable>
-          {codes && (
-            <View>
-              <Text style={{ color: colors.inkMuted }}>DEMO: share a code only at the matching physical handover. Live secure code delivery is not implemented.</Text>
-              {codes.pickupOtp && <Text style={{ color: colors.ink }}>Pickup code: {codes.pickupOtp}</Text>}
-              {codes.returnOtp ? <Text style={{ color: colors.ink }}>Return code: {codes.returnOtp}</Text> : <Text style={{ color: colors.inkMuted }}>Return code is withheld until ready for return.</Text>}
-            </View>
-          )}
-        </View>
-      )}
-      <Text style={{ marginTop: spacing.md, fontWeight: "700", color: colors.ink }}>Tracking</Text>
-      {trackingProgress(order.status, order.timeline).map((step) => (
-        <Text key={step.status} style={{ color: step.label === "Done" ? colors.success : colors.inkMuted }}>
-          {step.label}: {step.status}
-        </Text>
-      ))}
-      {(order.paymentStatus === "PENDING" || order.paymentStatus === "CREATED") &&
-        typeof paymentId === "string" &&
-        paymentId.length > 0 && (
-          <Pressable
-            onPress={captureDemo}
-            disabled={capturing}
-            style={{ backgroundColor: colors.action, borderRadius: 12, padding: 12, marginTop: spacing.md, minHeight: minTouchTarget, justifyContent: "center", opacity: capturing ? 0.6 : 1 }}
-          >
-            <Text style={{ color: "#fff", textAlign: "center", fontWeight: "700" }}>
-              {capturing ? "Capturing…" : "Simulate payment capture (DEMO)"}
-            </Text>
-          </Pressable>
-        )}
-      <Text style={{ marginTop: spacing.md, fontWeight: "700", color: colors.ink }}>Review (delivered orders, one per order)</Text>
-      {order.status === "DELIVERED" ? (
-        <View>
-          <TextInput value={score} onChangeText={setScore} keyboardType="numeric" style={{ borderColor: colors.border, borderWidth: 1, borderRadius: 8, padding: 8, marginTop: 8, width: 72 }} accessibilityLabel="Overall score 1 to 5" />
-          <TextInput value={review} onChangeText={setReview} placeholder="How was the service?" multiline style={{ borderColor: colors.border, borderWidth: 1, borderRadius: 8, padding: 8, marginTop: 8, minHeight: 72 }} />
-          <Pressable onPress={submitReview} style={{ backgroundColor: colors.action, borderRadius: 12, padding: 12, marginTop: 8, minHeight: minTouchTarget, justifyContent: "center" }}>
-            <Text style={{ color: "#fff", textAlign: "center", fontWeight: "700" }}>Submit review</Text>
-          </Pressable>
-        </View>
-      ) : (
-        <Text style={{ color: colors.inkMuted, marginTop: 8 }}>
-          Reviews open after delivery. Only delivered orders accept one review each.
-        </Text>
-      )}
-      {canOfferCancellation(order.status) && (
-        <Pressable onPress={cancel} accessibilityRole="button" style={{ marginTop: 12, minHeight: minTouchTarget, justifyContent: "center" }}>
-          <Text style={{ color: colors.danger, fontWeight: "700" }}>Cancel order (when allowed)</Text>
-        </Pressable>
-      )}
-      {notice && <Text style={{ marginTop: 12, color: colors.ink }}>{notice}</Text>}
-    </ScrollView>
-  );
+function OwnedDetail({ id }: { id: string }) {
+  const [data, setData] = useState<{ order: v2.Order; events: v2.OrderTimelineEvent[] } | null>(null);
+  const [error, setError] = useState<unknown>(null);
+  const [revision, setRevision] = useState(0);
+  useEffect(() => {
+    let active = true;
+    setData(null); setError(null);
+    Promise.all([apiV2.getOrder(id), apiV2.getOrderTimeline(id)]).then(([order, events]) => { if (active) setData({ order, events }); }).catch(cause => { if (active) setError(cause); });
+    return () => { active = false; };
+  }, [id, revision]);
+  if (error) return <NoteCard kind="error" title={describeError(error).title} body={describeError(error).body} actionLabel="Retry" onAction={() => setRevision(value => value + 1)} />;
+  if (!data) return <Loading label="Loading owned order" />;
+  const { order, events } = data;
+  return <>
+    <Card title={order.status.replaceAll("_", " ")}>
+      <Text style={{ color: colors.ink, marginTop: 8 }}>Order {order.id}</Text>
+      <Text style={{ color: colors.ink, marginTop: 8 }}>{formatINR(order.totalMinor)} · {order.paymentModel === "DUE_AT_RETURN" ? "Payment due at return" : "Prepaid order"}</Text>
+      <Text style={{ color: colors.inkMuted, marginTop: 8 }}>Scheduled pickup: {order.pickupWindow.start} — {order.pickupWindow.end}</Text>
+      <Text style={{ color: colors.inkMuted, marginTop: 8 }}>Promised return: {order.promisedReturnWindow.start} — {order.promisedReturnWindow.end}</Text>
+    </Card>
+    <Card title="Recorded history">
+      {events.length === 0 ? <Text style={{ color: colors.inkMuted }}>No timeline events have been recorded.</Text> : events.map((event, index) => <Text key={`${event.at}:${event.status}:${index}`} style={{ color: colors.ink, marginTop: 12 }}>{event.label}{"\n"}{event.at}{event.reason ? `\n${event.reason}` : ""}</Text>)}
+    </Card>
+    <NoteCard kind="note" title="Authoritative order record" body="A scheduled return is not a custody receipt or proof of payment. No rider location is simulated here. Adjustment decisions, rescheduling, cancellation, payment detail and reviews are not yet connected on this screen." actionLabel="Refresh" onAction={() => setRevision(value => value + 1)} />
+  </>;
 }

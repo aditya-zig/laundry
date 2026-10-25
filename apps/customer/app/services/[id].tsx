@@ -1,250 +1,323 @@
-import { useEffect, useState } from "react";
-import { ActivityIndicator, Pressable, ScrollView, Text, TextInput, View } from "react-native";
+import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
+import { Image, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import type { Service } from "@laundry/contracts";
-import { getClient } from "../../src/api";
-import { addLine } from "../../src/cart";
-import { getBasketLines, resetBasket } from "../../src/cart-store";
-import { colors, spacing, minTouchTarget, radius, typography, maxContentWidth } from "../../src/theme";
+import { Ionicons } from "@expo/vector-icons";
+import { v2 } from "@laundry/contracts";
+import { getV2Client } from "../../src/foundation/session";
+import {
+  kgLine,
+  pieceLine,
+  setKgCustodyCount,
+  setKgWeightGrams,
+  setPieceQuantity,
+  kgLineFor,
+  pieceCountFor,
+  type BagLine,
+} from "../../src/features/booking/lines";
+import {
+  rateHeadline,
+  rateMissingCopy,
+  unitHeadline,
+  describeError,
+} from "../../src/features/booking/presenters";
+import { bagStore } from "../../src/features/booking/basket-store";
+import { Loading, NoteCard } from "../../src/features/booking/ui";
+import { colors, minTouchTarget, radius, spacing } from "../../src/theme";
 
-export const getBasket = getBasketLines;
-export const setBasket = resetBasket;
+// Product service detail. Everything shown comes from the server service and
+// rate card. KG and quantity are kept separate for weight services: declared
+// item count is for custody, grams drive the price. Nothing is invented here.
+
+function gramsFromKg(raw: string): number {
+  const kg = Number.parseFloat(raw.replace(",", "."));
+  if (!Number.isFinite(kg) || kg <= 0) return 0;
+  return Math.round(kg * 1000);
+}
+
+function countFrom(raw: string): number {
+  const n = Number.parseInt(raw, 10);
+  return Number.isInteger(n) && n > 0 ? n : 0;
+}
 
 export default function ServiceDetail() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
-  const [service, setService] = useState<Service | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [qty, setQty] = useState<Record<string, string>>({});
-  const [notice, setNotice] = useState<string | null>(null);
+  const bag = bagStore();
+  const lines = useSyncExternalStore(bag.subscribe, bag.getLines, bag.getLines);
+  const [service, setService] = useState<v2.Service | null>(null);
+  const [rate, setRate] = useState<v2.EffectiveRateSummary | null | undefined>(undefined);
+  const [error, setError] = useState<unknown>(null);
+  const [loading, setLoading] = useState(true);
+  const [notice, setNotice] = useState<{ kind: "note" | "error"; text: string } | null>(null);
+  const [kgRaw, setKgRaw] = useState("");
+  const [custodyRaw, setCustodyRaw] = useState("");
+  const [pieceQty, setPieceQty] = useState<Record<string, number>>({});
 
-  useEffect(() => {
-    getClient()
-      .listServices()
-      .then((all) => {
-        const found = all.find((s) => s.id === id);
-        if (!found) setError("Service not found.");
-        else setService(found);
-      })
-      .catch((e) => setError(e instanceof Error ? e.message : "Could not load service"));
+  const load = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    setService(null);
+    setRate(undefined);
+    try {
+      const client = getV2Client();
+      const found = await client.getService(id);
+      setService(found);
+      try {
+        const summaries = await client.getEffectiveRates({ serviceCode: found.code });
+        setRate(summaries.find((summary) => summary.serviceCode === found.code) ?? null);
+      } catch {
+        // A service without an active rate card is bookable only when the
+        // operator publishes one; the bag still records intent.
+        setRate(null);
+      }
+    } catch (caught) {
+      setError(caught);
+    } finally {
+      setLoading(false);
+    }
   }, [id]);
 
-  if (error)
-    return (
-      <View style={{ padding: spacing.md, backgroundColor: colors.surfaceTint, minHeight: "100%" }}>
-        <View style={styles.errorCard}>
-          <Text style={styles.errorTitle}>Service unavailable</Text>
-          <Text style={{ color: colors.danger, marginTop: 4 }}>{error}</Text>
-        </View>
-      </View>
-    );
-  if (!service) return <ActivityIndicator style={{ marginTop: 48 }} color={colors.action} />;
+  useEffect(() => {
+    void load();
+  }, [load]);
 
-  function add(garmentTypeId: string) {
-    const n = Math.floor(Number(qty[garmentTypeId] ?? "1"));
+  function mutateBag(update: (lines: BagLine[]) => BagLine[]) {
     try {
-      setBasket(addLine(getBasket(), { serviceId: service!.id, garmentTypeId, quantity: n }));
-      setNotice(`${n} item(s) added to basket.`);
-    } catch (e) {
-      setNotice(e instanceof Error ? e.message : "Could not add to basket");
+      bag.setLines(update(lines));
+      setNotice(null);
+    } catch (caught) {
+      setNotice({ kind: "error", text: caught instanceof Error ? caught.message : "Could not update the bag" });
     }
   }
 
-  return (
-    <ScrollView style={{ backgroundColor: colors.surfaceTint }} contentContainerStyle={{ alignItems: "center" }}>
-      <View style={{ width: "100%", maxWidth: maxContentWidth, padding: spacing.md, paddingBottom: 48 }}>
-        <View style={styles.hero}>
-          <Text style={styles.eyebrow}>{service.priceUnit}</Text>
-          <Text style={styles.title}>{service.name}</Text>
-          <Text style={styles.subtitle}>{service.description}</Text>
-          <View style={styles.factRow}>
-            <View style={styles.factPill}>
-              <Text style={styles.factPillText}>Return in ~{service.turnaroundHours}h</Text>
-            </View>
-            <Text style={styles.factNote}>Final quote confirms the return window.</Text>
-          </View>
-        </View>
-        {service.garments.map((g) => (
-          <View key={g.id} style={styles.card}>
-            <View style={styles.cardTop}>
-              <Text style={styles.garmentName}>{g.name}</Text>
-              <View style={styles.pricePill}>
-                <Text style={styles.pricePillText}>INR {(g.priceMinor / 100).toFixed(2)}</Text>
-              </View>
-            </View>
-            <Text style={styles.perUnit}>per garment</Text>
-            <View style={{ flexDirection: "row", gap: 8, marginTop: 12, alignItems: "center" }}>
-              <TextInput
-                value={qty[g.id] ?? "1"}
-                onChangeText={(v) => setQty((q) => ({ ...q, [g.id]: v }))}
-                keyboardType="numeric"
-                style={styles.qtyInput}
-                accessibilityLabel={`Quantity for ${g.name}`}
-              />
-              <Pressable
-                onPress={() => add(g.id)}
-                style={({ pressed }) => [styles.addButton, pressed && { backgroundColor: colors.actionPressed }]}
-                accessibilityRole="button"
-                accessibilityLabel={`Add ${g.name} to basket`}
-              >
-                <Text style={{ color: "#fff", fontWeight: "700" }}>Add to basket</Text>
-              </Pressable>
-            </View>
-          </View>
-        ))}
-        {notice && (
-          <View style={styles.notice}>
-            <Text style={{ color: colors.ink, fontWeight: "600" }}>{notice}</Text>
-          </View>
-        )}
-        <Pressable
-          onPress={() => router.push("/basket")}
-          style={styles.reviewBasket}
-          accessibilityRole="button"
-          accessibilityLabel="Review basket"
-        >
-          <Text style={{ color: colors.action, fontWeight: "700", fontSize: typography.sizes.body }}>Review basket ({getBasket().length} lines)</Text>
-        </Pressable>
+  if (error !== null) {
+    return (
+      <View style={styles.screen}>
+        <ScrollView contentContainerStyle={styles.content}>
+          <NoteCard kind="error" title={describeError(error).title} body={describeError(error).body} actionLabel="Retry" onAction={() => void load()} />
+        </ScrollView>
       </View>
-    </ScrollView>
+    );
+  }
+  if (loading) {
+    return (
+      <View style={styles.screen}>
+        <Loading label="Loading service" />
+      </View>
+    );
+  }
+  if (!service) {
+    return (
+      <View style={styles.screen}>
+        <ScrollView contentContainerStyle={styles.content}>
+          <NoteCard kind="blocked" title="This service is not offered" body="It was removed from the catalog. Pick another service from the home screen." />
+        </ScrollView>
+      </View>
+    );
+  }
+
+  const headline = rate ? rateHeadline(rate) : null;
+  const activeGarments = service.garments.filter((g) => g.active);
+  const eligibleGarmentTypes = service.billingUnit === "KG" ? [] : activeGarments;
+
+  return (
+    <View style={styles.screen}>
+      <ScrollView contentContainerStyle={styles.content}>
+        {service.imageUrl ? (
+          <Image source={{ uri: service.imageUrl }} style={styles.image} accessibilityLabel={`${service.name} photograph`} />
+        ) : null}
+        <View style={styles.heroCard}>
+          <Text style={styles.title} accessibilityRole="header">
+            {service.name}
+          </Text>
+          <Text style={styles.unit}>{unitHeadline(service)}</Text>
+          {headline ? (
+            <>
+              <Text style={styles.rate}>{headline.title}</Text>
+              {headline.sub ? <Text style={styles.rateSub}>{headline.sub}</Text> : null}
+              {rate?.synthetic ? <Text style={styles.synthetic}>Indicative demo rate</Text> : null}
+            </>
+          ) : (
+            <Text style={styles.rate}>{rateMissingCopy()}</Text>
+          )}
+          <Text style={styles.description}>{service.description}</Text>
+          <Text style={styles.turnaround}>
+            Server turnaround target: {service.turnaroundHours} h. Your quote confirms the actual return window.
+          </Text>
+        </View>
+
+        {service.careExclusions.length > 0 ? (
+          <NoteCard kind="note" title="Not eligible for this service" body={service.careExclusions.join(", ")} />
+        ) : null}
+        {service.features.length > 0 ? (
+          <NoteCard kind="note" title="Included steps" body={service.features.join(" · ")} />
+        ) : null}
+
+        {service.billingUnit !== "PIECE" ? (
+          <View style={styles.kgCard}>
+            <Text style={styles.sectionTitle} accessibilityRole="header">
+              By weight
+            </Text>
+            <Text style={styles.kgHelp}>Enter the rough weight. The measured weight is confirmed at the facility, and the pickup team counts items separately.</Text>
+            <TextInput
+              value={kgRaw}
+              onChangeText={setKgRaw}
+              keyboardType="decimal-pad"
+              placeholder="Weight in kg, e.g. 4"
+              placeholderTextColor={colors.inkMuted}
+              style={styles.input}
+              accessibilityLabel={`Weight in kilograms for ${service.name}`}
+            />
+            <TextInput
+              value={custodyRaw}
+              onChangeText={setCustodyRaw}
+              keyboardType="number-pad"
+              placeholder="Approx item count (optional, for custody)"
+              placeholderTextColor={colors.inkMuted}
+              style={styles.input}
+              accessibilityLabel={`Approximate item count for ${service.name}`}
+            />
+            <Pressable
+              style={({ pressed }) => [styles.addButton, pressed && styles.pressedButton]}
+              onPress={() => {
+                const grams = gramsFromKg(kgRaw);
+                if (grams <= 0) {
+                  setNotice({ kind: "error", text: "Enter a weight in kilograms greater than 0." });
+                  return;
+                }
+                mutateBag((all) => {
+                  const custody = countFrom(custodyRaw);
+                  if (kgLineFor(all, service.id)) {
+                    const next = setKgWeightGrams(all, service.id, grams);
+                    return custody === 0 ? setKgCustodyCount(next, service.id, undefined) : setKgCustodyCount(next, service.id, custody);
+                  }
+                  return all.concat(kgLine(service.id, grams, custody === 0 ? undefined : custody));
+                });
+                setKgRaw("");
+                setCustodyRaw("");
+                setNotice({ kind: "note", text: "Added to your bag. Loading is confirmed at pickup." });
+              }}
+              accessibilityRole="button"
+              accessibilityLabel="Add weight to bag"
+            >
+              <Text style={styles.addText}>Add to bag</Text>
+            </Pressable>
+          </View>
+        ) : null}
+
+        {eligibleGarmentTypes.length > 0 ? (
+          <View style={styles.pieceCard}>
+            <Text style={styles.sectionTitle} accessibilityRole="header">
+              Per item
+            </Text>
+            {eligibleGarmentTypes.map((garment) => {
+              const count = pieceQty[garment.id] ?? 0;
+              const inBag = pieceCountFor(lines, service.id, garment.id);
+              return (
+                <View key={garment.id} style={styles.garmentRow}>
+                  <View style={styles.garmentCopy}>
+                    <Text style={styles.garmentName}>{garment.name}</Text>
+                  </View>
+                  <View style={styles.stepper}>
+                    <Pressable
+                      onPress={() => {
+                        const next = Math.max(0, count - 1);
+                        setPieceQty((q) => ({ ...q, [garment.id]: next }));
+                        if (inBag > 0) mutateBag((all) => setPieceQuantity(all, service.id, garment.id, Math.max(0, inBag - 1)));
+                      }}
+                      style={styles.step}
+                      accessibilityRole="button"
+                      accessibilityLabel={`Remove one ${garment.name}`}
+                    >
+                      <Ionicons name="remove" size={18} color={colors.action} />
+                    </Pressable>
+                    <Text style={styles.count} accessibilityLabel={`${count} ${garment.name}`}>
+                      {count}
+                    </Text>
+                    <Pressable
+                      onPress={() => {
+                        const next = count + 1;
+                        setPieceQty((q) => ({ ...q, [garment.id]: next }));
+                        mutateBag((all) =>
+                          inBag > 0
+                            ? setPieceQuantity(all, service.id, garment.id, inBag + 1)
+                            : all.concat(pieceLine(service.id, garment.id, 1)),
+                        );
+                      }}
+                      style={styles.step}
+                      accessibilityRole="button"
+                      accessibilityLabel={`Add one ${garment.name}`}
+                    >
+                      <Ionicons name="add" size={18} color={colors.action} />
+                    </Pressable>
+                  </View>
+                </View>
+              );
+            })}
+            <Text style={styles.kgHelp}>
+              The stepper keeps your bag and this screen in step; the exact count is confirmed at pickup.
+            </Text>
+          </View>
+        ) : null}
+
+        {notice ? <NoteCard kind={notice.kind} title={notice.text} /> : null}
+        <Pressable onPress={() => router.push("/basket")} style={styles.reviewBasket} accessibilityRole="button" accessibilityLabel="Review bag">
+          <Text style={styles.reviewText}>Review bag ({lines.length} line{lines.length === 1 ? "" : "s"})</Text>
+          <Ionicons name="arrow-forward" size={18} color={colors.action} />
+        </Pressable>
+      </ScrollView>
+    </View>
   );
 }
 
-const styles = {
-  hero: {
-    backgroundColor: colors.surface,
-    borderColor: colors.border,
-    borderWidth: 1,
-    borderRadius: radius.lg,
-    padding: spacing.md,
-  },
-  eyebrow: {
-    color: colors.action,
-    fontSize: 11,
-    fontWeight: "800" as const,
-    letterSpacing: 0.8,
-  },
-  title: {
+const styles = StyleSheet.create({
+  screen: { flex: 1, backgroundColor: colors.surfaceTint },
+  content: { padding: spacing.md, paddingBottom: 48, maxWidth: 560, width: "100%", alignSelf: "center" },
+  image: { width: "100%", height: 160, borderRadius: radius.md, backgroundColor: colors.surfaceCard, marginBottom: spacing.md },
+  heroCard: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, padding: spacing.md },
+  title: { color: colors.ink, fontSize: 26, fontWeight: "700" },
+  unit: { color: colors.inkMuted, fontSize: 14, marginTop: 4 },
+  rate: { color: colors.ink, fontSize: 17, fontWeight: "700", marginTop: 10 },
+  rateSub: { color: colors.inkMuted, fontSize: 12, marginTop: 2 },
+  synthetic: { color: colors.warning, fontSize: 12, fontWeight: "600", marginTop: 4 },
+  description: { color: colors.inkMuted, fontSize: 15, lineHeight: 22, marginTop: 8 },
+  turnaround: { color: colors.inkMuted, fontSize: 12, lineHeight: 18, marginTop: 8 },
+  sectionTitle: { color: colors.ink, fontSize: 18, fontWeight: "700" },
+  kgCard: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, padding: spacing.md, marginTop: spacing.md },
+  kgHelp: { color: colors.inkMuted, fontSize: 13, lineHeight: 19, marginTop: 6 },
+  input: {
     color: colors.ink,
-    fontSize: typography.sizes.display,
-    fontWeight: "800" as const,
-    marginTop: 4,
-  },
-  subtitle: {
-    color: colors.inkMuted,
-    marginTop: 4,
-    fontSize: typography.sizes.body,
-    lineHeight: 22,
-  },
-  factRow: {
-    flexDirection: "row" as const,
-    alignItems: "center" as const,
-    gap: 8,
-    marginTop: 12,
-  },
-  factPill: {
-    backgroundColor: colors.actionSoft,
-    borderRadius: radius.pill,
-    paddingVertical: 4,
-    paddingHorizontal: 10,
-  },
-  factPillText: {
-    color: colors.ink,
-    fontSize: typography.sizes.caption,
-    fontWeight: "700" as const,
-  },
-  factNote: {
-    color: colors.inkMuted,
-    fontSize: typography.sizes.caption,
-    flex: 1,
-    flexWrap: "wrap" as const,
-  },
-  card: {
-    marginTop: spacing.md,
-    backgroundColor: colors.surface,
-    borderColor: colors.border,
-    borderWidth: 1,
-    borderRadius: radius.md,
-    padding: spacing.md,
-  },
-  cardTop: {
-    flexDirection: "row" as const,
-    alignItems: "center" as const,
-    justifyContent: "space-between" as const,
-    gap: 8,
-  },
-  garmentName: {
-    color: colors.ink,
-    fontWeight: "700" as const,
-    fontSize: typography.sizes.body,
-    flex: 1,
-  },
-  pricePill: {
-    backgroundColor: colors.surfaceTint,
-    borderColor: colors.border,
-    borderWidth: 1,
-    borderRadius: radius.pill,
-    paddingVertical: 4,
-    paddingHorizontal: 10,
-  },
-  pricePillText: {
-    color: colors.ink,
-    fontWeight: "700" as const,
-    fontSize: typography.sizes.caption,
-  },
-  perUnit: {
-    color: colors.inkMuted,
-    fontSize: typography.sizes.caption,
-    marginTop: 2,
-  },
-  qtyInput: {
+    backgroundColor: colors.surfaceCard,
     borderColor: colors.border,
     borderWidth: 1,
     borderRadius: radius.sm,
-    padding: 8,
-    width: 72,
+    fontSize: 16,
+    paddingHorizontal: 12,
     minHeight: minTouchTarget,
-    color: colors.ink,
-    backgroundColor: colors.surface,
-    textAlign: "center" as const,
+    marginTop: 10,
   },
-  addButton: {
-    flex: 1,
-    backgroundColor: colors.action,
-    borderRadius: radius.md,
-    padding: 12,
-    minHeight: minTouchTarget,
-    justifyContent: "center" as const,
-    alignItems: "center" as const,
-  },
-  notice: {
-    marginTop: 12,
-    backgroundColor: colors.successSoft,
-    borderColor: colors.border,
-    borderWidth: 1,
-    borderRadius: radius.md,
-    padding: spacing.md,
-  },
-  errorCard: {
-    backgroundColor: colors.dangerSoft,
-    borderColor: colors.border,
-    borderWidth: 1,
-    borderRadius: radius.md,
-    padding: spacing.md,
-  },
-  errorTitle: {
-    color: colors.danger,
-    fontWeight: "700" as const,
-    fontSize: typography.sizes.body,
-  },
+  addButton: { backgroundColor: colors.action, minHeight: minTouchTarget, borderRadius: radius.sm, alignItems: "center", justifyContent: "center", marginTop: 12 },
+  pressedButton: { backgroundColor: colors.actionPressed },
+  addText: { color: colors.surface, fontSize: 15, fontWeight: "700" },
+  pieceCard: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, padding: spacing.md, marginTop: spacing.md },
+  garmentRow: { flexDirection: "row", alignItems: "center", marginTop: 12, borderBottomWidth: 1, borderBottomColor: colors.border, paddingBottom: 12 },
+  garmentCopy: { flex: 1, minWidth: 0 },
+  garmentName: { color: colors.ink, fontSize: 16, fontWeight: "600" },
+  stepper: { flexDirection: "row", alignItems: "center", borderRadius: radius.sm, borderWidth: 1, borderColor: colors.action },
+  step: { width: minTouchTarget, height: minTouchTarget, alignItems: "center", justifyContent: "center" },
+  count: { minWidth: 28, textAlign: "center", color: colors.ink, fontSize: 16, fontWeight: "600" },
   reviewBasket: {
-    marginTop: spacing.lg,
     minHeight: minTouchTarget,
-    justifyContent: "center" as const,
-    alignItems: "center" as const,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
     backgroundColor: colors.surface,
-    borderColor: colors.border,
     borderWidth: 1,
+    borderColor: colors.border,
     borderRadius: radius.pill,
+    marginTop: spacing.md,
+    padding: 12,
   },
-};
+  reviewText: { color: colors.action, fontSize: 15, fontWeight: "700" },
+});

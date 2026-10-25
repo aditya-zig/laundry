@@ -5,7 +5,13 @@ export function formatINR(amountMinor: number): string {
 }
 
 export function isQuoteExpired(expiresAt: string, now: string = new Date().toISOString()): boolean {
-  return Date.parse(expiresAt) <= Date.parse(now);
+  const expiry = Date.parse(expiresAt), current = Date.parse(now);
+  return !Number.isFinite(expiry) || !Number.isFinite(current) || expiry <= current;
+}
+
+/** Retained unknown commands may reconcile after quote expiry; fresh commands may not. */
+export function canConfirmBooking(expiresAt: string, outcomeUnknown: boolean, now: string = new Date().toISOString()): boolean {
+  return Number.isFinite(Date.parse(expiresAt)) && Number.isFinite(Date.parse(now)) && (outcomeUnknown || !isQuoteExpired(expiresAt, now));
 }
 
 export type PaymentLabel = "Payment received" | "Payment pending" | "Payment failed" | "No payment yet";

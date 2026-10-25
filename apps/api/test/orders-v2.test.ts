@@ -184,6 +184,22 @@ async function seed() {
 }
 
 describe('B04 quotes and booking', () => {
+  it('refuses new quotes and bookings with the deployment ordering gate closed, without losing cached booking recovery', async () => {
+    const { serviceId, addressId, customer } = await seed();
+    const closed = new OrdersService({ db: getPool(), authenticate: token => identity.authenticate(token), catalog, availability, clock, newOrdersEnabled: false });
+    const input = quoteInput(serviceId, addressId);
+    await expect(closed.createQuote(customer.accessToken, input, key())).rejects.toMatchObject({ code: 'PROVIDER_UNAVAILABLE' });
+    expect((await getPool().query('SELECT count(*)::int AS n FROM orders_v2_quotes')).rows[0].n).toBe(0);
+    const quoted = await orders.createQuote(customer.accessToken, input, key());
+    const booking = { quoteId: quoted.id, expectedVersion: quoted.version, paymentModel: 'DUE_AT_RETURN' as const };
+    await expect(closed.bookOrder(customer.accessToken, booking, key())).rejects.toMatchObject({ code: 'PROVIDER_UNAVAILABLE' });
+    expect((await getPool().query('SELECT count(*)::int AS n FROM orders_v2_orders')).rows[0].n).toBe(0);
+    const commandKey = key();
+    const booked = await orders.bookOrder(customer.accessToken, booking, commandKey);
+    expect(await closed.bookOrder(customer.accessToken, booking, commandKey)).toEqual(booked);
+    expect((await getPool().query('SELECT count(*)::int AS n FROM orders_v2_orders')).rows[0].n).toBe(1);
+    expect(await closed.getOrder(customer.accessToken, booked.id)).toEqual(booked);
+  });
   it('snapshots server prices and holds capacity for the quoted window', async () => {
     const { bucketId, serviceId, customer, addressId } = await seed();
     const quoted = await orders.createQuote(customer.accessToken, quoteInput(serviceId, addressId), key());

@@ -46,6 +46,30 @@ describe("F01-04 booking guard", () => {
     expect(calls[1]).toEqual(input);
   });
 
+  it.each([408, 429, 503])("does not invite a fresh booking after an unresolved HTTP %s", async status => {
+    const booker = createBooker(async () => { throw new V2ApiError(status, { code: "RATE_LIMITED", message: "retry", traceId: "t", retryable: false }, "retained"); });
+    expect(await booker.attempt(input)).toEqual({ phase: "unknown" });
+  });
+
+  it("freezes unknown intent across bag edits and permits an explicit original-intent retry", async () => {
+    const calls: v2.BookingInput[] = [];
+    const booker = createBooker(async value => { calls.push(value); throw new UnknownOutcomeError("lost", undefined, "retained"); });
+    const edited = { ...input };
+    await booker.attempt(edited);
+    edited.expectedVersion = 99;
+    expect(await booker.attempt(edited)).toEqual({ phase: "unknown" });
+    expect(calls).toHaveLength(1);
+    await booker.attempt();
+    expect(calls).toEqual([input, input]);
+  });
+
+  it("can reconcile a queued original intent after navigating back without a live quote", async () => {
+    const book = vi.fn(async () => order);
+    const booker = createBooker(book, input);
+    expect(await booker.attempt()).toEqual({ phase: "booked", order });
+    expect(book).toHaveBeenCalledWith(input);
+  });
+
   it("reports definitive server rejections as failed", async () => {
     const book = async () => {
       throw new V2ApiError(409, { code: "VERSION_CONFLICT", message: "quote changed", traceId: "t", retryable: true, currentVersion: 5 }, "key-2");
