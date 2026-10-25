@@ -1,5 +1,6 @@
 import { z } from "zod";
 import {
+  expectedVersionSchema,
   idSchema,
   instantSchema,
   ianaTimezoneSchema,
@@ -56,6 +57,7 @@ export type RateCard = z.infer<typeof rateCardSchema>;
 
 export const serviceSchema = z.object({
   id: idSchema,
+  version: expectedVersionSchema,
   code: serviceCodeSchema,
   name: z.string().min(1),
   description: z.string(),

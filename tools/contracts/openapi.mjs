@@ -44,6 +44,9 @@ export function buildOpenApi() {
       if (!operation.responses[status]) operation.responses[status] = { description: '', content: { 'application/json': { schema: ref('ErrorEnvelope') } } };
       operation.responses[status].description += `${code}. `;
     }
+    if (route.id === 'catalog.rates.effective') {
+      operation.parameters.push({ name: 'serviceCode', in: 'query', required: false, schema: { type: 'string', enum: v2.serviceCodeSchema.options }, description: 'Optionally restrict the response to one published service.' });
+    }
     if (route.id === 'availability.slots') {
       operation.parameters.push(
         { name: 'areaId', in: 'query', required: true, schema: { type: 'string', format: 'uuid' } },

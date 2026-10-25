@@ -13,7 +13,7 @@ const addressInput: v2.AddressInput = { label: "Synthetic home", line1: "Synthet
 const address: v2.Address = { ...addressInput, id: id(2), ownerId: actor.id, version: 1 };
 const garment: v2.GarmentEligibility = { id: id(3), name: "Synthetic shirt", eligibleServiceCodes: ["WASH_PRESS", "PRESS_ONLY", "DRY_CLEAN"], active: true };
 const services: v2.Service[] = v2.serviceCodeSchema.options.map((code, index) => ({
-  id: id(10 + index), code, name: `Synthetic ${code}`, description: V2_FIXTURE_LABEL,
+  id: id(10 + index), version: 1, code, name: `Synthetic ${code}`, description: V2_FIXTURE_LABEL,
   imageUrl: `https://example.invalid/catalog/${code}.jpg`, billingUnit: code === "WASH_FOLD" ? "KG" : "PIECE",
   turnaroundHours: 72, garments: [garment], features: [], careExclusions: ["Synthetic unsupported fabric"], active: true,
 }));
