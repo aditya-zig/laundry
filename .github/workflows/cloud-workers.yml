@@ -1,0 +1,63 @@
+name: Isolated cloud application workers
+on:
+  push:
+    branches: ['cloud/batch-*']
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: cloud-workers-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  candidate-review:
+    if: github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[launch-cloud-batch]')
+    runs-on: ubuntu-latest
+    timeout-minutes: 22
+    strategy:
+      fail-fast: false
+      max-parallel: 3
+      matrix:
+        task: [C01, B05, B06, B08, B09, B10, D01, F00, E02]
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: laundry
+          POSTGRES_PASSWORD: synthetic_cloud_only
+          POSTGRES_DB: laundry_verify_cloud
+        ports: ['5448:5432']
+        options: >-
+          --health-cmd "pg_isready -U laundry -d laundry_verify_cloud"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      DATABASE_URL: postgres://laundry:synthetic_cloud_only@localhost:5448/laundry_verify_cloud
+      DEMO_MODE: 'true'
+      CI: 'true'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.33.2
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24.22.0
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @laundry/contracts build && pnpm --filter @laundry/api-client build
+      - name: Install pinned agent runtime without project plugins or credentials
+        run: npm install --prefix "$RUNNER_TEMP/agent-runtime" --ignore-scripts --no-audit --no-fund opencode-ai@1.19.4
+      - name: Isolated free-model task with bounded lifetime and ownership-checked patch
+        run: node tools/agents/cloud-batch.mjs '${{ matrix.task }}' "$RUNNER_TEMP/agent-runtime/node_modules/opencode-linux-x64/bin/opencode"
+      - name: Retain actual process result, candidate patch and failures
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cloud-${{ matrix.task }}-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: .verification/cloud-batch/${{ matrix.task }}/
+          include-hidden-files: true
+          retention-days: 14
+          if-no-files-found: error
+# No production credentials, paid model fallback, deployment, repository write
+# permission, push or automatic integration. Patches are untrusted review inputs.
