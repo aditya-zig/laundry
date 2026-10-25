@@ -1,0 +1,475 @@
+/* F04 owned operations stylesheet. Retains the committed framed-sheet navy and
+ * teal direction: navy ink and header band, teal as the single data/action hue,
+ * light navy-tinted sheet frames, flat surfaces with 1px rules only. */
+
+.ops-frame {
+  --ops-ink: #0f1f3d;
+  --ops-muted: #4a5a78;
+  --ops-faint: #6b7a99;
+  --ops-teal: #0e7c7b;
+  --ops-teal-ink: #075e5d;
+  --ops-tint: #eef4ff;
+  --ops-border: #d7e0f0;
+  --ops-rule: #e8eef9;
+  --ops-good-bg: #dcfae5;
+  --ops-good-ink: #04250e;
+  --ops-bad-bg: #ffedea;
+  --ops-bad-ink: #831c1e;
+  --ops-warn-bg: #fffbeb;
+  --ops-warn-border: #fde68a;
+  --ops-warn-ink: #92400e;
+  --ops-shelf: #e4eaf5;
+
+  color: var(--ops-ink);
+  font: 14px/1.5 system-ui, sans-serif;
+  background: #f4f7fd;
+  border: 1px solid var(--ops-border);
+  border-radius: 12px;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 0 20px;
+}
+
+.ops-session {
+  box-sizing: border-box;
+  width: calc(100% - 32px);
+  max-width: 510px;
+  margin: clamp(16px, 4vh, 40px) auto;
+  padding: 28px 24px 24px;
+}
+
+.ops-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-weight: 700;
+  font-size: 15px;
+  margin-bottom: 16px;
+}
+
+.ops-header .ops-brand {
+  margin-bottom: 0;
+  color: #fff;
+}
+.ops-header .ops-brand-name {
+  display: block;
+  font-size: 15px;
+  line-height: 1.2;
+}
+.ops-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  background: var(--ops-ink);
+  border-radius: 12px 12px 0 0;
+  padding: 14px 24px;
+}
+
+.ops-header .ops-muted,
+.ops-header .ops-mini {
+  color: #c9d6ee;
+}
+
+.ops-mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  background: var(--ops-teal);
+  color: #fff;
+  font-weight: 800;
+}
+
+.ops-header .ops-mark {
+  background: #fff;
+  color: var(--ops-ink);
+}
+
+.ops-title {
+  font-size: 22px;
+  font-weight: 700;
+  margin: 4px 0 6px;
+}
+
+.ops-h2 {
+  font-size: 16px;
+  font-weight: 700;
+  margin: 0;
+}
+
+.ops-h3 {
+  font-size: 13px;
+  font-weight: 700;
+  margin: 18px 0 6px;
+}
+
+.ops-sub {
+  color: var(--ops-muted);
+  margin: 0 0 12px;
+}
+
+.ops-mini,
+.ops-mini-frame {
+  font-size: 12px;
+  color: var(--ops-muted);
+}
+
+.ops-muted {
+  color: var(--ops-muted);
+}
+
+.ops-form {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+.ops-label {
+  font-size: 13px;
+  font-weight: 600;
+  margin: 12px 0 4px;
+}
+
+.ops-input {
+  width: 100%;
+  max-width: 360px;
+  min-height: 44px;
+  border: 1px solid var(--ops-border);
+  border-radius: 8px;
+  padding: 9px 12px;
+  font: inherit;
+  color: var(--ops-ink);
+  background: #fff;
+  box-sizing: border-box;
+}
+
+.ops-input:focus-visible,
+.ops-primary:focus-visible,
+.ops-ghost:focus-visible,
+.ops-table button:focus-visible {
+  outline: 2px solid var(--ops-teal);
+  outline-offset: 2px;
+}
+
+.ops-primary {
+  margin-top: 14px;
+  border: 1px solid var(--ops-teal);
+  background: var(--ops-teal);
+  color: #fff;
+  border-radius: 8px;
+  min-height: 44px;
+  padding: 8px 16px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.ops-primary:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.ops-ghost {
+  border: 1px solid var(--ops-border);
+  background: #fff;
+  color: var(--ops-ink);
+  border-radius: 8px;
+  min-height: 32px;
+  padding: 4px 12px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.ops-ghost:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.ops-form-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.ops-notice {
+  margin: 12px 0;
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--ops-warn-border);
+  background: var(--ops-warn-bg);
+  color: var(--ops-warn-ink);
+  font-size: 13px;
+}
+
+.ops-notice-error {
+  background: var(--ops-bad-bg);
+  border-color: #f3c6c4;
+  color: var(--ops-bad-ink);
+}
+
+.ops-trace {
+  font-variant-numeric: tabular-nums;
+}
+
+.ops-sheets {
+  display: grid;
+  grid-template-columns: minmax(480px, 7fr) minmax(360px, 5fr);
+  gap: 16px;
+  padding: 20px 24px 0;
+}
+
+.ops-sheet {
+  border: 1px solid var(--ops-border);
+  border-radius: 12px;
+  background: #fff;
+  padding: 14px 16px 16px;
+  min-width: 0;
+}
+
+.ops-sheet-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  border-bottom: 1px solid var(--ops-rule);
+  padding-bottom: 8px;
+  margin-bottom: 10px;
+}
+
+.ops-freshness {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.ops-freshness .ops-mini {
+  font-variant-numeric: tabular-nums;
+}
+
+.ops-scroll {
+  overflow-x: auto;
+}
+
+.ops-table {
+  border-collapse: collapse;
+  width: 100%;
+  font-size: 13px;
+}
+
+.ops-table th {
+  text-align: left;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--ops-muted);
+  border-bottom: 1px solid var(--ops-rule);
+  padding: 6px 10px;
+  white-space: nowrap;
+}
+
+.ops-table td {
+  border-bottom: 1px solid var(--ops-rule);
+  padding: 9px 10px;
+  vertical-align: top;
+}
+
+.num,
+.ops-table td.num,
+.ops-table th.num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.ops-row-selected td:first-child {
+  box-shadow: inset 3px 0 0 var(--ops-teal);
+}
+
+.ops-pill {
+  display: inline-block;
+  font-size: 12px;
+  font-weight: 600;
+  border-radius: 999px;
+  padding: 2px 10px;
+  border: 1px solid var(--ops-border);
+  background: var(--ops-tint);
+  color: var(--ops-ink);
+  white-space: nowrap;
+}
+
+.ops-pill-warn {
+  background: var(--ops-warn-bg);
+  border-color: var(--ops-warn-border);
+  color: var(--ops-warn-ink);
+}
+
+.ops-pill-good {
+  background: var(--ops-good-bg);
+  color: var(--ops-good-ink);
+}
+
+.ops-pill-bad {
+  background: var(--ops-bad-bg);
+  color: var(--ops-bad-ink);
+}
+
+.ops-empty {
+  border: 1px dashed #c7d4ea;
+  border-radius: 8px;
+  padding: 16px;
+  color: var(--ops-muted);
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.ops-empty p {
+  margin: 0;
+}
+
+.ops-placeholder {
+  color: var(--ops-muted);
+  padding: 18px 4px;
+  margin: 0;
+}
+
+.ops-mini-frame {
+  border: 1px dashed #c7d4ea;
+  border-radius: 8px;
+  padding: 10px 12px;
+}
+
+.ops-skeleton {
+  height: 14px;
+  border-radius: 4px;
+  background: var(--ops-shelf);
+  margin: 12px 0;
+}
+
+.ops-loading {
+  padding: 6px 0 6px;
+}
+
+.ops-loading .ops-skeleton:last-child {
+  margin-bottom: 0;
+}
+
+.ops-sheet-foot {
+  border-top: 1px solid var(--ops-rule);
+  margin-top: 10px;
+  padding-top: 10px;
+}
+
+.ops-facts {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px 16px;
+  margin: 8px 0 0;
+}
+
+.ops-facts > div {
+  display: flex;
+  flex-direction: column;
+}
+
+.ops-facts dt {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--ops-muted);
+}
+
+.ops-facts dd {
+  margin: 1px 0 0;
+}
+
+.ops-list {
+  margin: 4px 0 0;
+  padding-left: 18px;
+}
+
+.ops-list li {
+  margin: 3px 0;
+}
+
+.ops-panel {
+  border: 1px solid var(--ops-border);
+  border-radius: 8px;
+  padding: 12px;
+  margin-top: 16px;
+  background: #fff;
+}
+
+.ops-panel .ops-notice {
+  margin-top: 10px;
+}
+
+.ops-blocked {
+  color: var(--ops-warn-ink);
+  background: var(--ops-warn-bg);
+  border: 1px solid var(--ops-warn-border);
+  border-radius: 8px;
+  padding: 8px 10px;
+  font-size: 13px;
+  margin: 10px 0 0;
+}
+
+.ops-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.ops-chip {
+  border: 1px solid var(--ops-border);
+  border-radius: 999px;
+  padding: 2px 10px;
+  font-size: 12px;
+  color: var(--ops-muted);
+}
+
+.ops-detail-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.ops-detail-head .ops-h2 {
+  font-size: 15px;
+}
+
+.ops-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.ops-header-actions .ops-ghost {
+  background: transparent;
+  border-color: #40507a;
+  color: #fff;
+}
+
+@media (max-width: 900px) {
+  .ops-sheets {
+    grid-template-columns: 1fr;
+  }
+  .ops-header {
+    flex-wrap: wrap;
+  }
+}
+
+@media (min-width: 1440px) {
+  .ops-frame {
+    margin-top: 24px;
+    margin-bottom: 24px;
+  }
+}

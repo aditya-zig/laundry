@@ -169,10 +169,20 @@ async function publish(event: v2.DomainEvent, dueAt: Date = now): Promise<void> 
 }
 
 function makeJobs(descriptors: JobHandlerDescriptor[] = [], overrides: Partial<JobsOptions> = {}): JobsService {
+  // These isolated dispatcher tests implement every other required consumer as
+  // a real transactional audit effect. They do not claim business-adapter or
+  // commercial acceptance. Tests that need a missing registry override it.
+  const peers: JobHandlerDescriptor[] = Object.entries(v2.EVENT_CONSUMERS).flatMap(([eventType, consumers]) =>
+    consumers.filter(consumer => !descriptors.some(d => d.consumer === consumer && d.eventType === eventType)).map(consumer => ({
+      consumer, eventType: v2.eventTypeSchema.parse(eventType), description: 'Dispatcher-test audit consumer',
+      handler: async ({ event, scope }) => { await scope.audit({ aggregateId: event.aggregateId,
+        action: 'TEST_CONSUMER_OBSERVED', reason: 'Isolated dispatcher test', before: null, after: { eventId: event.eventId } }); },
+    })),
+  );
   return new JobsService({
     db: getPool(),
     authenticate: token => identity.authenticate(token),
-    registry: new JobHandlerRegistry(descriptors),
+    registry: new JobHandlerRegistry([...descriptors, ...peers]),
     clock,
     jitter: () => 0.5,
     baseDelayMs: 1_000,
@@ -256,6 +266,32 @@ describe('B10 durable dispatch', () => {
     expect((await jobs.claim()).length).toBe(0);
   });
 
+  it('retains an event when required consumers have not been wired', async () => {
+    const event = mediaEvent();
+    await publish(event);
+    const jobs = makeJobs([], { registry: new JobHandlerRegistry([]) });
+    expect(await jobs.dispatchBatch()).toEqual({ claimed: 1, completed: 0, failed: 1, deadLettered: 0 });
+    expect((await getPool().query('SELECT dispatched_at,attempts FROM v2_outbox WHERE event_id=$1', [event.eventId])).rows[0]).toMatchObject({ dispatched_at: null, attempts: 1 });
+    expect(await count('SELECT count(*) AS n FROM v2_inbox WHERE event_id=$1', [event.eventId])).toBe(0);
+  });
+
+  it('fences a stale worker after an expired lease has been reclaimed', async () => {
+    const event = mediaEvent();
+    await publish(event);
+    const oldWorker = makeJobs([], { workerId: 'stale-worker' });
+    const [oldClaim] = await oldWorker.claim();
+    advance(31_000);
+    const current = makeJobs([], { workerId: 'current-worker' });
+    const [currentClaim] = await current.claim();
+    expect(currentClaim.version).toBeGreaterThan(oldClaim.version);
+    const before = (await getPool().query('SELECT * FROM job_runs WHERE event_id=$1', [event.eventId])).rows[0];
+    // Exercise the already-claimed work item delayed by a paused process.
+    await oldWorker['dispatchOne'](oldClaim);
+    expect((await getPool().query('SELECT * FROM job_runs WHERE event_id=$1', [event.eventId])).rows[0]).toEqual(before);
+    expect((await getPool().query('SELECT dispatched_at,attempts FROM v2_outbox WHERE event_id=$1', [event.eventId])).rows[0]).toMatchObject({ dispatched_at: null, attempts: 0 });
+    expect(await count('SELECT count(*) AS n FROM v2_inbox WHERE event_id=$1', [event.eventId])).toBe(0);
+  });
+
   it('applies a duplicate delivery once through the inbox', async () => {
     const applied: string[] = [];
     const jobs = makeJobs([{
@@ -277,6 +313,35 @@ describe('B10 durable dispatch', () => {
     expect(replay).toEqual({ claimed: 1, completed: 1, failed: 0, deadLettered: 0 });
     expect(applied).toEqual([event.eventId]);
     expect(await count('SELECT COUNT(*) AS n FROM v2_inbox WHERE consumer=$1', ['media'])).toBe(1);
+  });
+
+  it('keeps an in-flight transactional effect locked after lease time and dedupes its recovery', async () => {
+    let start!: () => void, release!: () => void;
+    const started = new Promise<void>(resolve => { start = resolve; });
+    const gate = new Promise<void>(resolve => { release = resolve; });
+    let calls = 0;
+    const descriptor: JobHandlerDescriptor = { consumer: 'media', eventType: 'media.uploaded.v2', description: 'Delayed transactional audit',
+      handler: async ({ event, scope }) => {
+        calls++;
+        await scope.audit({ aggregateId: event.aggregateId, action: 'TEST_DELAYED_EFFECT', reason: 'Lease race regression', before: null, after: { applied: true } });
+        start();
+        await gate;
+      } };
+    const event = mediaEvent();
+    await publish(event);
+    const oldWorker = makeJobs([descriptor], { workerId: 'slow-worker' });
+    const dispatch = oldWorker.dispatchBatch();
+    await started;
+    try {
+      advance(31_000);
+      const next = makeJobs([descriptor], { workerId: 'recovery-worker' });
+      expect(await next.claim()).toHaveLength(0);
+      release();
+      expect((await dispatch).completed).toBe(0);
+      expect((await next.dispatchBatch()).completed).toBe(1);
+      expect(calls).toBe(1);
+      expect(await count("SELECT count(*) AS n FROM v2_audit WHERE action='TEST_DELAYED_EFFECT'")).toBe(1);
+    } finally { release(); await dispatch; }
   });
 
   it('reclaims an expired lease without concurrent duplicate execution', async () => {

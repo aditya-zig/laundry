@@ -1,288 +1,150 @@
 import React, { useEffect, useState } from "react";
+import { ScrollView, StyleSheet, Text, View, Pressable } from "react-native";
+import { useFocusEffect, useRouter } from "expo-router";
+import type { v2 } from "@laundry/contracts";
+import { getFoundation } from "../src/foundation/session";
 import {
-  ActivityIndicator,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
-} from "react-native";
-import { useRouter } from "expo-router";
-import type { DeliveryJob } from "@laundry/contracts";
-import { getClient, setCachedJobs } from "../src/api";
+  historyJobs,
+  nextActionLabel,
+  purgePrivateJobsState,
+  type PrivateJobsState,
+} from "../src/features/jobs/access";
+import { createPartnerApi } from "../src/features/session/partner-api";
+import { usePartnerSession } from "../src/features/session/use-partner-session";
+import {
+  Badge,
+  Card,
+  EmptyState,
+  LoadingState,
+  NoticeBox,
+  windowLabel,
+} from "../src/features/ui";
 import {
   colors,
   maxContentWidth,
-  minTouchTarget,
-  radius,
   spacing,
-  typography,
 } from "../src/theme";
 
-export default function HistoryScreen() {
-  const router = useRouter();
-  const [completedJobs, setCompletedJobs] = useState<DeliveryJob[]>([]);
+function HistoryList() {
+  const session = usePartnerSession();
+  const api = createPartnerApi({ foundation: getFoundation() });
+  const actorId = session.state === "AUTHENTICATED" ? session.actor.id : null;
+  const [stateObj, setStateObj] = useState<PrivateJobsState>(() => purgePrivateJobsState());
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    loadCompletedJobs();
-  }, []);
+    if (session.state !== "AUTHENTICATED") {
+      setStateObj(purgePrivateJobsState());
+      setError(null);
+    }
+  }, [session.state]);
 
-  async function loadCompletedJobs() {
+  async function load() {
+    const atLoad = api.actor()?.id ?? null;
+    if (!atLoad) return;
     setLoading(true);
     setError(null);
     try {
-      const client = getClient();
-      const list = await client.listPartnerJobs();
-      setCachedJobs(list);
-      setCompletedJobs(list.filter((j) => j.status === "COMPLETED"));
-    } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : "Failed to load history";
-      setError(message);
+      const jobs = await api.listAssignedJobs();
+      if (api.actor()?.id !== atLoad) return;
+      setStateObj(s => ({ ...s, jobs }));
+    } catch (err) {
+      if (api.actor()?.id !== atLoad) return;
+      setError(err instanceof Error ? err.message : "Could not load completed tasks.");
     } finally {
-      setLoading(false);
+      if (api.actor()?.id === atLoad) setLoading(false);
     }
   }
 
+  useEffect(() => {
+    void load();
+  }, [actorId]);
+
+  useFocusEffect(
+    React.useCallback(() => {
+      if (actorId) void load();
+    }, [actorId]),
+  );
+
+  const closed = historyJobs(stateObj.jobs, actorId);
+
+  return (
+    <View>
+      {session.state === "RESTORE_FAILED" ? (
+        <NoticeBox title="History locked" body={`${session.message} Sign in again to view your completed tasks.`} tone="warning" />
+      ) : null}
+      {loading && closed.length === 0 ? <LoadingState label="Loading completed tasks…" /> : null}
+      {error ? (
+        <Card tone="danger">
+          <Text style={styles.bodyMuted}>{error}</Text>
+        </Card>
+      ) : null}
+      {!loading && !error && closed.length === 0 ? (
+        <EmptyState
+          title="No completed tasks yet"
+          body="Tasks move here after they complete, fail or are cancelled. Only tasks assigned to you appear."
+        />
+      ) : null}
+      {closed.map(job => (
+        <Card key={job.id}>
+          <View style={styles.row}>
+            <Badge label={job.leg} tone={job.leg === "PICKUP" ? "action" : "neutral"} />
+            <Badge
+              label={job.status}
+              tone={job.status === "COMPLETED" ? "success" : job.status === "FAILED" ? "danger" : "warning"}
+            />
+            <Badge label={`v${job.version}`} />
+          </View>
+          <Text style={styles.jobTitle}>{job.customerName}</Text>
+          <Text style={styles.bodyMuted}>
+            {job.addressLine1}, {job.addressCity}
+          </Text>
+          <Text style={styles.window}>
+            {windowLabel(job.window.start, job.window.end)} ({job.window.timezone})
+          </Text>
+          <Text style={styles.window}>
+            Order {job.orderId.slice(0, 8)} • next: {nextActionLabel(job)}
+          </Text>
+        </Card>
+      ))}
+    </View>
+  );
+}
+
+export default function HistoryScreen() {
+  const session = usePartnerSession();
   return (
     <ScrollView
       style={styles.screen}
       contentContainerStyle={styles.container}
-      keyboardShouldPersistTaps="handled"
     >
       <View style={styles.centerWrapper}>
-        <View style={styles.header}>
-          <Text style={styles.title}>Completed Tasks History</Text>
-          <Text style={styles.bodyMuted}>
-            Archive of successfully fulfilled laundry pickup and return deliveries.
-          </Text>
-        </View>
-
-        {loading ? (
-          <View style={styles.cardCenter}>
-            <ActivityIndicator size="large" color={colors.action} />
-            <Text style={[styles.bodyMuted, { marginTop: spacing.sm }]}>
-              Loading history...
-            </Text>
-          </View>
-        ) : null}
-
-        {error ? (
-          <View style={styles.card}>
-            <Text style={styles.errorTitle}>Unable to load task history</Text>
-            <Text style={styles.bodyMuted}>{error}</Text>
-            <Pressable
-              onPress={loadCompletedJobs}
-              style={styles.retryButton}
-              accessibilityRole="button"
-            >
-              <Text style={styles.retryButtonText}>Retry</Text>
-            </Pressable>
-          </View>
-        ) : null}
-
-        {!loading && !error && completedJobs.length === 0 ? (
-          <View style={styles.cardCenter}>
-            <Text style={styles.emptyTitle}>No completed tasks yet</Text>
-            <Text style={[styles.bodyMuted, { textAlign: "center", marginTop: 4 }]}>
-              Tasks completed with customer OTP verification will appear here.
-            </Text>
-            <Pressable
-              onPress={() => router.replace("/")}
-              style={[styles.primaryButton, { marginTop: spacing.md }]}
-              accessibilityRole="button"
-            >
-              <Text style={styles.primaryButtonText}>View Active Tasks</Text>
-            </Pressable>
-          </View>
-        ) : null}
-
-        {!loading && !error && completedJobs.map((job) => (
-          <View key={job.id} style={{ marginBottom: spacing.sm }}>
-            <Pressable
-              onPress={() => router.push(`/jobs/${job.id}`)}
-              style={({ pressed }: { pressed: boolean }) => [
-                styles.jobCard,
-                pressed && styles.jobCardPressed,
-              ]}
-              accessibilityRole="button"
-            >
-              <View style={styles.cardTop}>
-                <View
-                  style={[
-                    styles.badge,
-                    job.leg === "PICKUP" ? styles.badgeTeal : styles.badgeNavy,
-                  ]}
-                >
-                  <Text style={styles.badgeText}>{job.leg}</Text>
-                </View>
-                <View style={styles.completedPill}>
-                  <Text style={styles.completedPillText}>✓ COMPLETED</Text>
-                </View>
-              </View>
-
-              <Text style={styles.customerName}>{job.customerName}</Text>
-              <Text style={styles.addressText} numberOfLines={2}>
-                {job.address}
-              </Text>
-
-              <View style={styles.metaRow}>
-                <Text style={styles.metaText}>Bags delivered: {job.bagIds.length}</Text>
-                <Text style={styles.metaText}>Order: {job.orderId.slice(0, 8)}...</Text>
-              </View>
-            </Pressable>
-          </View>
-        ))}
+        <Text style={styles.heading}>Completed tasks</Text>
+        {session.state === "AUTHENTICATED" ? (
+          <HistoryList key={session.identityEpoch} />
+        ) : session.state === "LOADING" ? (
+          <LoadingState label="Checking sign-in…" />
+        ) : session.state === "CONFIG_ERROR" ? (
+          <NoticeBox title="App configuration required" body={session.message} tone="danger" />
+        ) : (
+          <EmptyState
+            title="Sign in required"
+            body="Completed tasks are private to each rider. Sign in from the task list to view yours."
+          />
+        )}
       </View>
     </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  screen: {
-    flex: 1,
-    backgroundColor: colors.surfaceTint,
-  },
-  container: {
-    padding: spacing.md,
-    alignItems: "center",
-  },
-  centerWrapper: {
-    width: "100%",
-    maxWidth: maxContentWidth,
-  },
-  header: {
-    marginBottom: spacing.md,
-  },
-  title: {
-    color: colors.ink,
-    fontSize: typography.sizes.title,
-    fontWeight: "700",
-    marginBottom: 2,
-  },
-  bodyMuted: {
-    color: colors.inkMuted,
-    fontSize: typography.sizes.body,
-    lineHeight: 22,
-  },
-  card: {
-    backgroundColor: colors.surface,
-    borderRadius: radius.md,
-    padding: spacing.md,
-    borderWidth: 1,
-    borderColor: colors.border,
-    marginBottom: spacing.md,
-  },
-  cardCenter: {
-    backgroundColor: colors.surface,
-    borderRadius: radius.md,
-    padding: spacing.lg,
-    borderWidth: 1,
-    borderColor: colors.border,
-    alignItems: "center",
-    justifyContent: "center",
-    marginBottom: spacing.md,
-  },
-  emptyTitle: {
-    color: colors.ink,
-    fontSize: typography.sizes.body,
-    fontWeight: "700",
-  },
-  errorTitle: {
-    color: colors.danger,
-    fontSize: typography.sizes.body,
-    fontWeight: "700",
-    marginBottom: spacing.xs,
-  },
-  jobCard: {
-    backgroundColor: colors.surface,
-    borderRadius: radius.md,
-    padding: spacing.md,
-    borderWidth: 1,
-    borderColor: colors.border,
-    marginBottom: spacing.sm,
-  },
-  jobCardPressed: {
-    backgroundColor: "#F1F5F9",
-  },
-  cardTop: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: spacing.xs,
-  },
-  badge: {
-    paddingVertical: 2,
-    paddingHorizontal: spacing.sm,
-    borderRadius: radius.sm,
-  },
-  badgeTeal: {
-    backgroundColor: "#CCFBF1",
-  },
-  badgeNavy: {
-    backgroundColor: "#DBEAFE",
-  },
-  badgeText: {
-    fontSize: typography.sizes.caption,
-    fontWeight: "700",
-    color: colors.ink,
-  },
-  completedPill: {
-    backgroundColor: "#DCFCE7",
-    paddingVertical: 2,
-    paddingHorizontal: spacing.xs,
-    borderRadius: radius.sm,
-  },
-  completedPillText: {
-    fontSize: typography.sizes.caption,
-    color: colors.success,
-    fontWeight: "700",
-  },
-  customerName: {
-    color: colors.ink,
-    fontSize: typography.sizes.body,
-    fontWeight: "700",
-    marginTop: 2,
-  },
-  addressText: {
-    color: colors.inkMuted,
-    fontSize: typography.sizes.caption,
-    marginTop: 2,
-  },
-  metaRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    marginTop: spacing.sm,
-  },
-  metaText: {
-    color: colors.inkMuted,
-    fontSize: typography.sizes.caption,
-  },
-  primaryButton: {
-    minHeight: minTouchTarget,
-    backgroundColor: colors.action,
-    borderRadius: radius.sm,
-    justifyContent: "center",
-    alignItems: "center",
-    paddingHorizontal: spacing.md,
-  },
-  primaryButtonText: {
-    color: colors.surface,
-    fontSize: typography.sizes.body,
-    fontWeight: "700",
-  },
-  retryButton: {
-    minHeight: minTouchTarget,
-    backgroundColor: colors.action,
-    borderRadius: radius.sm,
-    justifyContent: "center",
-    alignItems: "center",
-    marginTop: spacing.sm,
-  },
-  retryButtonText: {
-    color: colors.surface,
-    fontSize: typography.sizes.body,
-    fontWeight: "600",
-  },
+  screen: { flex: 1, backgroundColor: colors.surfaceTint },
+  container: { padding: spacing.md, alignItems: "center" },
+  centerWrapper: { width: "100%", maxWidth: maxContentWidth },
+  heading: { color: colors.ink, fontWeight: "700", fontSize: 18, marginBottom: spacing.sm },
+  bodyMuted: { color: colors.inkMuted, fontSize: 14, lineHeight: 20 },
+  row: { flexDirection: "row", gap: spacing.sm, flexWrap: "wrap", marginBottom: spacing.xs },
+  jobTitle: { color: colors.ink, fontWeight: "700" },
+  window: { color: colors.inkMuted, fontSize: 12, marginTop: 2 },
 });

@@ -8,7 +8,7 @@ const apiPackage = JSON.parse(readFileSync('apps/api/package.json', 'utf8')).nam
 const env = {
   ...process.env,
   DEMO_MODE: 'true', NODE_ENV: 'test', PORT: '4100', API_ORIGIN: 'http://localhost:4100',
-  EXPO_PUBLIC_API_URL: 'http://localhost:4100/v1', VITE_API_URL: 'http://localhost:4100/v1',
+  EXPO_PUBLIC_API_URL: 'http://localhost:4100/v1', VITE_API_URL: 'http://localhost:4100/v1', VITE_DEMO_MODE: 'true',
 };
 
 export default defineConfig({

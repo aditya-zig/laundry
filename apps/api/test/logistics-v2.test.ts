@@ -2,10 +2,13 @@ import 'reflect-metadata';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { NestFactory } from '@nestjs/core';
 import type { NestExpressApplication } from '@nestjs/platform-express';
-import { randomBytes, randomUUID } from 'node:crypto';
+import { createHmac, randomBytes, randomUUID } from 'node:crypto';
+import { ReviewsService } from '../../../modules/reviews/src';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { v2 } from '@laundry/contracts';
+import { BillingService, createObligationForOrder } from '../../../modules/billing/src';
+import { completeReturnWhenSettled } from '../../../modules/orders/src/completion';
 import { LogisticsV2Module } from '../src/features/logistics-v2/logistics.module';
 import { configureHttpBody } from '../src/http-body';
 import { EnvelopeFilter } from '../src/filters/http-exception.filter';
@@ -186,6 +189,138 @@ async function assignedPickup() {
   }, key());
   return { ...who, orderId, attempt, assignment };
 }
+
+describe('composed custody and final settlement', () => {
+  async function preparedReturn() {
+    const who = await actors();
+    logistics = new LogisticsService({ db: getPool(), authenticate: token => identity.authenticate(token), clock,
+      custodyCodeSecret: 'b06-test-custody-code-secret', custodyNotifier: notifier,
+      onReturnAccepted: (orderId, tx, context) => completeReturnWhenSettled(tx, orderId, context),
+    });
+    const billing = new BillingService({ db: getPool(), authenticate: token => identity.authenticate(token), clock,
+      onSettled: (orderId, tx, context) => completeReturnWhenSettled(tx, orderId, context),
+    });
+    const orderId = await seedOrder({ customerId: who.customer.actor.id, status: 'READY_FOR_RETURN', measured: true, qualityPassed: true });
+    const obligation = await createObligationForOrder(getPool(), { orderId, clock });
+    const attempt = await logistics.openLegAttempt(orderId, 'RETURN', { scheduledWindow: returnWindow });
+    await logistics.assign(who.operator.accessToken, { legAttemptId: attempt.id, riderId: who.riderOne.id,
+      expectedVersion: attempt.version, reason: 'Composed return test' }, key());
+    const job = await logistics.getRiderJob(who.riderOne.token, attempt.id);
+    const body = await handoverInput(job, notifier.latest()!.code);
+    const settleInput: v2.ManualPaymentConfirmation = { method: 'CASH', currency: 'INR', amountMinor: 6000, expectedVersion: obligation.version, reason: 'Cash received at return' };
+    return { ...who, billing, orderId, obligation, attempt, job, body, settleInput };
+  }
+  async function status(orderId: string) { return (await getPool().query('SELECT status FROM orders_v2_orders WHERE id=$1', [orderId])).rows[0].status; }
+
+  it.each(['custody-first', 'payment-first'] as const)('delivers once when both facts arrive: %s', async order => {
+    const p = await preparedReturn();
+    const custodyKey = key(), receiptKey = key();
+    const custody = () => logistics.recordHandover(p.riderOne.token, p.body, custodyKey);
+    const settle = () => p.billing.confirmManual(p.operator.accessToken, p.obligation.id, p.settleInput, receiptKey);
+    if (order === 'custody-first') { await custody(); expect(await status(p.orderId)).toBe('RETURNING'); await settle(); }
+    else { await settle(); expect(await status(p.orderId)).toBe('READY_FOR_RETURN'); await custody(); }
+    expect(await status(p.orderId)).toBe('DELIVERED');
+    await Promise.all([custody(), settle()]);
+    expect((await getPool().query("SELECT count(*)::int n FROM orders_v2_timeline WHERE order_id=$1 AND status='DELIVERED'", [p.orderId])).rows[0].n).toBe(1);
+    const events = (await getPool().query("SELECT envelope FROM v2_outbox WHERE aggregate_id=$1 AND event_type='order.delivered.v2'", [p.orderId])).rows;
+    expect(events).toHaveLength(1);
+    expect(v2.domainEventSchema.parse(events[0].envelope).eventType).toBe('order.delivered.v2');
+  });
+
+  it('does not mistake a partial receipt for final settlement', async () => {
+    const p = await preparedReturn();
+    await logistics.recordHandover(p.riderOne.token, p.body, key());
+    await p.billing.confirmManual(p.operator.accessToken, p.obligation.id, { ...p.settleInput, amountMinor: 1000 }, key());
+    expect(await status(p.orderId)).toBe('RETURNING');
+    const current = (await getPool().query('SELECT version FROM billing_obligations WHERE id=$1', [p.obligation.id])).rows[0];
+    await p.billing.confirmManual(p.operator.accessToken, p.obligation.id, { ...p.settleInput, amountMinor: 5000, expectedVersion: current.version }, key());
+    expect(await status(p.orderId)).toBe('DELIVERED');
+  });
+
+  it('serializes simultaneous custody and settlement without duplicate delivery', async () => {
+    const p = await preparedReturn();
+    await Promise.all([logistics.recordHandover(p.riderOne.token, p.body, key()),
+      p.billing.confirmManual(p.operator.accessToken, p.obligation.id, p.settleInput, key())]);
+    expect(await status(p.orderId)).toBe('DELIVERED');
+    expect((await getPool().query("SELECT count(*)::int n FROM v2_outbox WHERE aggregate_id=$1 AND event_type='order.delivered.v2'", [p.orderId])).rows[0].n).toBe(1);
+  });
+
+  it('holds delivery while an unknown gateway attempt could still capture, then recovers after reconciliation', async () => {
+    const p = await preparedReturn();
+    const attempt = await p.billing.recordAttempt({ obligationId: p.obligation.id, method: 'GATEWAY', amountMinor: 6000 });
+    await p.billing.resolveAttempt(attempt.id, 'OUTCOME_UNKNOWN');
+    await logistics.recordHandover(p.riderOne.token, p.body, key());
+    await p.billing.confirmManual(p.operator.accessToken, p.obligation.id, p.settleInput, key());
+    expect(await status(p.orderId)).toBe('RETURNING');
+    await p.billing.resolveAttempt(attempt.id, 'FAILED', { failureReason: 'Authoritative test adapter reconciliation' });
+    expect(await status(p.orderId)).toBe('DELIVERED');
+  });
+
+  it('requires an actual audited zero-due resolution, never a fabricated receipt', async () => {
+    const p = await preparedReturn();
+    // Synthetic zero-price fixture only; not an approved commercial rate.
+    await getPool().query('UPDATE orders_v2_orders SET total_minor=0 WHERE id=$1', [p.orderId]);
+    await getPool().query('UPDATE billing_obligations SET amount_due_minor=0 WHERE id=$1', [p.obligation.id]);
+    await logistics.recordHandover(p.riderOne.token, p.body, key());
+    expect(await status(p.orderId)).toBe('RETURNING');
+    await p.billing.voidZeroDue({ obligationId: p.obligation.id, actor: p.operator.actor,
+      resolution: { auditId: key(), reason: 'Audited synthetic zero-due resolution' } });
+    expect(await status(p.orderId)).toBe('DELIVERED');
+    expect((await getPool().query('SELECT count(*)::int n FROM billing_receipts WHERE order_id=$1', [p.orderId])).rows[0].n).toBe(0);
+  });
+
+  it('rolls back receipt, settlement and events if the composed delivery step fails', async () => {
+    const p = await preparedReturn();
+    await logistics.recordHandover(p.riderOne.token, p.body, key());
+    const broken = new BillingService({ db: getPool(), authenticate: token => identity.authenticate(token), clock,
+      onSettled: async () => { throw new Error('Synthetic completion failure'); } });
+    const receiptKey = key();
+    await expect(broken.confirmManual(p.operator.accessToken, p.obligation.id, p.settleInput, receiptKey)).rejects.toThrow('Synthetic completion failure');
+    expect((await getPool().query('SELECT count(*)::int n FROM billing_receipts WHERE order_id=$1', [p.orderId])).rows[0].n).toBe(0);
+    expect((await getPool().query("SELECT count(*)::int n FROM v2_outbox WHERE event_type='payment.settled.v2'")).rows[0].n).toBe(0);
+    expect(await status(p.orderId)).toBe('RETURNING');
+    await p.billing.confirmManual(p.operator.accessToken, p.obligation.id, p.settleInput, receiptKey);
+    expect(await status(p.orderId)).toBe('DELIVERED');
+  });
+
+  it('unlocks an owned post-delivery review only after real custody and final settlement', async () => {
+    const p = await preparedReturn();
+    const reviews = new ReviewsService({ db: getPool(), authenticate: token => identity.authenticate(token), clock });
+    expect((await reviews.eligibility(p.customer.accessToken, p.orderId)).eligible).toBe(false);
+    await logistics.recordHandover(p.riderOne.token, p.body, key());
+    expect((await reviews.eligibility(p.customer.accessToken, p.orderId)).eligible).toBe(false);
+    await p.billing.confirmManual(p.operator.accessToken, p.obligation.id, p.settleInput, key());
+    expect((await reviews.eligibility(p.customer.accessToken, p.orderId)).eligible).toBe(true);
+    const version = (await getPool().query('SELECT version FROM orders_v2_orders WHERE id=$1', [p.orderId])).rows[0].version;
+    const review = await reviews.create(p.customer.accessToken, p.orderId, { orderId: p.orderId, expectedVersion: version,
+      overall: 5, mediaIds: [], publishConsent: false }, key());
+    expect(review).toMatchObject({ orderId: p.orderId, publication: 'PENDING', publishConsent: false });
+  });
+
+  it('completes from a signed capture and ignores webhook replay', async () => {
+    const p = await preparedReturn();
+    const secret = 'synthetic-capture-signing-key-for-test';
+    const billing = new BillingService({ db: getPool(), authenticate: token => identity.authenticate(token), clock,
+      webhookSecrets: { synthetic: secret }, onSettled: (id, tx, context) => completeReturnWhenSettled(tx, id, context) });
+    const attempt = await billing.recordAttempt({ obligationId: p.obligation.id, method: 'GATEWAY', amountMinor: 6000 });
+    await logistics.recordHandover(p.riderOne.token, p.body, key());
+    const raw = Buffer.from(JSON.stringify({ eventId: key(), paymentId: attempt.id, providerReference: 'synthetic-capture',
+      outcome: 'SUCCEEDED', amountMinor: 6000, currency: 'INR', occurredAt: now.toISOString() }));
+    const signature = createHmac('sha256', secret).update(raw).digest('hex');
+    expect(await billing.processWebhook('synthetic', raw, signature)).toMatchObject({ accepted: true, duplicate: false });
+    expect(await status(p.orderId)).toBe('DELIVERED');
+    expect(await billing.processWebhook('synthetic', raw, signature)).toMatchObject({ accepted: true, duplicate: true });
+    expect((await getPool().query("SELECT count(*)::int n FROM v2_outbox WHERE event_type='payment.settled.v2'")).rows[0].n).toBe(1);
+  });
+
+  it('does not deliver for a rejected custody code even when paid', async () => {
+    const p = await preparedReturn();
+    await p.billing.confirmManual(p.operator.accessToken, p.obligation.id, p.settleInput, key());
+    await expect(logistics.recordHandover(p.riderOne.token, { ...p.body, code: p.body.code === '000000' ? '111111' : '000000' }, key())).rejects.toBeDefined();
+    expect(await status(p.orderId)).toBe('READY_FOR_RETURN');
+    expect((await getPool().query("SELECT count(*)::int n FROM v2_outbox WHERE aggregate_id=$1 AND event_type='order.delivered.v2'", [p.orderId])).rows[0].n).toBe(0);
+  });
+});
 
 describe('B06-01 assignment visibility', () => {
   it('lists and reads exactly the jobs a rider holds', async () => {

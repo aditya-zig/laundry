@@ -5,12 +5,17 @@ import { OrderDetailPage } from "./pages/OrderDetail";
 import { DispatchPage } from "./pages/Dispatch";
 import { CatalogPage } from "./pages/Catalog";
 import { SupportPage } from "./pages/Support";
+import { ProductOperationsApp } from "./pages/ProductOperationsApp";
 
 function route(): string {
   return window.location.hash || "#/orders";
 }
 
 export default function App() {
+  return import.meta.env.VITE_DEMO_MODE === "true" ? <DemoOperationsApp /> : <ProductOperationsApp />;
+}
+
+function DemoOperationsApp() {
   const [hash, setHash] = useState(route());
   const [authed, setAuthed] = useState(() => getToken() !== undefined);
   const [error, setError] = useState<string | null>(null);

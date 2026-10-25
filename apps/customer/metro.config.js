@@ -19,6 +19,7 @@ config.resolver.nodeModulesPaths = [
 ];
 
 const workspaceDist = {
+  "@laundry/app-foundation": path.resolve(workspaceRoot, "packages/app-foundation/dist/index.js"),
   "@laundry/contracts": path.resolve(workspaceRoot, "packages/contracts/dist/index.js"),
   "@laundry/api-client": path.resolve(workspaceRoot, "packages/api-client/dist/index.js"),
   "@laundry/design-tokens": path.resolve(workspaceRoot, "packages/design-tokens/dist/index.js"),

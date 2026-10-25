@@ -1,5 +1,6 @@
 import { Module, Controller, Get, Post, Body, Req, UseGuards, Header, HttpCode } from "@nestjs/common";
 import { z } from "zod";
+import { completeReturnWhenSettled } from '../../../modules/orders/src/completion';
 import { AuthController } from "./controllers/auth.controller";
 import { CatalogController } from "./controllers/catalog.controller";
 import { OrdersController } from "./controllers/orders.controller";
@@ -104,11 +105,14 @@ let logistics: LogisticsService | undefined;
 function logisticsService(): LogisticsService {
   // Tracking/custody reads and transactional leg creation do not require a
   // dispatch provider. Assignment refuses missing custody-code delivery.
-  return (logistics ??= new LogisticsService({ db: getPool(), authenticate: authenticate() }));
+  return (logistics ??= new LogisticsService({ db: getPool(), authenticate: authenticate(),
+    onReturnAccepted: (id, tx, context) => completeReturnWhenSettled(tx, id, context),
+  }));
 }
 let billing: BillingService | undefined;
 function billingService(): BillingService {
-  return (billing ??= new BillingService({ db: getPool(), authenticate: authenticate(), provider: {
+  return (billing ??= new BillingService({ db: getPool(), authenticate: authenticate(),
+    onSettled: (id, tx, context) => completeReturnWhenSettled(tx, id, context), provider: {
     async refund() { throw new BillingFault('PROVIDER_UNAVAILABLE', 'A live refund provider is not configured'); },
   } }));
 }

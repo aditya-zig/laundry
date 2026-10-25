@@ -205,15 +205,19 @@ export class JobsService {
         [now, limit],
       )).rows;
       if (rows.length > 0) {
-        await client.query(
+        const leases = (await client.query<{ event_id: string; version: number }>(
           `INSERT INTO job_runs (event_id, version, lease_owner, lease_expires_at, updated_at)
            SELECT unnest($1::uuid[]), 1, $2, $3, $4
            ON CONFLICT (event_id) DO UPDATE
-             SET lease_owner = EXCLUDED.lease_owner,
+             SET version = job_runs.version + 1,
+                 lease_owner = EXCLUDED.lease_owner,
                  lease_expires_at = EXCLUDED.lease_expires_at,
-                 updated_at = EXCLUDED.updated_at`,
+                 updated_at = EXCLUDED.updated_at
+           RETURNING event_id, version`,
           [rows.map(row => row.event_id), this.workerId, expiresAt, now],
-        );
+        )).rows;
+        const versions = new Map(leases.map(row => [row.event_id, row.version]));
+        for (const row of rows) row.version = versions.get(row.event_id)!;
       }
       await client.query('COMMIT');
       return rows;
@@ -248,7 +252,9 @@ export class JobsService {
     for (const consumer of consumers) {
       const handler = this.registry?.get(consumer, event.eventType);
       if (!handler) {
-        this.log({ event: 'job.skipped', jobId: job.event_id, eventType: event.eventType, consumer });
+        // A declared consumer is required work, not an optional observer.
+        // Keep this event retryable/dead-letterable until the adapter exists.
+        failure ??= { consumer, code: 'PROVIDER_UNAVAILABLE', outcome: 'FAILED' };
         continue;
       }
       try {
@@ -256,7 +262,12 @@ export class JobsService {
           consumer,
           { id: SYSTEM_ACTOR_ID, role: 'SYSTEM', consumerScopes: [consumer] },
           event,
-          async scope => { await handler({ consumer, event, scope }); },
+          async scope => {
+            // Lock the outbox and lease for the whole effect transaction. A
+            // paused process cannot act after another worker reclaimed it.
+            if (!await this.lockLease(scope.handle, job)) throw new JobsFault('VERSION_CONFLICT', 'Job lease is no longer held');
+            await handler({ consumer, event, scope });
+          },
         );
       } catch (error) {
         const classified = classifyFailure(error);
@@ -266,24 +277,44 @@ export class JobsService {
     if (failure) {
       return this.recordFailure(job, failure.code, failure.consumer, event.eventType, failure.outcome);
     }
-    await this.complete(job.event_id, event.eventType);
-    return 'COMPLETED';
+    return await this.complete(job, event.eventType) ? 'COMPLETED' : 'FAILED';
   }
 
-  private async complete(jobId: string, eventType: string): Promise<void> {
+  private async lockLease(tx: PoolClient, job: ClaimedRow): Promise<boolean> {
+    return (await tx.query(
+      `SELECT r.event_id FROM v2_outbox o JOIN job_runs r ON r.event_id=o.event_id
+        WHERE o.event_id=$1 AND o.dispatched_at IS NULL AND r.lease_owner=$2
+          AND r.version=$3 AND r.lease_expires_at>$4
+        FOR UPDATE OF o,r`, [job.event_id, this.workerId, job.version, this.clock()],
+    )).rows.length === 1;
+  }
+
+  private async withLease<T>(job: ClaimedRow, work: (tx: PoolClient) => Promise<T>): Promise<T | undefined> {
+    const tx = await this.options.db.connect();
+    let poisoned = false;
+    try {
+      await tx.query('BEGIN');
+      const result = await this.lockLease(tx, job) ? await work(tx) : undefined;
+      await tx.query('COMMIT');
+      return result;
+    } catch (error) {
+      try { await tx.query('ROLLBACK'); } catch { poisoned = true; }
+      throw error;
+    } finally { tx.release(poisoned); }
+  }
+
+  private async complete(job: ClaimedRow, eventType: string): Promise<boolean> {
     const now = this.clock();
-    await this.options.db.query(
-      'UPDATE v2_outbox SET dispatched_at = $2 WHERE event_id = $1 AND dispatched_at IS NULL',
-      [jobId, now],
-    );
-    await this.options.db.query(
-      `UPDATE job_runs
-          SET lease_owner = NULL, lease_expires_at = NULL, last_error_code = NULL,
-              last_error_consumer = NULL, last_success_at = $2, updated_at = $2
-        WHERE event_id = $1`,
-      [jobId, now],
-    );
-    this.log({ event: 'job.completed', jobId, eventType });
+    const completed = await this.withLease(job, async tx => {
+      await tx.query('UPDATE v2_outbox SET dispatched_at=$2 WHERE event_id=$1', [job.event_id, now]);
+      await tx.query(
+        `UPDATE job_runs SET lease_owner=NULL, lease_expires_at=NULL, last_error_code=NULL,
+           last_error_consumer=NULL, last_success_at=$2, updated_at=$2 WHERE event_id=$1`, [job.event_id, now],
+      );
+      return true;
+    });
+    if (completed) this.log({ event: 'job.completed', jobId: job.event_id, eventType });
+    return completed ?? false;
   }
 
   private async recordFailure(
@@ -300,42 +331,27 @@ export class JobsService {
     // messages can contain a phone number or an address, so they never reach
     // the dead-letter row or the log line.
     const reason = `Consumer ${consumer} failed with ${code} after ${attempts} attempt${attempts === 1 ? '' : 's'}`;
-    if (!terminal) {
-      const dueAt = new Date(now.getTime() + retryDelayMs(attempts, this.jitter, { baseMs: this.baseDelayMs, maxMs: this.maxDelayMs }));
-      await this.options.db.query(
-        'UPDATE v2_outbox SET attempts = $2, due_at = $3 WHERE event_id = $1',
-        [job.event_id, attempts, dueAt],
+    const dueAt = new Date(now.getTime() + retryDelayMs(attempts, this.jitter, { baseMs: this.baseDelayMs, maxMs: this.maxDelayMs }));
+    const result = await this.withLease(job, async tx => {
+      await tx.query('UPDATE v2_outbox SET attempts=$2, due_at=$3 WHERE event_id=$1', [job.event_id, attempts, terminal ? job.due_at : dueAt]);
+      const version = job.version + 1;
+      if (terminal) {
+        await tx.query(
+          `INSERT INTO job_dead_letters (job_id,consumer,event_type,attempts,reason_code,reason,job_version,dead_lettered_at)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8) ON CONFLICT (job_id) WHERE replayed_at IS NULL DO NOTHING`,
+          [job.event_id, consumer, eventType, attempts, code, reason, version, now],
+        );
+      }
+      await tx.query(
+        `UPDATE job_runs SET version=$2, lease_owner=NULL, lease_expires_at=NULL,
+          last_error_code=$3,last_error_consumer=$4,updated_at=$5 WHERE event_id=$1`,
+        [job.event_id, version, code, consumer, now],
       );
-      await this.options.db.query(
-        `UPDATE job_runs
-            SET version = version + 1, lease_owner = NULL, lease_expires_at = NULL,
-                last_error_code = $2, last_error_consumer = $3, updated_at = $4
-          WHERE event_id = $1`,
-        [job.event_id, code, consumer, now],
-      );
-      this.log({ event: 'job.failed', jobId: job.event_id, eventType, consumer, code, outcome, attempts, dueAt: dueAt.toISOString() });
-      return 'FAILED';
-    }
-    await this.options.db.query('UPDATE v2_outbox SET attempts = $2 WHERE event_id = $1', [job.event_id, attempts]);
-    const version = job.version + 1;
-    await this.options.db.query(
-      `INSERT INTO job_dead_letters
-         (job_id, consumer, event_type, attempts, reason_code, reason, job_version, dead_lettered_at)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
-       ON CONFLICT (job_id) WHERE replayed_at IS NULL DO NOTHING`,
-      [job.event_id, consumer, eventType, attempts, code, reason, version, now],
-    );
-    await this.options.db.query(
-      `INSERT INTO job_runs (event_id, version, lease_owner, lease_expires_at, last_error_code, last_error_consumer, updated_at)
-       VALUES ($1, $2, NULL, NULL, $3, $4, $5)
-       ON CONFLICT (event_id) DO UPDATE
-         SET version = EXCLUDED.version, lease_owner = NULL, lease_expires_at = NULL,
-             last_error_code = EXCLUDED.last_error_code, last_error_consumer = EXCLUDED.last_error_consumer,
-             updated_at = EXCLUDED.updated_at`,
-      [job.event_id, version, code, consumer, now],
-    );
-    this.log({ event: 'job.dead-letter', jobId: job.event_id, eventType, consumer, code, outcome, attempts });
-    return 'DEAD_LETTER';
+      return terminal ? 'DEAD_LETTER' as const : 'FAILED' as const;
+    });
+    if (result) this.log({ event: terminal ? 'job.dead-letter' : 'job.failed', jobId: job.event_id, eventType,
+      consumer, code, outcome, attempts, ...(!terminal ? { dueAt: dueAt.toISOString() } : {}) });
+    return result ?? 'FAILED';
   }
 
   private async snapshot(): Promise<{ health: v2.JobHealth; lastSuccessfulDispatchAt: Date | null; oldestDueAt: Date | null }> {

@@ -3,6 +3,7 @@ import type { Pool, PoolClient } from 'pg';
 import { v2 } from '@laundry/contracts';
 import { createPostgresCommandExecutor, canonicalJson } from '../../shared/src/command-executor';
 import { CustodyCodeMismatch, LogisticsFault } from './v2-errors';
+import type { DeliveryReconciliation } from '../../orders/src/completion';
 
 /**
  * Production-v2 logistics: assignment, pickup and return custody, handover
@@ -151,6 +152,7 @@ export interface LogisticsOptions {
   locationFreshMinutes?: number;
   custodyNotifier?: CustodyCodeNotifier;
   verifier?: LogisticsProviderVerifier;
+  onReturnAccepted?: DeliveryReconciliation;
 }
 
 interface OrderRow {
@@ -281,6 +283,15 @@ function attemptView(row: AttemptRow): v2.LegAttempt {
     ...(row.completed_at === null ? {} : { completedAt: row.completed_at.toISOString() }),
     ...(row.failure_reason === null ? {} : { failureReason: row.failure_reason }),
   });
+}
+
+export async function acceptedReturnForOrder(tx: PoolClient, orderId: string): Promise<v2.LegAttempt | undefined> {
+  const row = (await tx.query<AttemptRow>(`SELECT l.* FROM logistics_leg_attempts l
+    WHERE l.order_id=$1 AND l.leg='RETURN' AND l.status='COMPLETED' AND EXISTS (
+      SELECT 1 FROM logistics_handovers h WHERE h.leg_attempt_id=l.id AND h.order_id=l.order_id
+        AND h.accepted=true AND h.leg='RETURN' AND h.custody_kind='RETURN_COMPLETED')
+    ORDER BY l.completed_at DESC,l.id DESC LIMIT 1`, [orderId])).rows[0];
+  return row ? attemptView(row) : undefined;
 }
 
 function assignmentView(row: AssignmentRow): v2.Assignment {
@@ -809,9 +820,10 @@ export class LogisticsService {
     }
     const rider = await this.actorOf(token, RIDER);
     const requestHash = hashPayload({ operation: 'logistics.rider.handover', payload: parsed });
+    const traceId = randomUUID();
     try {
       const result = await this.executor.execute(
-        { actor: rider, operation: 'logistics.rider.handover', idempotencyKey: key, payload: plain(parsed), traceId: randomUUID() },
+        { actor: rider, operation: 'logistics.rider.handover', idempotencyKey: key, payload: plain(parsed), traceId },
         async () => { await this.actorOf(token, RIDER); },
         async scope => {
           const tx = scope.handle;
@@ -889,9 +901,8 @@ export class LogisticsService {
           } else if (order.status !== 'RETURNING') {
             throw new LogisticsFault('INVALID_INPUT', `A ${order.status} order is not on the return leg`);
           }
-          // COMPLETE_RETURN is deliberately not attempted here: the guard needs
-          // settled payment, which B05 owns. The return custody event is
-          // recorded and the order waits in RETURNING.
+          // The composed hook below requires persisted custody AND final
+          // billing resolution. Without it the order remains RETURNING.
 
           const updatedAttempt = (await tx.query<AttemptRow>(`UPDATE logistics_leg_attempts SET
             status='COMPLETED',completed_at=$2,version=version+1,updated_at=$2 WHERE id=$1 RETURNING *`,
@@ -936,6 +947,9 @@ export class LogisticsService {
               garmentCount: parsed.garmentCount,
               condition: parsed.condition,
             },
+          });
+          if (attempt.leg === 'RETURN') await this.options.onReturnAccepted?.(order.id, tx, {
+            actorId: rider.id, actorRole: rider.role, traceId, now: this.clock(),
           });
           return handoverResult(row) as unknown as v2.JsonValue;
         },

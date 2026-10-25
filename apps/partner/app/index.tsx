@@ -1,23 +1,31 @@
 import React, { useEffect, useState } from "react";
+import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Link, useRouter, useFocusEffect } from "expo-router";
+import { v2 } from "@laundry/contracts";
+import { UnknownOutcomeError, V2ApiError } from "@laundry/api-client";
+import { getFoundation } from "../src/foundation/session";
 import {
-  ActivityIndicator,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
-} from "react-native";
-import { Link, useRouter } from "expo-router";
-import type { DeliveryJob } from "@laundry/contracts";
+  activeJobs,
+  listRenderRow,
+  nextActionLabel,
+  type PrivateJobsState,
+  purgePrivateJobsState,
+} from "../src/features/jobs/access";
+
+import { createPartnerApi, pendingHandoverReceipts } from "../src/features/session/partner-api";
+import { usePartnerSession } from "../src/features/session/use-partner-session";
 import {
-  demoSignIn,
-  getClient,
-  getCurrentUser,
-  getToken,
-  setCachedJobs,
-  signOut,
-} from "../src/api";
-import { nextAction } from "../src/jobs";
+  Badge,
+  Card,
+  EmptyState,
+  Field,
+  Input,
+  LoadingState,
+  NoticeBox,
+  PrimaryButton,
+  SectionTitle,
+  windowLabel,
+} from "../src/features/ui";
 import {
   colors,
   maxContentWidth,
@@ -27,66 +35,311 @@ import {
   typography,
 } from "../src/theme";
 
-export default function PartnerHome() {
-  const router = useRouter();
-  const [token, setTokenState] = useState<string | undefined>(getToken());
-  const [user, setUserState] = useState(getCurrentUser());
-  const [authLoading, setAuthLoading] = useState(false);
-  const [authError, setAuthError] = useState<string | null>(null);
+type Challenge = { challengeId: string; expiresAt: string };
+type SignInMode = "IDLE" | "AWAITING_CODE";
 
-  const [jobs, setJobs] = useState<DeliveryJob[]>([]);
-  const [jobsLoading, setJobsLoading] = useState(false);
-  const [jobsError, setJobsError] = useState<string | null>(null);
+function useRiderApi() {
+  return createPartnerApi({ foundation: getFoundation() });
+}
+
+function HomeSignedOut({ onSignedIn }: { onSignedIn: () => void }) {
+  const [phone, setPhone] = useState("");
+  const [challenge, setChallenge] = useState<Challenge | null>(null);
+  const [code, setCode] = useState("");
+  const [mfaCode, setMfaCode] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const api = useRiderApi();
+
+  async function requestChallenge() {
+    setBusy(true);
+    setError(null);
+    try {
+      const parsed = v2.otpRequestSchema.safeParse({ phone: phone.trim() });
+      if (!parsed.success) {
+        setError("Enter your phone in international format, e.g. +919876543210.");
+        return;
+      }
+      const result = await api.requestChallenge(parsed.data.phone);
+      setChallenge({ challengeId: result.challengeId, expiresAt: result.expiresAt });
+    } catch (err) {
+      setError(describeAuthError(err, "Could not request a sign-in code."));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function verify() {
+    if (!challenge) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const snapshot = await api.verifyAndAdoptSession({
+        challengeId: challenge.challengeId,
+        code: code.trim(),
+        mfaCode: mfaCode.trim() === "" ? undefined : mfaCode.trim(),
+      });
+      if (snapshot.state === "authenticated") onSignedIn();
+    } catch (err) {
+      setError(describeAuthError(err, "Sign-in failed. The code may be wrong or expired."));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <Card>
+      <Text style={styles.title}>Delivery partner sign-in</Text>
+      <Text style={styles.bodyMuted}>
+        Sign in with your registered phone number and the one-time code sent to it. This app has no demo
+        accounts.
+      </Text>
+      <Field label="Phone number">
+        <Input
+          value={phone}
+          onChangeText={setPhone}
+          placeholder="+919876543210"
+          accessibilityLabel="Phone number"
+          maxLength={18}
+        />
+      </Field>
+      {challenge ? (
+        <>
+          <Field label="One-time code">
+            <Input
+              value={code}
+              onChangeText={setCode}
+              placeholder="Six-digit code"
+              accessibilityLabel="One-time code"
+              numeric
+              maxLength={6}
+              autoFocus
+            />
+          </Field>
+          <Field label="Staff MFA code (optional)">
+            <Input
+              value={mfaCode}
+              onChangeText={setMfaCode}
+              placeholder="Only for provisioned staff"
+              accessibilityLabel="Staff MFA code"
+              numeric
+              maxLength={6}
+            />
+          </Field>
+          <Text style={styles.hint}>
+            Code sent. Challenge expires {new Date(challenge.expiresAt).toLocaleTimeString()}
+            . Re-request a code if it expired — the phone number is never prefilled.
+          </Text>
+          <PrimaryButton
+            label="Verify and sign in"
+            onPress={verify}
+            busy={busy}
+            disabled={code.trim().length !== 6}
+          />
+          <PrimaryButton label="Request a new code" onPress={requestChallenge} busy={busy} tone="quiet" />
+        </>
+      ) : (
+        <PrimaryButton label="Request sign-in code" onPress={requestChallenge} busy={busy} />
+      )}
+      {error ? <NoticeBox title="Sign-in problem" body={error} tone="danger" /> : null}
+    </Card>
+  );
+}
+
+function describeAuthError(err: unknown, fallback: string): string {
+  if (err instanceof V2ApiError) {
+    if (err.code === "RATE_LIMITED") return "Too many sign-in attempts. Wait before requesting another code.";
+    if (err.code === "INVALID_INPUT") return err.message;
+    if (err.code === "UNAUTHENTICATED") return "Sign-in code was rejected or expired.";
+    return err.message;
+  }
+  if (err instanceof UnknownOutcomeError) {
+    return "The sign-in outcome is unknown. Retry with the same details before changing anything else.";
+  }
+  return err instanceof Error ? err.message : fallback;
+}
+
+function JobRow(props: { subject: v2.RiderJob | { id: string; leg: string; status: string; customerVisible: false }; customerVisible: boolean; isMine: boolean; pending: boolean }) {
+  const router = useRouter();
+  return (
+    <Pressable
+      onPress={() => router.push(`/jobs/${props.subject.id}`)}
+      style={({ pressed }) => [styles.jobRow, pressed && styles.jobRowPressed]}
+      accessibilityRole="button"
+      accessibilityLabel={
+        props.customerVisible
+          ? `Open task ${(props.subject as v2.RiderJob).customerName}`
+          : `Open assigned task`
+      }
+      testID={`rider-job-${props.subject.id}`}
+    >
+      <View style={styles.jobRowTop}>
+        <Badge label={(props.subject as v2.RiderJob).leg} tone={(props.subject as v2.RiderJob).leg === "PICKUP" ? "action" : "neutral"} />
+        <Badge
+          label={(props.subject as v2.RiderJob).status}
+          tone={(props.subject as v2.RiderJob).status === "FAILED" ? "danger" : "neutral"}
+        />
+        {props.pending ? <Badge label="Pending sync — not confirmed" tone="warning" /> : null}
+      </View>
+      {props.customerVisible ? (
+        <>
+          <Text style={styles.jobTitle}>{(props.subject as v2.RiderJob).customerName}</Text>
+          <Text style={styles.jobMeta}>
+            {(props.subject as v2.RiderJob).addressLine1}, {(props.subject as v2.RiderJob).addressCity}
+          </Text>
+        </>
+      ) : (
+        <View style={styles.jobTitle}>
+          <Text style={styles.bodyMuted}>
+            {props.isMine ? "Assigned to you — full details unavailable from cache" : "Not assigned to you. Customer details are not shown."}
+          </Text>
+        </View>
+      )}
+      <View style={styles.jobRowBottom}>
+        <Text style={styles.jobWindow}>
+          {windowLabel((props.subject as v2.RiderJob | v2.RiderJob).window?.start ?? "", (props.subject as v2.RiderJob).window?.end ?? "")}
+        </Text>
+        <Text style={styles.nextAction}>{props.customerVisible ? nextActionLabel(props.subject as v2.RiderJob) : nextActionOfSubject(props.subject as v2.RiderJob)}</Text>
+      </View>
+    </Pressable>
+  );
+}
+
+function nextActionOfSubject(_job: v2.RiderJob): string {
+  return "Open the task to confirm what you can act on";
+}
+
+function TaskList() {
+  const session = usePartnerSession();
+  const api = useRiderApi();
+  const actorId = session.state === "AUTHENTICATED" ? session.actor.id : null;
+  const [stateObj, setStateObj] = useState<PrivateJobsState>(() => purgePrivateJobsState());
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [pending, setPending] = useState<string[]>([]);
 
   useEffect(() => {
-    if (token) {
-      loadJobs();
+    if (session.state !== "AUTHENTICATED") {
+      setStateObj(purgePrivateJobsState());
+      setPending([]);
+      setLoadError(null);
     }
-  }, [token]);
+  }, [session.state]);
 
-  async function handleDemoSignIn() {
-    setAuthLoading(true);
-    setAuthError(null);
+  async function load() {
+    if (!actorId) return;
+    setLoading(true);
+    setLoadError(null);
     try {
-      const session = await demoSignIn("rider");
-      setTokenState(session.token);
-      setUserState(session.user);
-    } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : "Failed to sign in";
-      setAuthError(message);
+      const jobs = await api.listAssignedJobs();
+      if (api.actor()?.id !== actorId) return;
+      setStateObj(s => ({ ...s, jobs }));
+      const receipts = pendingHandoverReceipts(await api.queuedMutations());
+      if (api.actor()?.id !== actorId) return;
+      setPending(receipts.map(r => r.jobId));
+    } catch (err) {
+      if (api.actor()?.id !== actorId) return;
+      setLoadError(err instanceof Error ? err.message : "Could not load assigned tasks.");
     } finally {
-      setAuthLoading(false);
+      if (api.actor()?.id === actorId) setLoading(false);
     }
   }
 
-  function handleSignOut() {
-    signOut();
-    setTokenState(undefined);
-    setUserState(undefined);
-    setJobs([]);
-    setJobsError(null);
-  }
+  useEffect(() => {
+    void load();
+  }, [actorId]);
 
-  async function loadJobs() {
-    setJobsLoading(true);
-    setJobsError(null);
-    try {
-      const client = getClient();
-      const list = await client.listPartnerJobs();
-      setJobs(list);
-      setCachedJobs(list);
-    } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : "Could not fetch jobs";
-      setJobsError(message);
-    } finally {
-      setJobsLoading(false);
-    }
-  }
-
-  // Active uncompleted jobs
-  const activeJobs = jobs.filter(
-    (j) => j.status !== "COMPLETED" && j.status !== "CANCELLED"
+  useFocusEffect(
+    React.useCallback(() => {
+      if (actorId) void load();
+    }, [actorId]),
   );
+
+  const mine = activeJobs(stateObj.jobs, actorId);
+  const signedOut = session.state !== "AUTHENTICATED";
+
+  return (
+    <View>
+      <View style={styles.navRow}>
+        <Link href="/history" asChild>
+          <Pressable style={styles.navPill} accessibilityRole="button">
+            <Text style={styles.navPillText}>Completed history</Text>
+          </Pressable>
+        </Link>
+        <Link href="/account" asChild>
+          <Pressable style={styles.navPill} accessibilityRole="button">
+            <Text style={styles.navPillText}>Account</Text>
+          </Pressable>
+        </Link>
+      </View>
+      <SectionTitle
+        right={
+          <Pressable onPress={load} disabled={loading || signedOut} accessibilityRole="button" accessibilityLabel="Refresh tasks">
+            <Text style={[styles.navPillText, styles.refresh, (loading || signedOut) && styles.refreshDisabled]}>
+              {loading ? "Refreshing…" : "Refresh"}
+            </Text>
+          </Pressable>
+        }
+      >
+        {`Assigned tasks (${mine.length})`}
+      </SectionTitle>
+      {session.state === "RESTORE_FAILED" ? (
+        <NoticeBox
+          title="Previous sign-in could not be restored"
+          body={`${session.message} Sign in again to continue; no task data is shown.`}
+          tone="warning"
+        />
+      ) : null}
+      {signedOut ? null : loading && mine.length === 0 ? <LoadingState label="Loading assigned tasks…" /> : null}
+      {loadError ? (
+        <Card tone="danger">
+          <Text style={styles.errorTitle}>Assigned tasks could not be loaded</Text>
+          <Text style={styles.bodyMuted}>{loadError}</Text>
+        </Card>
+      ) : null}
+      {!signedOut && !loading && !loadError && mine.length === 0 ? (
+        <EmptyState
+          title="No tasks assigned"
+          body="Dispatch has not assigned you a delivery task yet. Refresh after dispatch assigns a route."
+        />
+      ) : null}
+      {mine.map(job => (
+        <JobRow
+          key={job.id}
+          subject={job}
+          customerVisible={true}
+          isMine={true}
+          pending={pending.includes(job.id)}
+        />
+      ))}
+      {renderRestrictedRows(stateObj.jobs, actorId, pending)}
+    </View>
+  );
+}
+
+function renderRestrictedRows(jobs: v2.RiderJob[], actorId: string | null, pending: string[]) {
+  const rows = jobs
+    .map(job => listRenderRow(job, actorId))
+    .filter(row => row.visibility !== "MINE");
+  if (rows.length === 0) return null;
+  return (
+    <View>
+      <Text style={styles.restrictedHeading}>Restricted tasks (no customer data shown)</Text>
+      {rows.map(row => (
+        <JobRow
+          key={row.subject.id}
+          subject={{ id: row.subject.id, leg: row.subject.leg, status: row.subject.status, customerVisible: false }}
+          customerVisible={false}
+          isMine={false}
+          pending={pending.includes(row.subject.id)}
+        />
+      ))}
+    </View>
+  );
+}
+
+export default function PartnerHome() {
+  const session = usePartnerSession();
 
   return (
     <ScrollView
@@ -95,271 +348,43 @@ export default function PartnerHome() {
       keyboardShouldPersistTaps="handled"
     >
       <View style={styles.centerWrapper}>
-        {/* DEMO Tag */}
-        <View style={styles.demoTag}>
-          <Text style={styles.demoTagText}>DEMO MODE — PARTNER APP</Text>
+        <View style={styles.tagRow}>
+          <Badge label="SDK v2 wire" tone="neutral" />
+          <Badge
+            label={
+              session.state === "AUTHENTICATED"
+                ? `Signed in as ${session.actor.role}`
+                : "Not signed in"
+            }
+            tone={session.state === "AUTHENTICATED" ? "success" : "neutral"}
+          />
         </View>
-
-        {!token ? (
-          <View style={styles.card}>
-            <Text style={styles.title}>Delivery Partner Access</Text>
-            <Text style={styles.bodyMuted}>
-              Assigned pickup and return tasks for verified logistics partners. Sign in with demo rider credentials to proceed.
-            </Text>
-
-            {authError ? (
-              <View style={styles.errorBox}>
-                <Text style={styles.errorText}>{authError}</Text>
-              </View>
-            ) : null}
-
-            <Pressable
-              onPress={handleDemoSignIn}
-              disabled={authLoading}
-              style={({ pressed }: { pressed: boolean }) => [
-                styles.primaryButton,
-                pressed && styles.primaryButtonPressed,
-                authLoading && styles.buttonDisabled,
-              ]}
-              accessibilityRole="button"
-              accessibilityLabel="[DEMO] Sign in as Rider"
-            >
-              {authLoading ? (
-                <ActivityIndicator color={colors.surface} />
-              ) : (
-                <Text style={styles.primaryButtonText}>[DEMO] Sign in as Rider</Text>
-              )}
-            </Pressable>
-          </View>
-        ) : (
-          <View>
-            {/* Signed-in user header bar */}
-            <View style={styles.riderBar}>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.riderName}>{user?.name ?? "Demo Rider"}</Text>
-                <Text style={styles.riderRole}>Role: {user?.role ?? "rider"} • ID: {user?.id ?? "active"}</Text>
-              </View>
-              <Pressable
-                onPress={handleSignOut}
-                style={styles.signOutButton}
-                accessibilityRole="button"
-                accessibilityLabel="Sign out"
-              >
-                <Text style={styles.signOutText}>Sign Out</Text>
-              </Pressable>
-            </View>
-
-            {/* Quick links to History and Account */}
-            <View style={styles.navRow}>
-              <Link href="/history" asChild>
-                <Pressable style={styles.navPill} accessibilityRole="button">
-                  <Text style={styles.navPillText}>Completed History</Text>
-                </Pressable>
-              </Link>
-              <Link href="/account" asChild>
-                <Pressable style={styles.navPill} accessibilityRole="button">
-                  <Text style={styles.navPillText}>Account Settings</Text>
-                </Pressable>
-              </Link>
-            </View>
-
-            <View style={styles.sectionHeader}>
-              <Text style={styles.sectionTitle}>Assigned Tasks ({activeJobs.length})</Text>
-              <Pressable
-                onPress={loadJobs}
-                disabled={jobsLoading}
-                style={styles.refreshButton}
-                accessibilityRole="button"
-                accessibilityLabel="Refresh tasks"
-              >
-                <Text style={styles.refreshText}>{jobsLoading ? "Refreshing..." : "Refresh"}</Text>
-              </Pressable>
-            </View>
-
-            {/* Real Loading State */}
-            {jobsLoading && jobs.length === 0 ? (
-              <View style={styles.cardCenter}>
-                <ActivityIndicator size="large" color={colors.action} />
-                <Text style={[styles.bodyMuted, { marginTop: spacing.sm }]}>
-                  Loading assigned jobs...
-                </Text>
-              </View>
-            ) : null}
-
-            {/* Real Error State */}
-            {jobsError ? (
-              <View style={styles.card}>
-                <Text style={styles.errorTitle}>Unable to load tasks</Text>
-                <Text style={styles.bodyMuted}>{jobsError}</Text>
-                <Pressable
-                  onPress={loadJobs}
-                  style={styles.retryButton}
-                  accessibilityRole="button"
-                  accessibilityLabel="Retry loading tasks"
-                >
-                  <Text style={styles.retryButtonText}>Retry</Text>
-                </Pressable>
-              </View>
-            ) : null}
-
-            {/* Real Empty State */}
-            {!jobsLoading && !jobsError && activeJobs.length === 0 ? (
-              <View style={styles.cardCenter}>
-                <Text style={styles.emptyTitle}>No tasks assigned</Text>
-                <Text style={[styles.bodyMuted, { textAlign: "center", marginTop: 4 }]}>
-                  You have no pending delivery jobs assigned right now. Check back when dispatch assigns a new route.
-                </Text>
-              </View>
-            ) : null}
-
-            {/* Assigned Job Cards */}
-            {activeJobs.map((job) => {
-              const legBadge = job.leg === "PICKUP" ? "PICKUP" : "RETURN";
-              const isProvider = job.dispatchMode === "PROVIDER";
-
-              return (
-                <View key={job.id} style={{ marginBottom: spacing.md }}>
-                  <Pressable
-                    onPress={() => router.push(`/jobs/${job.id}`)}
-                    style={({ pressed }: { pressed: boolean }) => [
-                      styles.jobCard,
-                      pressed && styles.jobCardPressed,
-                    ]}
-                    accessibilityRole="button"
-                    accessibilityLabel={`View job for ${job.customerName}`}
-                    testID={`delivery-job-${job.id}`}
-                  >
-                    <View style={styles.jobCardTop}>
-                      <View style={[styles.badge, job.leg === "PICKUP" ? styles.badgeTeal : styles.badgeNavy]}>
-                        <Text style={styles.badgeText}>{legBadge}</Text>
-                      </View>
-                      <View style={[styles.statusBadge, isProvider && styles.statusBadgeProvider]}>
-                        <Text style={styles.statusBadgeText}>
-                          {isProvider ? "PROVIDER" : job.status}
-                        </Text>
-                      </View>
-                    </View>
-
-                    <Text style={styles.customerName}>{job.customerName}</Text>
-                    <Text style={styles.jobAddress} numberOfLines={2}>
-                      {job.address}
-                    </Text>
-
-                    <View style={styles.metaRow}>
-                      <Text style={styles.metaItem}>Bags: {job.bagIds.length}</Text>
-                      <Text style={styles.metaItem}>
-                        Window: {new Date(job.window.start).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
-                      </Text>
-                    </View>
-
-                    <View style={styles.nextActionBox}>
-                      <Text style={styles.nextActionLabel}>NEXT ACTION</Text>
-                      <Text style={styles.nextActionText}>{nextAction(job)}</Text>
-                    </View>
-                  </Pressable>
-                </View>
-              );
-            })}
-          </View>
-        )}
+        {session.state === "CONFIG_ERROR" ? (
+          <NoticeBox
+            title="App configuration required"
+            body={session.message}
+            tone="danger"
+          />
+        ) : null}
+        {session.state === "LOADING" ? <LoadingState label="Checking existing sign-in…" /> : null}
+        {session.state === "AUTHENTICATED" ? <TaskList key={session.identityEpoch} /> : null}
+        {session.state === "SIGNED_OUT" || session.state === "RESTORE_FAILED" ? (
+          <HomeSignedOut onSignedIn={session.refresh ?? (() => undefined)} />
+        ) : null}
       </View>
     </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  screen: {
-    flex: 1,
-    backgroundColor: colors.surfaceTint,
-  },
-  container: {
-    padding: spacing.md,
-    alignItems: "center",
-  },
-  centerWrapper: {
-    width: "100%",
-    maxWidth: maxContentWidth,
-  },
-  demoTag: {
-    backgroundColor: "#FEE2E2",
-    borderColor: "#FCA5A5",
-    borderWidth: 1,
-    borderRadius: radius.sm,
-    paddingVertical: spacing.xs,
-    paddingHorizontal: spacing.sm,
-    marginBottom: spacing.md,
-    alignSelf: "flex-start",
-  },
-  demoTagText: {
-    color: colors.danger,
-    fontSize: typography.sizes.caption,
-    fontWeight: "700",
-  },
-  card: {
-    backgroundColor: colors.surface,
-    borderRadius: radius.md,
-    padding: spacing.md,
-    borderWidth: 1,
-    borderColor: colors.border,
-    marginBottom: spacing.md,
-  },
-  cardCenter: {
-    backgroundColor: colors.surface,
-    borderRadius: radius.md,
-    padding: spacing.lg,
-    borderWidth: 1,
-    borderColor: colors.border,
-    alignItems: "center",
-    justifyContent: "center",
-    marginBottom: spacing.md,
-  },
-  title: {
-    color: colors.ink,
-    fontSize: typography.sizes.title,
-    fontWeight: "700",
-    marginBottom: spacing.xs,
-  },
-  bodyMuted: {
-    color: colors.inkMuted,
-    fontSize: typography.sizes.body,
-    lineHeight: 22,
-  },
-  riderBar: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    backgroundColor: colors.surface,
-    borderRadius: radius.md,
-    padding: spacing.md,
-    borderWidth: 1,
-    borderColor: colors.border,
-    marginBottom: spacing.sm,
-  },
-  riderName: {
-    color: colors.ink,
-    fontSize: typography.sizes.body,
-    fontWeight: "700",
-  },
-  riderRole: {
-    color: colors.inkMuted,
-    fontSize: typography.sizes.caption,
-    marginTop: 2,
-  },
-  signOutButton: {
-    minHeight: minTouchTarget,
-    justifyContent: "center",
-    paddingHorizontal: spacing.sm,
-  },
-  signOutText: {
-    color: colors.danger,
-    fontSize: typography.sizes.caption,
-    fontWeight: "700",
-  },
-  navRow: {
-    flexDirection: "row",
-    gap: spacing.sm,
-    marginBottom: spacing.md,
-  },
+  screen: { flex: 1, backgroundColor: colors.surfaceTint },
+  container: { padding: spacing.md, alignItems: "center" },
+  centerWrapper: { width: "100%", maxWidth: maxContentWidth },
+  tagRow: { flexDirection: "row", gap: spacing.sm, marginBottom: spacing.md, flexWrap: "wrap" },
+  title: { color: colors.ink, fontSize: typography.sizes.title, fontWeight: "700", marginBottom: spacing.xs },
+  bodyMuted: { color: colors.inkMuted, fontSize: typography.sizes.body, lineHeight: 22 },
+  hint: { color: colors.inkMuted, fontSize: typography.sizes.caption, marginTop: spacing.sm },
+  navRow: { flexDirection: "row", gap: spacing.sm, marginBottom: spacing.md },
   navPill: {
     flex: 1,
     minHeight: minTouchTarget,
@@ -371,171 +396,31 @@ const styles = StyleSheet.create({
     alignItems: "center",
     paddingHorizontal: spacing.sm,
   },
-  navPillText: {
-    color: colors.ink,
-    fontWeight: "600",
-    fontSize: typography.sizes.caption,
-  },
-  sectionHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    marginBottom: spacing.sm,
-  },
-  sectionTitle: {
-    color: colors.ink,
-    fontSize: typography.sizes.body,
-    fontWeight: "700",
-  },
-  refreshButton: {
-    minHeight: minTouchTarget,
-    justifyContent: "center",
-    paddingHorizontal: spacing.sm,
-  },
-  refreshText: {
-    color: colors.action,
-    fontWeight: "600",
-    fontSize: typography.sizes.caption,
-  },
-  emptyTitle: {
-    color: colors.ink,
-    fontSize: typography.sizes.body,
-    fontWeight: "700",
-  },
-  jobCard: {
+  navPillText: { color: colors.action, fontWeight: "600", fontSize: typography.sizes.caption },
+  refresh: { color: colors.action, fontWeight: "600" },
+  refreshDisabled: { color: colors.inkMuted },
+  errorTitle: { color: colors.danger, fontWeight: "700", marginBottom: spacing.xs },
+  jobRow: {
     backgroundColor: colors.surface,
     borderRadius: radius.md,
     padding: spacing.md,
     borderWidth: 1,
     borderColor: colors.border,
     marginBottom: spacing.md,
-  },
-  jobCardPressed: {
-    backgroundColor: "#F1F5F9",
-  },
-  jobCardTop: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: spacing.xs,
-  },
-  badge: {
-    paddingVertical: 2,
-    paddingHorizontal: spacing.sm,
-    borderRadius: radius.sm,
-  },
-  badgeTeal: {
-    backgroundColor: "#CCFBF1",
-  },
-  badgeNavy: {
-    backgroundColor: "#DBEAFE",
-  },
-  badgeText: {
-    fontSize: typography.sizes.caption,
-    fontWeight: "700",
-    color: colors.ink,
-  },
-  statusBadge: {
-    paddingVertical: 2,
-    paddingHorizontal: spacing.xs,
-    borderRadius: radius.sm,
-    backgroundColor: "#F3F4F6",
-  },
-  statusBadgeProvider: {
-    backgroundColor: "#FEF3C7",
-  },
-  statusBadgeText: {
-    fontSize: typography.sizes.caption,
-    color: colors.inkMuted,
-    fontWeight: "600",
-  },
-  customerName: {
-    color: colors.ink,
-    fontSize: typography.sizes.body,
-    fontWeight: "700",
-    marginTop: 2,
-  },
-  jobAddress: {
-    color: colors.inkMuted,
-    fontSize: typography.sizes.caption,
-    marginTop: 2,
-    lineHeight: 18,
-  },
-  metaRow: {
-    flexDirection: "row",
-    gap: spacing.md,
-    marginTop: spacing.sm,
-  },
-  metaItem: {
-    color: colors.inkMuted,
-    fontSize: typography.sizes.caption,
-    fontWeight: "500",
-  },
-  nextActionBox: {
-    marginTop: spacing.sm,
-    padding: spacing.sm,
-    backgroundColor: colors.surfaceTint,
-    borderRadius: radius.sm,
-  },
-  nextActionLabel: {
-    color: colors.action,
-    fontSize: 10,
-    fontWeight: "800",
-    letterSpacing: 0.5,
-  },
-  nextActionText: {
-    color: colors.ink,
-    fontSize: typography.sizes.caption,
-    fontWeight: "600",
-    marginTop: 2,
-  },
-  primaryButton: {
     minHeight: minTouchTarget,
-    backgroundColor: colors.action,
-    borderRadius: radius.md,
-    justifyContent: "center",
-    alignItems: "center",
-    marginTop: spacing.md,
-    paddingHorizontal: spacing.md,
   },
-  primaryButtonPressed: {
-    backgroundColor: colors.actionPressed,
-  },
-  primaryButtonText: {
-    color: colors.surface,
-    fontSize: typography.sizes.body,
-    fontWeight: "700",
-  },
-  buttonDisabled: {
-    opacity: 0.6,
-  },
-  errorBox: {
-    backgroundColor: "#FEE2E2",
-    borderRadius: radius.sm,
-    padding: spacing.sm,
-    marginTop: spacing.sm,
-  },
-  errorText: {
-    color: colors.danger,
+  jobRowPressed: { backgroundColor: "#F1F5F9" },
+  jobRowTop: { flexDirection: "row", gap: spacing.sm, marginBottom: spacing.xs, flexWrap: "wrap" },
+  jobTitle: { color: colors.ink, fontWeight: "700", marginTop: spacing.xs },
+  jobMeta: { color: colors.inkMuted, marginTop: 2 },
+  jobRowBottom: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginTop: spacing.sm },
+  jobWindow: { color: colors.inkMuted, fontSize: typography.sizes.caption },
+  nextAction: { color: colors.action, fontWeight: "600", fontSize: typography.sizes.caption, flexShrink: 1, textAlign: "right" },
+  restrictedHeading: {
+    color: colors.inkMuted,
     fontSize: typography.sizes.caption,
-  },
-  errorTitle: {
-    color: colors.danger,
-    fontSize: typography.sizes.body,
     fontWeight: "700",
-    marginBottom: spacing.xs,
-  },
-  retryButton: {
-    minHeight: minTouchTarget,
-    backgroundColor: colors.action,
-    borderRadius: radius.sm,
-    justifyContent: "center",
-    alignItems: "center",
     marginTop: spacing.sm,
-  },
-  retryButtonText: {
-    color: colors.surface,
-    fontSize: typography.sizes.body,
-    fontWeight: "600",
+    marginBottom: spacing.sm,
   },
 });

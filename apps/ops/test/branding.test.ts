@@ -12,10 +12,12 @@ function read(relativePath: string): string {
 afterEach(() => {
   setSession(undefined);
   vi.unstubAllGlobals();
+  vi.unstubAllEnvs();
 });
 
 describe("Laundry display branding", () => {
   it.each([undefined, "demo-operator-token"])("renders the correct operations heading for session %s", (token) => {
+    vi.stubEnv("VITE_DEMO_MODE", "true");
     vi.stubGlobal("window", { location: { hash: "#/catalog" } });
     setSession(token);
     const html = renderToStaticMarkup(createElement(App));

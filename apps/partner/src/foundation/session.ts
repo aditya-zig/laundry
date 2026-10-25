@@ -7,3 +7,4 @@ export const configurePartnerSessionStores = binding.configure;
 export const getFoundation = binding.getFoundation;
 export const getV2Client = binding.getV2Client;
 export const partnerCacheEpoch = binding.cacheEpoch;
+export const onPartnerIdentityChange = binding.onIdentityChange;

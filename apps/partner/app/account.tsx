@@ -1,214 +1,191 @@
-import React from "react";
-import {
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
-} from "react-native";
+import React, { useEffect, useState } from "react";
+import { ScrollView, StyleSheet, Text, View } from "react-native";
 import { useRouter } from "expo-router";
-import { getCurrentUser, getToken, signOut } from "../src/api";
+import { getFoundation } from "../src/foundation/session";
+import { createPartnerApi, pendingHandoverReceipts, type PendingHandoverReceipt } from "../src/features/session/partner-api";
+import { usePartnerSession } from "../src/features/session/use-partner-session";
+import {
+  Badge,
+  Card,
+  EmptyState,
+  LoadingState,
+  NoticeBox,
+  PrimaryButton,
+} from "../src/features/ui";
 import {
   colors,
   maxContentWidth,
-  minTouchTarget,
-  radius,
   spacing,
-  typography,
 } from "../src/theme";
 
-export default function AccountScreen() {
+function AccountPanel() {
+  const session = usePartnerSession();
   const router = useRouter();
-  const user = getCurrentUser();
-  const token = getToken();
+  const api = createPartnerApi({ foundation: getFoundation() });
+  const actor = session.state === "AUTHENTICATED" ? session.actor : null;
+  const [pending, setPending] = useState<PendingHandoverReceipt[]>([]);
+  const [flushResult, setFlushResult] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [signOutNote, setSignOutNote] = useState<string | null>(null);
 
-  function handleSignOut() {
-    signOut();
-    router.replace("/");
+  async function loadQueue() {
+    try {
+      const receipts = pendingHandoverReceipts(await api.queuedMutations());
+      if (api.actor()?.id !== (actor?.id ?? null)) return;
+      setPending(receipts);
+    } catch {
+      setPending([]);
+      setFlushResult("The pending queue could not be read right now.");
+    }
   }
 
+  useEffect(() => {
+    if (actor) void loadQueue();
+  }, [actor?.id]);
+
+  async function flush() {
+    setBusy(true);
+    try {
+      const report = await api.flushQueue();
+      const parts = [
+        `confirmed: ${report.confirmed.length}`,
+        `discarded stale: ${report.discardedStale.length}`,
+        `still pending: ${report.pending.length}`,
+      ];
+      const pendingReasons = report.pending
+        .slice(0, 3)
+        .map(entry => {
+          const cause = entry.cause instanceof Error ? entry.cause.message : String(entry.cause);
+          return `${entry.record.routeId}: ${cause}`;
+        });
+      setFlushResult([
+        `Queue flush finished (${parts.join(", ")}).`,
+        ...pendingReasons,
+      ].join("\n"));
+      await loadQueue();
+    } catch (err) {
+      setFlushResult(
+        err instanceof Error
+          ? `Flush did not finish: ${err.message}`
+          : "Flush did not finish.",
+      );
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function signOut() {
+    setBusy(true);
+    setSignOutNote(null);
+    try {
+      const report = await api.signOut();
+      setSignOutNote(
+        report.serverRevocationConfirmed
+          ? "Signed out. The server session was revoked and private task data was cleared from view."
+          : "Signed out locally. The server revocation could not be confirmed; local task data was cleared from view.",
+      );
+      router.replace("/");
+    } catch (err) {
+      setSignOutNote(err instanceof Error ? `Sign-out failed: ${err.message}` : "Sign-out failed.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  if (!actor) {
+    return (
+      <EmptyState
+        title="Sign in required"
+        body="Account details and the pending custody queue are private. Sign in from the task list."
+      />
+    );
+  }
+
+  return (
+    <View>
+      <Card>
+        <Text style={styles.heading}>Account</Text>
+        <View style={styles.row}>
+          <Badge label={actor.role} tone="action" />
+          <Badge label={`facilities: ${actor.facilityIds.length}`} />
+        </View>
+        <Text style={styles.bodyMuted}>Actor ID: {actor.id}</Text>
+        <Text style={styles.bodyMuted}>
+          Task visibility comes from the server-derived actor scope; request bodies never grant scope.
+        </Text>
+      </Card>
+
+      <Card tone={pending.length > 0 ? "warning" : "success"}>
+        <Text style={styles.heading}>Pending custody intents</Text>
+        <Text style={styles.bodyMuted}>
+          {pending.length === 0
+            ? "No pending custody handover intents. Confirmed online handovers never sit in this list."
+            : `${pending.length} handover intent(s) without a confirmed outcome. Each retains its original action ID, code and version and will be sent unchanged.`}
+        </Text>
+        {pending.map(entry => (
+          <View key={entry.idempotencyKey} style={styles.pendingRow}>
+            <Text style={styles.meta}>
+              job {entry.jobId.slice(0, 8)}… • action {entry.actionId.slice(0, 8)}… • queued{" "}
+              {new Date(entry.createdAt).toLocaleString()}
+            </Text>
+          </View>
+        ))}
+        <NoticeBox
+          title="Queue storage honesty"
+          body="This app currently uses the shared session foundation's injected stores. On the web build those stores are memory-only: closing the tab drops unconfirmed intents. A memory queue is NOT durable offline storage; durable persistence needs the native store integration (pending F00/native acceptance)."
+          tone="warning"
+        />
+        {pending.length > 0 ? (
+          <>
+            <PrimaryButton label="Flush pending queue now" onPress={flush} busy={busy} />
+            <Text style={styles.hint}>Flush replays each intent unchanged with its original idempotency key.</Text>
+          </>
+        ) : null}
+      </Card>
+
+      {flushResult ? <NoticeBox title="Flush result" body={flushResult} tone="warning" /> : null}
+
+      <Card>
+        <PrimaryButton label="Sign out" tone="quiet" onPress={signOut} busy={busy} />
+        {signOutNote ? <NoticeBox title="Sign-out status" body={signOutNote} tone="warning" /> : null}
+      </Card>
+    </View>
+  );
+}
+
+export default function AccountScreen() {
+  const session = usePartnerSession();
   return (
     <ScrollView
       style={styles.screen}
       contentContainerStyle={styles.container}
-      keyboardShouldPersistTaps="handled"
     >
       <View style={styles.centerWrapper}>
-        <View style={styles.demoTag}>
-          <Text style={styles.demoTagText}>[DEMO] RIDER SESSION</Text>
-        </View>
-
-        <View style={styles.card}>
-          <Text style={styles.title}>Partner Profile</Text>
-
-          <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>Name</Text>
-            <Text style={styles.infoValue}>{user?.name ?? "Demo Rider"}</Text>
-          </View>
-
-          <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>Phone</Text>
-            <Text style={styles.infoValue}>{user?.phone ?? "+91 98765 43210"}</Text>
-          </View>
-
-          <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>Role</Text>
-            <Text style={styles.infoValue}>{user?.role ?? "rider"}</Text>
-          </View>
-
-          <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>Partner ID</Text>
-            <Text style={styles.infoValue}>{user?.id ?? "demo-rider-session"}</Text>
-          </View>
-
-          <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>Auth Status</Text>
-            <Text style={styles.infoValue}>
-              {token ? "Authenticated (Demo)" : "Not signed in"}
-            </Text>
-          </View>
-        </View>
-
-        {/* Explicit No-Earnings Notice per spec */}
-        <View style={styles.payrollCard}>
-          <Text style={styles.payrollTitle}>Partner Employment & Payroll</Text>
-          <Text style={styles.payrollText}>
-            Laundry does not provide payroll, settlement, or earnings calculation. Payouts and work shifts are governed by your licensed logistics service provider contract.
-          </Text>
-        </View>
-
-        {/* Cache & Security Notice */}
-        <View style={styles.card}>
-          <Text style={styles.cardHeading}>Security & Cache</Text>
-          <Text style={styles.bodyMuted}>
-            Active task data is cached locally during shifts. Signing out purges all cached job details and customer addresses from memory.
-          </Text>
-
-          <Pressable
-            onPress={handleSignOut}
-            style={({ pressed }: { pressed: boolean }) => [
-              styles.signOutButton,
-              pressed && styles.signOutButtonPressed,
-            ]}
-            accessibilityRole="button"
-            accessibilityLabel="Sign out and purge cached jobs"
-          >
-            <Text style={styles.signOutButtonText}>
-              Sign Out & Purge Job Cache
-            </Text>
-          </Pressable>
-        </View>
+        {session.state === "AUTHENTICATED" ? (
+          <AccountPanel />
+        ) : session.state === "LOADING" ? (
+          <LoadingState label="Checking sign-in…" />
+        ) : session.state === "CONFIG_ERROR" ? (
+          <NoticeBox title="App configuration required" body={session.message} tone="danger" />
+        ) : (
+          <EmptyState
+            title="Sign in required"
+            body="Account details are private. Sign in from the task list first."
+          />
+        )}
       </View>
     </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  screen: {
-    flex: 1,
-    backgroundColor: colors.surfaceTint,
-  },
-  container: {
-    padding: spacing.md,
-    alignItems: "center",
-  },
-  centerWrapper: {
-    width: "100%",
-    maxWidth: maxContentWidth,
-  },
-  demoTag: {
-    backgroundColor: "#FEE2E2",
-    borderColor: "#FCA5A5",
-    borderWidth: 1,
-    borderRadius: radius.sm,
-    paddingVertical: spacing.xs,
-    paddingHorizontal: spacing.sm,
-    marginBottom: spacing.md,
-    alignSelf: "flex-start",
-  },
-  demoTagText: {
-    color: colors.danger,
-    fontSize: typography.sizes.caption,
-    fontWeight: "700",
-  },
-  card: {
-    backgroundColor: colors.surface,
-    borderRadius: radius.md,
-    padding: spacing.md,
-    borderWidth: 1,
-    borderColor: colors.border,
-    marginBottom: spacing.md,
-  },
-  title: {
-    color: colors.ink,
-    fontSize: typography.sizes.title,
-    fontWeight: "700",
-    marginBottom: spacing.md,
-  },
-  cardHeading: {
-    color: colors.ink,
-    fontSize: typography.sizes.body,
-    fontWeight: "700",
-    marginBottom: spacing.xs,
-  },
-  infoRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    paddingVertical: spacing.xs,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.surfaceTint,
-  },
-  infoLabel: {
-    color: colors.inkMuted,
-    fontSize: typography.sizes.caption,
-    fontWeight: "600",
-  },
-  infoValue: {
-    color: colors.ink,
-    fontSize: typography.sizes.caption,
-    fontWeight: "700",
-  },
-  payrollCard: {
-    backgroundColor: colors.surface,
-    borderRadius: radius.md,
-    padding: spacing.md,
-    borderWidth: 1,
-    borderColor: colors.border,
-    marginBottom: spacing.md,
-  },
-  payrollTitle: {
-    color: colors.ink,
-    fontSize: typography.sizes.body,
-    fontWeight: "700",
-    marginBottom: 4,
-  },
-  payrollText: {
-    color: colors.inkMuted,
-    fontSize: typography.sizes.caption,
-    lineHeight: 18,
-  },
-  bodyMuted: {
-    color: colors.inkMuted,
-    fontSize: typography.sizes.caption,
-    lineHeight: 20,
-  },
-  signOutButton: {
-    minHeight: minTouchTarget,
-    backgroundColor: "#FEE2E2",
-    borderColor: "#FCA5A5",
-    borderWidth: 1,
-    borderRadius: radius.sm,
-    justifyContent: "center",
-    alignItems: "center",
-    marginTop: spacing.md,
-    paddingHorizontal: spacing.md,
-  },
-  signOutButtonPressed: {
-    backgroundColor: "#FCD34D",
-  },
-  signOutButtonText: {
-    color: colors.danger,
-    fontSize: typography.sizes.body,
-    fontWeight: "700",
-  },
+  screen: { flex: 1, backgroundColor: colors.surfaceTint },
+  container: { padding: spacing.md, alignItems: "center" },
+  centerWrapper: { width: "100%", maxWidth: maxContentWidth },
+  heading: { color: colors.ink, fontWeight: "700", fontSize: 18, marginBottom: spacing.xs },
+  bodyMuted: { color: colors.inkMuted, fontSize: 14, lineHeight: 20, marginTop: spacing.xs },
+  row: { flexDirection: "row", gap: spacing.sm, flexWrap: "wrap", marginVertical: spacing.xs },
+  pendingRow: { marginTop: spacing.sm },
+  meta: { color: colors.inkMuted, fontSize: 12 },
+  hint: { color: colors.inkMuted, fontSize: 12, marginTop: spacing.sm },
 });

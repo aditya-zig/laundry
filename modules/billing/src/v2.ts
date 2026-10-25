@@ -57,6 +57,8 @@ export function verifyProviderSignature(rawBody: Buffer, signature: string | und
   return timingSafeEqual(Buffer.from(digest), Buffer.from(given));
 }
 
+import type { DeliveryReconciliation } from '../../orders/src/completion';
+
 export interface BillingOptions {
   db: Pool;
   authenticate?: (token: string) => Promise<{ actor: v2.Actor }>;
@@ -64,6 +66,7 @@ export interface BillingOptions {
   clock?: () => Date;
   /** Per-provider webhook secrets. A provider without a secret is refused. */
   webhookSecrets?: Record<string, string>;
+  onSettled?: DeliveryReconciliation;
 }
 
 interface ObligationRow {
@@ -524,8 +527,9 @@ export class BillingService {
     const operator = await this.actorOf(token, STAFF);
     const payload = { ...parsed, obligationId };
     const commandHash = createHash('sha256').update(canonicalJson({ operation: 'billing.manual.confirm', payload })).digest('hex');
+    const traceId = randomUUID();
     const result = await this.executor.execute(
-      { actor: operator, operation: 'billing.manual.confirm', idempotencyKey: key, payload: payload as unknown as v2.JsonValue, traceId: randomUUID() },
+      { actor: operator, operation: 'billing.manual.confirm', idempotencyKey: key, payload: payload as unknown as v2.JsonValue, traceId },
       async () => { await this.actorOf(token, STAFF); },
       async scope => {
         const tx: PoolClient = scope.handle;
@@ -539,6 +543,7 @@ export class BillingService {
           await tx.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))', [`billing-manual-reference:${parsed.externalReference}`]);
           if ((await tx.query("SELECT 1 FROM billing_receipts WHERE external_reference=$1 AND confirmed_via <> 'GATEWAY_CAPTURE'", [parsed.externalReference])).rowCount) throw new BillingFault('INVALID_INPUT', 'This manual transaction reference has already been recorded');
         }
+        await this.lockOrderForObligation(tx, obligationId);
         const row = (await tx.query<ObligationRow>(
           'SELECT * FROM billing_obligations WHERE id=$1 FOR UPDATE', [obligationId])).rows[0];
         if (!row) throw new BillingFault('NOT_FOUND', 'Obligation not found');
@@ -570,6 +575,10 @@ export class BillingService {
           before: { status: row.status, amountSettledMinor: amountOf(row.amount_settled_minor) },
           after: { status, amountSettledMinor: settled, receiptId: receipt.id, method: parsed.method, confirmedBy: operator.id },
         });
+        if (status === 'SETTLED') {
+          await this.publishSettlement(tx, row.id, receipt.id, traceId);
+          await this.options.onSettled?.(row.order_id, tx, { actorId: operator.id, actorRole: operator.role, traceId, now: this.clock() });
+        }
         return receipt as unknown as v2.JsonValue;
       },
     );
@@ -854,6 +863,7 @@ export class BillingService {
         } else if (payload.amountMinor <= 0) {
           note = 'Zero-amount capture recorded without a receipt';
         } else {
+          await this.lockOrderForObligation(tx, attempt.obligation_id);
           const obligation = (await tx.query<ObligationRow>(
             'SELECT * FROM billing_obligations WHERE id=$1 FOR UPDATE', [attempt.obligation_id])).rows[0];
           if (!obligation) {
@@ -868,12 +878,12 @@ export class BillingService {
             const status = guard(() => v2.deriveObligationStatus({
               amountDueMinor: amountOf(obligation.amount_due_minor), amountSettledMinor: settled,
             }));
-            await tx.query(
+            const receipt = (await tx.query<ReceiptRow>(
               `INSERT INTO billing_receipts
                 (id, obligation_id, order_id, amount_minor, currency, method, confirmed_by, confirmed_via, external_reference, provider, provider_event_id, issued_at)
-               VALUES ($1,$2,$3,$4,'INR','GATEWAY',NULL,'GATEWAY_CAPTURE',$5,$6,$7,$8)`,
+               VALUES ($1,$2,$3,$4,'INR','GATEWAY',NULL,'GATEWAY_CAPTURE',$5,$6,$7,$8) RETURNING *`,
               [randomUUID(), obligation.id, obligation.order_id, payload.amountMinor, payload.providerReference, provider, payload.eventId, this.clock()],
-            );
+            )).rows[0];
             await tx.query(
               `UPDATE billing_payment_attempts SET status='SUCCEEDED', resolved_at=$2, provider_reference=$3, external_event_id=$4
                WHERE id=$1`, [attempt.id, this.clock(), payload.providerReference, payload.eventId],
@@ -882,6 +892,10 @@ export class BillingService {
               'UPDATE billing_obligations SET amount_settled_minor=$2, status=$3, version=version+1, updated_at=$4 WHERE id=$1',
               [obligation.id, settled, status, this.clock()],
             );
+            if (status === 'SETTLED') {
+              await this.publishSettlement(tx, obligation.id, receipt.id, inserted.id);
+              await this.options.onSettled?.(obligation.order_id, tx, { actorId: inserted.id, actorRole: 'PROVIDER', traceId: inserted.id, now: this.clock() });
+            }
             applied = true;
           }
         }
@@ -907,6 +921,20 @@ export class BillingService {
       return { accepted: true, duplicate: false };
     });
     return v2.webhookResultSchema.parse(result);
+  }
+
+  private async lockOrderForObligation(tx: PoolClient, obligationId: string): Promise<void> {
+    await tx.query(`SELECT ord.id FROM orders_v2_orders ord JOIN billing_obligations o ON o.order_id=ord.id
+      WHERE o.id=$1 FOR UPDATE OF ord`, [obligationId]);
+  }
+
+  private async publishSettlement(tx: PoolClient, obligationId: string, receiptId: string, traceId: string): Promise<void> {
+    const obligation = obligationOf((await tx.query<ObligationRow>('SELECT * FROM billing_obligations WHERE id=$1', [obligationId])).rows[0]);
+    const receipt = receiptOf((await tx.query<ReceiptRow>('SELECT * FROM billing_receipts WHERE id=$1', [receiptId])).rows[0]);
+    const event = v2.domainEventSchema.parse({ eventId: randomUUID(), eventType: 'payment.settled.v2', schemaVersion: 2,
+      aggregateId: obligation.id, aggregateVersion: obligation.version, traceId, occurredAt: this.clock().toISOString(), payload: { obligation, receipt } });
+    await tx.query(`INSERT INTO v2_outbox (event_id,aggregate_id,aggregate_version,event_type,envelope)
+      VALUES ($1,$2,$3,$4,$5)`, [event.eventId, event.aggregateId, event.aggregateVersion, event.eventType, canonicalJson(event)]);
   }
 
   // ------------------------------------------------- internal write hooks
@@ -940,16 +968,21 @@ export class BillingService {
    * is deliberately unreachable here; only a signed provider event can settle. */
   async resolveAttempt(attemptId: string, outcome: 'PENDING' | 'FAILED' | 'EXPIRED' | 'OUTCOME_UNKNOWN', detail?: { failureReason?: string }): Promise<v2.PaymentAttempt> {
     v2.idSchema.parse(attemptId);
-    const row = (await this.options.db.query<AttemptRow>(
-      'SELECT * FROM billing_payment_attempts WHERE id=$1', [attemptId])).rows[0];
-    if (!row) throw new BillingFault('NOT_FOUND', 'Payment attempt not found');
-    guard(() => v2.assertPaymentAttemptTransition(row.status, outcome, {}));
-    const resolved = outcome === 'PENDING' ? null : this.clock();
-    const updated = (await this.options.db.query<AttemptRow>(
-      `UPDATE billing_payment_attempts SET status=$2, resolved_at=$3, failure_reason=$4 WHERE id=$1 RETURNING *`,
-      [attemptId, outcome, resolved, detail?.failureReason ?? null],
-    )).rows[0];
-    return attemptOf(updated);
+    return this.tx(async tx => {
+      const row = (await tx.query<AttemptRow>('SELECT * FROM billing_payment_attempts WHERE id=$1 FOR UPDATE', [attemptId])).rows[0];
+      if (!row) throw new BillingFault('NOT_FOUND', 'Payment attempt not found');
+      guard(() => v2.assertPaymentAttemptTransition(row.status, outcome, {}));
+      const updated = (await tx.query<AttemptRow>(
+        `UPDATE billing_payment_attempts SET status=$2, resolved_at=$3, failure_reason=$4 WHERE id=$1 RETURNING *`,
+        [attemptId, outcome, outcome === 'PENDING' ? null : this.clock(), detail?.failureReason ?? null],
+      )).rows[0];
+      if (outcome === 'FAILED' || outcome === 'EXPIRED') {
+        await this.lockOrderForObligation(tx, row.obligation_id);
+        const order = (await tx.query<{ order_id: string }>('SELECT order_id FROM billing_obligations WHERE id=$1', [row.obligation_id])).rows[0];
+        if (order) await this.options.onSettled?.(order.order_id, tx, { actorId: row.id, actorRole: 'PROVIDER', traceId: randomUUID(), now: this.clock() });
+      }
+      return attemptOf(updated);
+    });
   }
 
   /**
@@ -959,7 +992,9 @@ export class BillingService {
    */
   async voidZeroDue(input: { obligationId: string; resolution: { auditId: string; reason: string }; actor: v2.Actor }): Promise<v2.Obligation> {
     v2.idSchema.parse(input.obligationId);
+    const traceId = randomUUID();
     return this.tx(async tx => {
+      await this.lockOrderForObligation(tx, input.obligationId);
       const row = (await tx.query<ObligationRow>(
         'SELECT * FROM billing_obligations WHERE id=$1 FOR UPDATE', [input.obligationId])).rows[0];
       if (!row) throw new BillingFault('NOT_FOUND', 'Obligation not found');
@@ -980,9 +1015,10 @@ export class BillingService {
           input.actor.id, input.actor.role, row.id, input.resolution.reason,
           canonicalJson({ status: row.status, amountDueMinor: amountOf(row.amount_due_minor) }),
           canonicalJson({ status, voidReason: input.resolution.reason, auditId: input.resolution.auditId }),
-          randomUUID(),
+          traceId,
         ],
       );
+      await this.options.onSettled?.(row.order_id, tx, { actorId: input.actor.id, actorRole: input.actor.role, traceId, now: this.clock() });
       return obligationOf(updated);
     });
   }
