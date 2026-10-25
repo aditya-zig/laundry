@@ -1,0 +1,42 @@
+{
+  "task": "B04",
+  "issue": 14,
+  "owner": "backend",
+  "baseSha": "08ec897018f437802041f553dcb026ec8ddb0a10",
+  "sourceSha": "10e445ba56844d4c5054e53f2b188ab61bb6dfd0",
+  "testedSha": "10e445ba56844d4c5054e53f2b188ab61bb6dfd0",
+  "scope": "Unified booking, measured intake with adjustments, care and quality checks, cancellation and reschedule; no payment obligation or pickup/delivery route",
+  "contractVersion": "laundry-wire-v2.0.0-candidate",
+  "contractDigest": null,
+  "state": "BLOCKED_CONTRACT",
+  "providers": { "smsAcceptance": "FAKE", "commercialNetworkCalls": 0, "liveAcceptance": "NOT_APPLICABLE" },
+  "migrations": ["modules/schema/migrations/013_orders.sql"],
+  "commands": [
+    { "argv": ["pnpm", "check"], "exitCode": 0 },
+    { "argv": ["pnpm", "contracts:generate"], "exitCode": 0, "paths": 80, "operations": 84 },
+    { "argv": ["pnpm", "contracts:check"], "exitCode": 0, "passed": 7 },
+    { "argv": ["node", "tools/cloud/postgres.mjs", "exec", "--", "pnpm", "--filter", "@laundry/api", "exec", "vitest", "run", "orders-v2"], "exitCode": 0, "passed": 19 }
+  ],
+  "cloudRuns": [],
+  "scenarioScope": {
+    "B04-01": "Quote snapshots server prices and holds capacity; idempotent booking creates one order and one reservation; obligation is B05",
+    "B04-02": "Stale quote version, expired hold, expired quote and stale order version all rejected with VERSION_CONFLICT or QUOTE_EXPIRED",
+    "B04-03": "Higher measured total proposes adjustment and blocks care until accepted; accepted adjustment returns to AT_FACILITY with new total; lower weight lowers bill without extra charge; decline holds at ON_HOLD with old total, care resumes after RESUME; adjustment expiry sweeps once with audit row",
+    "B04-04": "Partially covered: decline into hold, expiry into hold, lower-weight repricing covered; agreed unpaid return waits for B05 obligation",
+    "B04-05": "Pre-pickup cancellation releases capacity and completes when reconciliation facts verified; post-pickup stops at CANCEL_REQUESTED; reschedule moves reservation atomically; CONFIRM_CANCEL requires B05/B06 evidence"
+  },
+  "remaining": [
+    "Payment obligation creation, receipts, settlement and refunds (B05)",
+    "Pickup and return legs, custody proof, rider assignment and tracking (B06)",
+    "Evidence uploads, media access and retention sweep (B07)",
+    "Incidents, rewash and verified consented reviews (B08)",
+    "WhatsApp drafts, exact confirmation and human escalation (B09)",
+    "Worker retries, dead letters, privacy jobs, observability (B10)",
+    "Design system, app foundations and three app screens (D01, F00-F04)",
+    "Integrated verification in PostgreSQL and browsers (E01)",
+    "Native Android build and verification (E02)",
+    "Production readiness, migration rehearsal and launch handoff (E03)",
+    "C01 freeze, tariff approval, production ordering"
+  ],
+  "productionReady": false
+}
