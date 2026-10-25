@@ -3,7 +3,7 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from
 import { NestFactory } from '@nestjs/core';
 import { Module } from '@nestjs/common';
 import { ProductModule } from '../src/features/product.module';
-import { BillingService, createObligationForOrder } from '../../../modules/billing/src';
+import { BillingService, createObligationForOrder, reconcileObligationForReturn } from '../../../modules/billing/src';
 import { LogisticsService } from '../../../modules/logistics/src';
 import type { NestExpressApplication } from '@nestjs/platform-express';
 import { randomBytes, randomUUID } from 'node:crypto';
@@ -629,6 +629,100 @@ describe('transactional booking peer integration', () => {
     expect((await getPool().query('SELECT status FROM orders_v2_quotes WHERE id=$1', [quoted.id])).rows[0].status).toBe('OPEN');
     expect((await getPool().query('SELECT status FROM availability_holds WHERE id=$1', [quoted.holdReference])).rows[0].status).toBe('HELD');
     expect(await reservedCount(bucketId)).toBe(1);
+  });
+});
+
+describe('transactional return-ready peer integration', () => {
+  async function checkingOrder(measuredWeightGrams = 2400, failReturn = false) {
+    const seeded = await seed();
+    await provisionStaff(operatorPhone);
+    const operator = await signin(operatorPhone);
+    const authenticate = (token: string) => identity.authenticate(token);
+    const logistics = new LogisticsService({ db: getPool(), authenticate, clock });
+    const composed = new OrdersService({ db: getPool(), authenticate, catalog, availability, clock,
+      onBooked: async (booked, tx) => { await createObligationForOrder(tx, { orderId: booked.id, clock }); },
+      onReady: async (ready, tx) => {
+        const obligation = await reconcileObligationForReturn(tx, { orderId: ready.id, clock });
+        await logistics.openLegAttempt(ready.id, 'RETURN', { scheduledWindow: ready.promisedReturnWindow }, tx);
+        if (failReturn) throw new Error('Synthetic return dispatch failure');
+        return obligation;
+      },
+    });
+    const quote = await composed.createQuote(seeded.customer.accessToken, quoteInput(seeded.serviceId, seeded.addressId), key());
+    const booked = await composed.bookOrder(seeded.customer.accessToken, { quoteId: quote.id, expectedVersion: quote.version, paymentModel: 'DUE_AT_RETURN' }, key());
+    const pickedUp = await composed.markPickupPending(operator.accessToken, booked.id);
+    let intake = await composed.recordIntake(operator.accessToken, booked.id, {
+      expectedVersion: pickedUp.version,
+      lines: [{ orderLineId: booked.lines[0].orderLineId, measuredWeightGrams, condition: 'GOOD' }],
+      containers: [{ id: randomUUID(), sealed: true, condition: 'GOOD', garmentCount: 6 }], mediaIds: [],
+    }, key());
+    if (intake.adjustment?.state === 'PROPOSED') intake = await composed.decideAdjustment(seeded.customer.accessToken, booked.id, {
+      expectedVersion: intake.version, adjustmentId: intake.adjustment.id, adjustmentVersion: intake.adjustment.version, decision: 'ACCEPT',
+    }, key());
+    const care = await composed.recordCare(operator.accessToken, booked.id, { expectedVersion: intake.version, target: 'IN_CARE' }, key());
+    const checking = await composed.recordCare(operator.accessToken, booked.id, { expectedVersion: care.version, target: 'QUALITY_CHECK' }, key());
+    const input: v2.QualityCheck = { expectedVersion: checking.version, passed: true,
+      containers: [{ id: randomUUID(), sealed: true, condition: 'GOOD', garmentCount: 6 }], mediaIds: [] };
+    return { ...seeded, operator, composed, checking, input, booked };
+  }
+
+  it.each([2400, 500])('reconciles accepted intake weight %i, opens one return leg and publishes once under concurrent replay', async weight => {
+    const { customer, operator, composed, checking, input, booked } = await checkingOrder(weight);
+    const idem = key();
+    const results = await Promise.all([composed.recordQualityCheck(operator.accessToken, booked.id, input, idem), composed.recordQualityCheck(operator.accessToken, booked.id, input, idem)]);
+    expect(results[0]).toEqual(results[1]);
+    const ready = results[0];
+    expect(ready.status).toBe('READY_FOR_RETURN');
+    expect(ready.version).toBe(checking.version + 1);
+    const billing = new BillingService({ db: getPool(), authenticate: token => identity.authenticate(token), clock });
+    const obligations = await billing.listOrderObligations(customer.accessToken, ready.id);
+    expect(obligations.items).toHaveLength(1);
+    expect(obligations.items[0]).toMatchObject({ amountDueMinor: ready.totalMinor, amountSettledMinor: 0, status: 'OPEN', version: 2 });
+    expect(ready.totalMinor).toBe(weight === 2400 ? 10000 : 4000);
+    const legs = (await getPool().query("SELECT * FROM logistics_leg_attempts WHERE order_id=$1 AND leg='RETURN'", [ready.id])).rows;
+    expect(legs).toHaveLength(1);
+    expect(legs[0]).toMatchObject({ status: 'BOOKED', scheduled_window: ready.promisedReturnWindow });
+    const events = (await getPool().query("SELECT envelope FROM v2_outbox WHERE aggregate_id=$1 AND event_type='order.ready-for-return.v2'", [ready.id])).rows;
+    expect(events).toHaveLength(1);
+    expect(v2.domainEventSchema.parse(events[0].envelope)).toMatchObject({ eventType: 'order.ready-for-return.v2', aggregateVersion: ready.version,
+      payload: { orderId: ready.id, obligation: { amountDueMinor: ready.totalMinor } } });
+  });
+
+  it('rolls back quality-check, repricing, return leg, audit/result and ready event if dispatch fails', async () => {
+    const { operator, composed, input, checking, booked } = await checkingOrder(2400, true);
+    const idem = key();
+    const audits = (await getPool().query('SELECT count(*)::int AS n FROM v2_audit')).rows[0].n;
+    await expect(composed.recordQualityCheck(operator.accessToken, booked.id, input, idem)).rejects.toThrow('Synthetic return dispatch failure');
+    expect(await composed.getOrder(operator.accessToken, booked.id)).toMatchObject({ status: 'QUALITY_CHECK', version: checking.version });
+    expect((await getPool().query('SELECT amount_due_minor,version FROM billing_obligations WHERE order_id=$1', [booked.id])).rows[0]).toMatchObject({ amount_due_minor: '6000', version: 1 });
+    expect((await getPool().query("SELECT count(*)::int AS n FROM logistics_leg_attempts WHERE leg='RETURN'")).rows[0].n).toBe(0);
+    expect((await getPool().query("SELECT count(*)::int AS n FROM v2_outbox WHERE event_type='order.ready-for-return.v2'")).rows[0].n).toBe(0);
+    expect((await getPool().query('SELECT count(*)::int AS n FROM v2_audit')).rows[0].n).toBe(audits);
+    expect((await getPool().query('SELECT count(*)::int AS n FROM v2_command_results WHERE idempotency_key=$1', [idem])).rows[0].n).toBe(0);
+  });
+
+  it('does not dispatch or reprice after a failed quality check', async () => {
+    const { operator, composed, input, booked } = await checkingOrder();
+    const result = await composed.recordQualityCheck(operator.accessToken, booked.id, { ...input, passed: false, note: 'Requires rewash' }, key());
+    expect(result.status).toBe('IN_CARE');
+    expect((await getPool().query('SELECT amount_due_minor FROM billing_obligations WHERE order_id=$1', [booked.id])).rows[0].amount_due_minor).toBe('6000');
+    expect((await getPool().query("SELECT count(*)::int AS n FROM logistics_leg_attempts WHERE leg='RETURN'")).rows[0].n).toBe(0);
+  });
+
+  it('holds repricing when an unsettled provider attempt could still collect the old amount', async () => {
+    const { operator, composed, input, booked } = await checkingOrder();
+    const billing = new BillingService({ db: getPool(), clock });
+    const obligation = (await getPool().query('SELECT id FROM billing_obligations WHERE order_id=$1', [booked.id])).rows[0];
+    await billing.recordAttempt({ obligationId: obligation.id, amountMinor: 6000, method: 'GATEWAY' });
+    await expect(composed.recordQualityCheck(operator.accessToken, booked.id, input, key())).rejects.toMatchObject({ code: 'PAYMENT_PENDING' });
+    expect((await composed.getOrder(operator.accessToken, booked.id)).status).toBe('QUALITY_CHECK');
+  });
+
+  it('requires tracked refund resolution instead of erasing overpaid money', async () => {
+    const { operator, composed, input, booked } = await checkingOrder(500);
+    await getPool().query("UPDATE billing_obligations SET amount_settled_minor=6000,status='SETTLED' WHERE order_id=$1", [booked.id]);
+    await expect(composed.recordQualityCheck(operator.accessToken, booked.id, input, key())).rejects.toMatchObject({ code: 'REQUIRES_APPROVAL' });
+    expect((await getPool().query('SELECT amount_due_minor,amount_settled_minor FROM billing_obligations WHERE order_id=$1', [booked.id])).rows[0]).toMatchObject({ amount_due_minor: '6000', amount_settled_minor: '6000' });
   });
 });
 

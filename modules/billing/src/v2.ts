@@ -295,6 +295,39 @@ export async function createObligationForOrder(
   return obligationOf(existing);
 }
 
+/** Finalize the accepted order total inside the quality-check transaction.
+ * Received money is immutable; overpayment and unknown captures need explicit
+ * reconciliation, not silently discarded receipts or a fabricated refund. */
+export async function reconcileObligationForReturn(
+  transaction: PoolClient,
+  input: { orderId: string; clock?: () => Date },
+): Promise<v2.Obligation> {
+  v2.idSchema.parse(input.orderId);
+  const order = (await transaction.query<{ total_minor: string | number; status: v2.OrderStatus }>(
+    'SELECT total_minor,status FROM orders_v2_orders WHERE id=$1 FOR UPDATE', [input.orderId],
+  )).rows[0];
+  if (!order) throw new BillingFault('NOT_FOUND', 'Order not found');
+  if (order.status !== 'READY_FOR_RETURN') throw new BillingFault('INVALID_INPUT', 'Final billing requires a passed quality check');
+  const row = (await transaction.query<ObligationRow>(
+    "SELECT * FROM billing_obligations WHERE order_id=$1 ORDER BY (status <> 'VOID') DESC, created_at DESC LIMIT 1 FOR UPDATE", [input.orderId],
+  )).rows[0];
+  if (!row) throw new BillingFault('REQUIRES_APPROVAL', 'The booking has no payment obligation to reconcile');
+  if (row.status === 'VOID') throw new BillingFault('REQUIRES_APPROVAL', 'A void obligation requires its recorded return resolution');
+  const due = amountOf(order.total_minor), settled = amountOf(row.amount_settled_minor);
+  if (due === amountOf(row.amount_due_minor)) return obligationOf(row);
+  if (settled > due) throw new BillingFault('REQUIRES_APPROVAL', 'Received money exceeds the final total; resolve the tracked refund before dispatch');
+  const unresolved = (await transaction.query(
+    "SELECT 1 FROM billing_payment_attempts WHERE obligation_id=$1 AND status IN ('CREATED','PENDING','OUTCOME_UNKNOWN') LIMIT 1", [row.id],
+  )).rows.length > 0;
+  if (unresolved) throw new BillingFault('PAYMENT_PENDING', 'Reconcile the outstanding payment attempt before changing the amount due');
+  const status = v2.deriveObligationStatus({ amountDueMinor: due, amountSettledMinor: settled });
+  const updated = (await transaction.query<ObligationRow>(
+    'UPDATE billing_obligations SET amount_due_minor=$2,status=$3,version=version+1,updated_at=$4 WHERE id=$1 RETURNING *',
+    [row.id, due, status, input.clock?.() ?? new Date()],
+  )).rows[0];
+  return obligationOf(updated);
+}
+
 export class BillingService {
   private readonly executor: ReturnType<typeof createPostgresCommandExecutor>;
   private readonly clock: () => Date;
@@ -882,20 +915,25 @@ export class BillingService {
    * route for this; the coordinator calls it when it starts a payment. */
   async recordAttempt(input: { obligationId: string; method: v2.PaymentMethod; amountMinor: number; providerReference?: string }): Promise<v2.PaymentAttempt> {
     v2.idSchema.parse(input.obligationId);
-    const obligation = (await this.options.db.query<ObligationRow>(
-      'SELECT * FROM billing_obligations WHERE id=$1', [input.obligationId])).rows[0];
-    if (!obligation) throw new BillingFault('NOT_FOUND', 'Obligation not found');
-    if (obligation.status === 'VOID') throw new BillingFault('INVALID_INPUT', 'A void obligation cannot start a payment');
-    if (input.amountMinor > amountOf(obligation.amount_due_minor) - amountOf(obligation.amount_settled_minor)) {
-      throw new BillingFault('INVALID_INPUT', 'A payment attempt cannot exceed the remaining due');
-    }
-    const row = (await this.options.db.query<AttemptRow>(
-      `INSERT INTO billing_payment_attempts
-        (id, obligation_id, status, method, amount_minor, provider_reference, external_event_id, started_at, resolved_at, failure_reason, attempt_count)
-       VALUES ($1,$2,'CREATED',$3,$4,$5,NULL,$6,NULL,NULL,1) RETURNING *`,
-      [randomUUID(), obligation.id, input.method, input.amountMinor, input.providerReference ?? null, this.clock()],
-    )).rows[0];
-    return attemptOf(row);
+    v2.moneySchema.parse(input.amountMinor);
+    v2.paymentMethodSchema.parse(input.method);
+    return this.tx(async tx => {
+      // Share the obligation lock with final repricing and receipt settlement.
+      const obligation = (await tx.query<ObligationRow>(
+        'SELECT * FROM billing_obligations WHERE id=$1 FOR UPDATE', [input.obligationId])).rows[0];
+      if (!obligation) throw new BillingFault('NOT_FOUND', 'Obligation not found');
+      if (obligation.status === 'VOID') throw new BillingFault('INVALID_INPUT', 'A void obligation cannot start a payment');
+      if (input.amountMinor > amountOf(obligation.amount_due_minor) - amountOf(obligation.amount_settled_minor)) {
+        throw new BillingFault('INVALID_INPUT', 'A payment attempt cannot exceed the remaining due');
+      }
+      const row = (await tx.query<AttemptRow>(
+        `INSERT INTO billing_payment_attempts
+          (id, obligation_id, status, method, amount_minor, provider_reference, external_event_id, started_at, resolved_at, failure_reason, attempt_count)
+         VALUES ($1,$2,'CREATED',$3,$4,$5,NULL,$6,NULL,NULL,1) RETURNING *`,
+        [randomUUID(), obligation.id, input.method, input.amountMinor, input.providerReference ?? null, this.clock()],
+      )).rows[0];
+      return attemptOf(row);
+    });
   }
 
   /** Close an attempt that is not backed by an authoritative capture. SUCCEEDED

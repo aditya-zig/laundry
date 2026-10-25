@@ -39,6 +39,8 @@ export interface OrdersOptions {
   reconciliation?: OrdersReconciliation;
   /** Coordinator-owned peer composition; must use this exact transaction. */
   onBooked?: (order: v2.Order, transaction: PoolClient) => Promise<void>;
+  /** Reconcile final billing and open the return leg in the same transaction. */
+  onReady?: (order: v2.Order, transaction: PoolClient) => Promise<v2.Obligation>;
   clock?: () => Date;
   adjustmentMinutes?: number;
 }
@@ -988,8 +990,9 @@ export class OrdersService {
   async recordQualityCheck(token: string, orderId: string, input: v2.QualityCheck, key: string): Promise<v2.Order> {
     const parsed = v2.qualityCheckSchema.parse(input);
     const { actor } = await this.fulfillmentOrder(token, orderId, FULFILLMENT);
+    const traceId = randomUUID();
     const result = await this.executor.execute(
-      { actor, operation: 'orders.ops.qc', idempotencyKey: key, payload: { ...parsed, orderId } as unknown as v2.JsonValue, traceId: randomUUID() },
+      { actor, operation: 'orders.ops.qc', idempotencyKey: key, payload: { ...parsed, orderId } as unknown as v2.JsonValue, traceId },
       async () => { await this.fulfillmentOrder(token, orderId, FULFILLMENT); },
       async scope => {
         const tx: PoolClient = scope.handle;
@@ -1022,7 +1025,17 @@ export class OrdersService {
           before: { status: row.status, containers: row.containers.length },
           after: { status: next.status, containers: parsed.containers.length },
         });
-        return order(updated, await this.timeline(orderId, tx)) as unknown as v2.JsonValue;
+        const ready = order(updated, await this.timeline(orderId, tx));
+        if (parsed.passed && this.options.onReady) {
+          const obligation = v2.obligationSchema.parse(await this.options.onReady(ready, tx));
+          if (obligation.orderId !== ready.id || obligation.amountDueMinor !== ready.totalMinor) {
+            throw new OrdersFault('INVALID_INPUT', 'The return obligation must match the accepted order total');
+          }
+          await scope.publish({ eventId: randomUUID(), eventType: 'order.ready-for-return.v2', schemaVersion: 2,
+            aggregateId: ready.id, aggregateVersion: ready.version, occurredAt: this.clock().toISOString(), traceId,
+            payload: { orderId: ready.id, readyAt: this.clock().toISOString(), obligation } });
+        }
+        return ready as unknown as v2.JsonValue;
       },
     );
     return v2.orderSchema.parse(result);

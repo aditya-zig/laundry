@@ -175,14 +175,21 @@ export function createSessionFoundation(options: SessionFoundationOptions): Sess
     ensureAuthenticated: requireActor,
     async authorized(run) {
       const started = generation;
-      await requireActor();
-      if (generation !== started) throw unauthenticated();
-      try { return await run(client); }
+      const actor = await requireActor(), scope = identityKey(actor);
+      const current = () => generation === started && session !== null && identityKey(session.actor) === scope;
+      const execute = async () => {
+        if (!current()) throw unauthenticated();
+        const result = await run(client);
+        if (!current()) throw unauthenticated();
+        return result;
+      };
+      if (!current()) throw unauthenticated();
+      try { return await execute(); }
       catch (error) {
-        if (!unauthorized(error) || generation !== started) throw error;
+        if (!unauthorized(error) || !current()) throw error;
         await refresh();
-        if (generation !== started) throw unauthenticated();
-        try { return await run(client); }
+        if (!current()) throw unauthenticated();
+        try { return await execute(); }
         catch (second) { if (unauthorized(second) && generation === started) { generation++; clear(); await write(null).catch(() => undefined); } throw second; }
       }
     },
@@ -213,7 +220,7 @@ export function createSessionFoundation(options: SessionFoundationOptions): Sess
           const result = await foundation.authorized(c => sendRecord(c, record));
           await queue.remove(record.idempotencyKey); return result as CommandResults[K];
         } catch (error) {
-          if (error instanceof V2ApiError && error.status < 500 && error.status !== 401) await queue.remove(record.idempotencyKey);
+          if (error instanceof V2ApiError && error.status < 500 && ![401, 408, 429].includes(error.status) && !error.retryable && error.code !== 'PROVIDER_OUTCOME_UNKNOWN') await queue.remove(record.idempotencyKey);
           throw error;
         }
       })().finally(() => { if (activeCommands.get(fingerprint) === work) activeCommands.delete(fingerprint); });

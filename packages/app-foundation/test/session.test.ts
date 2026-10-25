@@ -85,6 +85,17 @@ describe('F00 refresh and stable command identities', () => {
     h.handle = h.defaultHandle; const report = await f.flushQueuedMutations(); expect(report.confirmed).toHaveLength(1); expect(await f.listQueuedMutations()).toHaveLength(0);
     expect(h.books()[0].headers.get('idempotency-key')).toBe(h.books()[1].headers.get('idempotency-key')); expect(h.books()[0].body).toEqual(h.books()[1].body);
   });
+  it.each([{ status: 429, code: 'RATE_LIMITED', retryable: false }, { status: 408, code: 'PROVIDER_OUTCOME_UNKNOWN', retryable: true }, { status: 409, code: 'PAYMENT_PENDING', retryable: true }])('retains the command key after $status $code', async error => {
+    const h = new Harness(), f = await h.signedIn();
+    h.handle = req => req.path.endsWith('/orders') ? response({ ...error, message: 'Try reconciliation later', traceId: 'synthetic' }, error.status) : h.defaultHandle(req);
+    await expect(f.enqueueMutation(booking())).rejects.toBeInstanceOf(V2ApiError);
+    expect(await f.listQueuedMutations()).toHaveLength(1);
+    h.handle = h.defaultHandle;
+    const report = await f.flushQueuedMutations();
+    expect(report.confirmed).toHaveLength(1);
+    expect(h.books()[0].headers.get('idempotency-key')).toBe(h.books()[1].headers.get('idempotency-key'));
+    expect(h.books()[0].body).toEqual(h.books()[1].body);
+  });
   it('SES-08 persisted intent survives a new foundation instance; unknown replay is never confirmed', async () => {
     const h = new Harness(), f = await h.signedIn(); h.handle = req => { if (req.path.endsWith('/orders')) throw new Error('offline'); return h.defaultHandle(req); };
     await expect(f.enqueueMutation(booking())).rejects.toBeInstanceOf(UnknownOutcomeError);
@@ -127,6 +138,16 @@ describe('F00 refresh and stable command identities', () => {
   });
 });
 describe('F00 teardown, scoped caches and asynchronous identity races', () => {
+  it('a late authorized response cannot cross a logout or actor change', async () => {
+    const h = new Harness(), f = await h.signedIn();
+    const held = gate<string>(), started = gate<void>();
+    const request = f.authorized(async () => { started.resolve(); return held.promise; });
+    const denied = expect(request).rejects.toMatchObject({ code: 'UNAUTHENTICATED' });
+    await started.promise;
+    await f.logout();
+    held.resolve('old actor private data');
+    await denied;
+  });
   it('SES-11 logout revokes, clears local credentials/queue and invalidates identity', async () => {
     const h = new Harness(), f = await h.signedIn(); const report = await f.logout(); expect(report).toMatchObject({ serverRevocationConfirmed: true, localCredsCleared: true }); expect(f.getActor()).toBeNull(); expect(await h.store.read()).toBeNull(); expect(h.changes.at(-1)).toBeNull();
   });

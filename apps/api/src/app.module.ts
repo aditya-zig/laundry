@@ -17,12 +17,12 @@ import { OrdersModule } from "./features/orders/orders.module";
 import { identityFromEnvironment, type IdentityService } from "../../../modules/identity/src";
 import { CatalogService } from "../../../modules/catalog/src";
 import { AvailabilityService } from "../../../modules/availability/src";
-import { OrdersService } from "../../../modules/orders/src";
+import { OrdersFault, OrdersService } from "../../../modules/orders/src";
 import { getPool } from "../../../modules/shared/src/db";
 import { demoMode } from "../../../modules/shared/src/auth";
 import { ProductModule } from './features/product.module';
-import { BillingService, BillingFault, createObligationForOrder } from '../../../modules/billing/src';
-import { LogisticsService } from '../../../modules/logistics/src';
+import { BillingService, BillingFault, createObligationForOrder, reconcileObligationForReturn } from '../../../modules/billing/src';
+import { LogisticsFault, LogisticsService } from '../../../modules/logistics/src';
 import { SupportService } from '../../../modules/support/src';
 import { ReviewsService } from '../../../modules/reviews/src';
 import { JobsService } from '../../../modules/jobs/src';
@@ -86,6 +86,16 @@ function ordersService(): OrdersService {
     onBooked: async (order, transaction) => {
       await createObligationForOrder(transaction, { orderId: order.id });
       await logisticsService().openLegAttempt(order.id, 'PICKUP', { scheduledWindow: order.pickupWindow }, transaction);
+    },
+    onReady: async (order, transaction) => {
+      try {
+        const obligation = await reconcileObligationForReturn(transaction, { orderId: order.id });
+        await logisticsService().openLegAttempt(order.id, 'RETURN', { scheduledWindow: order.promisedReturnWindow }, transaction);
+        return obligation;
+      } catch (error) {
+        if (error instanceof BillingFault || error instanceof LogisticsFault) throw new OrdersFault(error.code, error.message);
+        throw error;
+      }
     },
   }));
 }
