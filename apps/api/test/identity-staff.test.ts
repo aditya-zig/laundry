@@ -121,6 +121,7 @@ describe('B01 staff invitation lifecycle (provisioning vs runtime separation)', 
     expect(refreshed.actor.facilityIds).toEqual(facilityIds);
     await getPool().query('UPDATE identity_staff SET active=false,deactivated_at=$2 WHERE phone=$1', [operatorPhone, now]);
     nextTime(60_000);
+    expect((await service.authenticate(refreshed.accessToken)).actor.role).toBe('CUSTOMER');
     const plain = await signin(operatorPhone);
     expect(plain.actor.role).toBe('CUSTOMER');
     expect(plain.actor.facilityIds).toEqual([]);

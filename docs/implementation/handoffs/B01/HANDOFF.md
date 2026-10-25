@@ -74,12 +74,15 @@ injection, phone idempotency across network handoff, global SMS budget races,
 unknown-vs-definite delivery outcomes, stale/foreign/deleted addresses, oversized
 identity input and exact raw webhook bytes.
 
-Outstanding scope: staff invitations/MFA/assignment scopes, verified WhatsApp
-linking, identity retention-worker integration, the final shared internal-port
-compatibility review/freeze and application session wiring. These are blockers,
-not waived findings. All business handlers, media, money/custody integration,
-native acceptance and actual physical/provider evidence still have their own
-production gates.
+Outstanding scope after this revision: MFA as a session-issuance requirement
+(the frozen candidate `Session` carries no challenge field, so it needs an
+explicit wire revision), the final shared internal-port compatibility
+review/freeze and application session wiring. Staff invitations, roles,
+facility membership and TOTP MFA are recorded in `STAFF.md`; verified WhatsApp
+channel binding is recorded in `WHATSAPP.md`; the retention worker is recorded
+in `RETENTION.md`. These are blockers, not waived findings. All business
+handlers, media, money/custody integration, native acceptance and actual
+physical/provider evidence still have their own production gates.
 
 ## Verification before commit
 

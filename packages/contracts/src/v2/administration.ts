@@ -28,6 +28,7 @@ export type StaffMfaResult = z.infer<typeof staffMfaResultSchema>;
 export const whatsAppLinkSchema = z.object({ challengeId: idSchema, code: z.string().regex(/^\d{6}$/) }).strict();
 export type WhatsAppLink = z.infer<typeof whatsAppLinkSchema>;
 export const whatsAppLinkResultSchema = z.object({ linked: z.literal(true), linkedAt: instantSchema }).strict();
+export type WhatsAppLinkResult = z.infer<typeof whatsAppLinkResultSchema>;
 export const serviceUpdateSchema = serviceSchema.omit({ id: true }).partial().extend({ expectedVersion: expectedVersionSchema, reason: z.string().trim().min(1).max(2000) }).strict();
 export type ServiceUpdate = z.infer<typeof serviceUpdateSchema>;
 export const rateCardInputSchema = rateCardSchema.omit({ id: true, version: true, approvedAt: true, activatedAt: true }).strict();

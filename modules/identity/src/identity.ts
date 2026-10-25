@@ -417,6 +417,44 @@ export class IdentityService {
     }, async tx => { await this.lock(tx, `staff-mfa-owner:${current.actor.id}`); return this.authenticated(tx, token, true); });
   }
 
+  // Verified WhatsApp channel binding. The customer must prove fresh control
+  // of the phone already bound to their profile; a challenge for any other
+  // phone is refused before an attempt is consumed. Linking deliberately does
+  // not mint a session: it only records the channel proof for conversations.
+  async linkWhatsApp(token: string, input: v2.WhatsAppLink, key: string): Promise<v2.WhatsAppLinkResult> {
+    const current = await this.authenticate(token);
+    if (current.actor.role !== 'CUSTOMER') throw new IdentityFault('UNAUTHENTICATED', 'WhatsApp linking requires a customer account');
+    const parsed = v2.whatsAppLinkSchema.parse(input);
+    return this.command<v2.WhatsAppLinkResult>(`whatsapp-link:${current.actor.id}`, key, parsed, async tx => {
+      if (!await this.rate(tx, `whatsapp-link:${current.actor.id}`, 20)) return denied('RATE_LIMITED', 'Too many WhatsApp link attempts');
+      const profile = (await tx.query<{ phone: string }>(
+        'SELECT phone FROM identity_profiles WHERE id=$1 AND active=$2', [current.actor.id, true])).rows[0];
+      const challenge = (await tx.query<{ phone: string; code_hash: string; issuer_mode: string; status: string; attempts: number; expires_at: Date }>(
+        'SELECT phone,code_hash,issuer_mode,status,attempts,expires_at FROM identity_otp_challenges WHERE id=$1', [parsed.challengeId])).rows[0];
+      const live = !!challenge && challenge.issuer_mode === this.options.provider.mode &&
+        !(process.env.NODE_ENV === 'production' && challenge.issuer_mode !== 'LIVE');
+      if (!profile || !challenge || !live || challenge.status !== 'ACCEPTED' || challenge.attempts >= 5 ||
+        challenge.expires_at.getTime() <= this.clock().getTime() || challenge.phone !== profile.phone) {
+        return denied('UNAUTHENTICATED', 'Verify the phone on this account to link WhatsApp');
+      }
+      // Consume the attempt atomically against the same conditions. A
+      // concurrent sign-in verification either wins the row or leaves this
+      // conditional update with nothing to consume.
+      const consumed = (await tx.query<{ code_hash: string }>(`UPDATE identity_otp_challenges SET attempts=attempts+1
+        WHERE id=$1 AND status='ACCEPTED' AND attempts<5 AND expires_at>$2 AND issuer_mode=$3 RETURNING code_hash`,
+      [parsed.challengeId, this.clock(), this.options.provider.mode])).rows[0];
+      if (!consumed) return denied('UNAUTHENTICATED', 'Code is invalid or expired');
+      if (!timingSafeEqual(Buffer.from(consumed.code_hash, 'hex'), Buffer.from(this.hash('otp', `${parsed.challengeId}:${parsed.code}`), 'hex'))) return denied('UNAUTHENTICATED', 'Code is invalid or expired');
+      const used = await tx.query("UPDATE identity_otp_challenges SET status='USED' WHERE id=$1 AND status='ACCEPTED'", [parsed.challengeId]);
+      if (!used.rowCount) return denied('UNAUTHENTICATED', 'Code is invalid or expired');
+      const linkedAt = this.clock();
+      await tx.query(`INSERT INTO identity_whatsapp_links (profile_id,phone,linked_at) VALUES ($1,$2,$3)
+        ON CONFLICT (profile_id) DO UPDATE SET phone=EXCLUDED.phone,linked_at=EXCLUDED.linked_at`, [current.actor.id, profile.phone, linkedAt]);
+      await this.audit(tx, 'WHATSAPP_LINKED', current.actor.id);
+      return success(v2.whatsAppLinkResultSchema.parse({ linked: true, linkedAt: linkedAt.toISOString() }));
+    }, async tx => { await this.lock(tx, `whatsapp-owner:${current.actor.id}`); return this.authenticated(tx, token); });
+  }
+
   // Deployment-owner provisioning helper. No HTTP route exposes it: only the
   // owner path may hand the enrollment URI to the intended staff device.
   async mfaProvisioningUri(challengeId: string): Promise<string | undefined> {

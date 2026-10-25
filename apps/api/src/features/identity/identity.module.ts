@@ -102,6 +102,13 @@ export class IdentityController {
     noStore(response);
     return this.identity.configureStaffMfa(token(authorization), v2.staffMfaSetupSchema.parse(input), key);
   }
+
+  @Post('whatsapp/link')
+  @HttpCode(200)
+  linkWhatsApp(@Body() input: unknown, @Headers('authorization') authorization: string | undefined, @Headers('idempotency-key') key: string, @Res({ passthrough: true }) response: Response) {
+    noStore(response);
+    return this.identity.linkWhatsApp(token(authorization), v2.whatsAppLinkSchema.parse(input), key);
+  }
   @Get('addresses')
   addresses(@Headers('authorization') authorization: string | undefined, @Res({ passthrough: true }) response: Response) {
     noStore(response);
