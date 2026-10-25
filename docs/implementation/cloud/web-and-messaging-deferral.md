@@ -63,6 +63,23 @@ production dependency tree. An initial symlink-layout failure and a verifier
 assertion incorrectly applied to an unauthorized health response were fixed;
 neither failed run is recorded as acceptance.
 
+Fifteen anonymous public-content checks passed across the three sites. The
+served HTML/JavaScript did not expose the ingress credential or database/private
+key material checked by the verifier. `/.env`, `/.data/web.env` and
+`/node_modules/pg/package.json` returned 404 on every site.
+
+Real Chrome inspection confirmed the customer’s empty-published-catalog state
+and the rider’s non-demo sign-in screen; both screenshots were reviewed. The
+browser wrapper failed initially, and the resumed inspection lost its CDP target
+before operations-screen evidence was captured. A complete three-screen browser
+pass is therefore not claimed. All three origins passed the separate HTTP/API
+checks described above. No sign-in or messaging action was performed.
+
+At the deployed source revision, dependency-security run `40227268722` passed.
+Laundry checks `40227268739` and Agent verification `40227268716` completed with
+failures. These scoped hosted checks do not waive those failures or establish a
+clean full-release result; further end-to-end acceptance remains required.
+
 Private deployment/verification receipts remain ignored in `.data`. This is a
 hosted, deliberately gated checkpoint—not live messaging/payment, native-device,
 physical-fulfillment, approved launch catalog/pricing or whole-product acceptance.
