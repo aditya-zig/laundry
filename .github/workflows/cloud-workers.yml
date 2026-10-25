@@ -3,6 +3,12 @@ on:
   push:
     branches: ['cloud/batch-*']
   workflow_dispatch:
+    inputs:
+      lane:
+        description: One isolated lane, or the complete screen batch
+        type: choice
+        options: [all, F01, F03, F04, E03]
+        default: all
 permissions:
   contents: read
 concurrency:
@@ -17,7 +23,7 @@ jobs:
       fail-fast: false
       max-parallel: 3
       matrix:
-        task: [F01, F03, F04, E03]
+        task: ${{ fromJSON(inputs.lane == 'F01' && '["F01"]' || inputs.lane == 'F03' && '["F03"]' || inputs.lane == 'F04' && '["F04"]' || inputs.lane == 'E03' && '["E03"]' || '["F01","F03","F04","E03"]') }}
     services:
       postgres:
         image: postgres:17-alpine

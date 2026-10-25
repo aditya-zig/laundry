@@ -20,6 +20,12 @@ test('task ownership is exclusive and directory patterns do not match sibling pr
   assert.equal(owned('modules/jobs-other/secret', TASKS.B10.paths), false);
   assert.equal(owned('packages/contracts/src/v2/identity.ts', TASKS.C01.paths), false);
 });
+test('customer follow-up owns the actual grouped Expo entry and can mount its screens', () => {
+  for (const path of ['apps/customer/app/(tabs)/index.tsx', 'apps/customer/app/(tabs)/account.tsx', 'apps/customer/app/_layout.tsx']) {
+    assert.equal(owned(path, TASKS.F01.paths), true);
+    for (const id of ['F03', 'F04', 'E03']) assert.equal(owned(path, TASKS[id].paths), false);
+  }
+});
 test('provider errors, failed exits, truncation, unexpected cost and empty output cannot become successful dispatch receipts', () => {
   const good = [{ type: 'text', sessionID: 'session', part: { text: 'Report' } }, { type: 'step_finish', part: { reason: 'stop', cost: 0 } }].map(JSON.stringify).join('\n');
   assert.equal(parseResult(good, 0).steps, 1);
@@ -34,6 +40,9 @@ test('dispatch is isolated, cannot cancel existing evidence, and has neither wri
   assert.match(workflow, /contents: read/);
   assert.match(workflow, /cancel-in-progress: false/);
   assert.match(workflow, /max-parallel: 3/);
+  assert.match(workflow, /options: \[all, F01, F03, F04, E03\]/);
+  for (const lane of ['F01', 'F03', 'F04', 'E03']) assert.ok(workflow.includes(`inputs.lane == '${lane}' && '["${lane}"]'`));
+  assert.doesNotMatch(workflow, /format\([^\n]*inputs\.lane/);
   assert.doesNotMatch(workflow, /secrets\.|contents: write|continue-on-error|git push/);
   assert.match(BASE, /^[a-f0-9]{40}$/);
 });
