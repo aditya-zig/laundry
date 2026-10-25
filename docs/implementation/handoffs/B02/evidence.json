@@ -1,0 +1,60 @@
+{
+  "task": "B02",
+  "issue": 12,
+  "owner": "backend",
+  "baseSha": "2ca0398",
+  "sourceSha": "e8268a7c5d3a69abe5e182a2aa84709b0c069a8f",
+  "testedSha": "e8268a7c5d3a69abe5e182a2aa84709b0c069a8f",
+  "scope": "Catalog reads, operator rate-card lifecycle and the integer pricing engine; no quote persistence",
+  "contractVersion": "laundry-wire-v2.0.0-candidate",
+  "contractDigest": null,
+  "state": "BLOCKED_CONTRACT",
+  "providers": { "smsAcceptance": "FAKE", "commercialNetworkCalls": 0, "liveAcceptance": "NOT_APPLICABLE" },
+  "migrations": ["modules/schema/migrations/011_catalog.sql"],
+  "commands": [
+    { "argv": ["pnpm", "check"], "exitCode": 0 },
+    { "argv": ["pnpm", "contracts:generate"], "exitCode": 0, "paths": 80, "operations": 84 },
+    { "argv": ["pnpm", "contracts:check"], "exitCode": 0, "passed": 103 },
+    { "argv": ["node", "tools/cloud/postgres.mjs", "exec", "--", "pnpm", "--filter", "@laundry/api", "test"], "exitCode": 0, "passed": 193 }
+  ],
+  "cloudRuns": [
+    {
+      "sha": "e8268a7c5d3a69abe5e182a2aa84709b0c069a8f",
+      "workflow": "Agent verification evidence",
+      "runId": 40189018261,
+      "conclusion": "success",
+      "duration": "5m4s"
+    },
+    {
+      "sha": "e8268a7c5d3a69abe5e182a2aa84709b0c069a8f",
+      "workflow": "Wandary checks",
+      "runId": 40189018304,
+      "conclusion": "success",
+      "duration": "6m30s"
+    },
+    {
+      "sha": "e8268a7c5d3a69abe5e182a2aa84709b0c069a8f",
+      "workflow": "Dependency security gate",
+      "runId": 40189018308,
+      "conclusion": "failure",
+      "duration": "41s",
+      "failureScope": "node-forge@1.4.0 via apps__customer>expo>@expo/cli; documented external block, not a B02 regression"
+    }
+  ],
+  "scenarioScope": {
+    "B02-01": "Public catalog and effective-rate reads require an active service and an approved, activated, already-effective card; quote-level enforcement stays with B04",
+    "B02-02": "KG increments, minimum billable weight, CEIL/FLOOR/NONE rounding and PIECE totals proven with integer arithmetic",
+    "B02-03": "Rate cards are immutable after write; the snapshot is not yet persisted on a quote",
+    "B02-04": "Ineligible garment rejection is B04; unpriced or unsupported card shapes fail explicitly"
+  },
+  "remaining": [
+    "No service or garment create route in the published inventory",
+    "ServiceUpdate.garments is refused because no garment administration route exists",
+    "INCREMENT components have no contract unit and are refused",
+    "Tax is a flat amount; no percentage field exists",
+    "BOTH services report a single unit price",
+    "No tier rules or licensed-asset attribution fields",
+    "C01 freeze, tariff approval, quote persistence, client consumption, production ordering"
+  ],
+  "productionReady": false
+}

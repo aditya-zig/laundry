@@ -111,7 +111,18 @@ several cards cover the same service, the highest activated version whose
 - `pnpm contracts:generate`: 80 paths, 84 operations.
 - `pnpm contracts:check` and `pnpm check` pass.
 
-Cloud run receipts are recorded in `evidence.json` after this commit is pushed.
+## Cloud receipts for `e8268a7`
+
+| Workflow | Run | Result |
+| --- | --- | --- |
+| Agent verification evidence | 40189018261 | success, 5m4s |
+| Wandary checks | 40189018304 | success, 6m30s |
+| Dependency security gate | 40189018308 | failure, 41s |
+
+The dependency gate failure is the standing `node-forge@1.4.0` advisory reached
+through `apps__customer>expo>@expo/cli`. It is unrelated to this change and has
+no patched release. It remains red rather than waived.
+
 These results do not claim a deployed backend, approved business configuration,
 native acceptance or production readiness. Production ordering remains
 disabled.
