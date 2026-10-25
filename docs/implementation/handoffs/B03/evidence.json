@@ -1,0 +1,56 @@
+{
+  "task": "B03",
+  "issue": 13,
+  "owner": "backend",
+  "baseSha": "e8268a7",
+  "sourceSha": "08ec897018f437802041f553dcb026ec8ddb0a10",
+  "testedSha": "08ec897018f437802041f553dcb026ec8ddb0a10",
+  "state": "BLOCKED_CONTRACT",
+  "contractDigest": null,
+  "providers": { "commercialNetworkCalls": 0, "liveAcceptance": "NOT_APPLICABLE" },
+  "migrations": ["modules/schema/migrations/012_availability.sql"],
+  "commands": [
+    { "argv": ["pnpm", "check"], "exitCode": 0 },
+    { "argv": ["pnpm", "contracts:generate"], "exitCode": 0, "paths": 80, "operations": 84 },
+    { "argv": ["pnpm", "contracts:check"], "exitCode": 0 },
+    { "argv": ["node", "tools/cloud/postgres.mjs", "exec", "--", "pnpm", "--filter", "@laundry/api", "test"], "exitCode": 0, "passed": 202 }
+  ],
+  "cloudRuns": [
+    {
+      "sha": "08ec897018f437802041f553dcb026ec8ddb0a10",
+      "workflow": "Agent verification evidence",
+      "runId": 40189607798,
+      "conclusion": "success",
+      "duration": "5m14s"
+    },
+    {
+      "sha": "08ec897018f437802041f553dcb026ec8ddb0a10",
+      "workflow": "Wandary checks",
+      "runId": 40189607900,
+      "conclusion": "success",
+      "duration": "6m6s"
+    },
+    {
+      "sha": "08ec897018f437802041f553dcb026ec8ddb0a10",
+      "workflow": "Dependency security gate",
+      "runId": 40189607807,
+      "conclusion": "failure",
+      "duration": "33s",
+      "failureScope": "node-forge@1.4.0 (GHSA-86w9-cpqp-85rv) via apps__customer>expo>@expo/cli; no patched release, not a B03 regression"
+    }
+  ],
+  "scenarioScope": {
+    "B03-01": "Two simultaneous holds for a capacity-1 bucket resolve to one success and one NO_CAPACITY, and the bucket's reserved count is 1",
+    "B03-02": "Expiry sweeps once across a reconstructed service instance, a repeated sweep returns zero, capacity returns once, and release after expiry is a no-op",
+    "B03-03": "IST lead time, closed Sunday, an overnight window crossing local midnight and rejection of an inverted search range through slotQuerySchema",
+    "B03-04": "Mixed services with 24 h and 48 h care time produce a 48 h return, and a requested deadline met only by the earliest pair keeps later pairs visible as DEADLINE_UNAVAILABLE"
+  },
+  "remaining": [
+    "No area, postal-code or bucket creation route in the published inventory",
+    "Holds, reserve, release and expiry are internal service methods; no published hold HTTP route, so the customer reservation flow belongs to B04",
+    "operationsCalendar is capped at 500 buckets; pagination is not in the contract",
+    "No capacity-generation job; recurring buckets are owner data",
+    "C01 freeze, contract digest, quote and order persistence, client consumption, production ordering"
+  ],
+  "productionReady": false
+}

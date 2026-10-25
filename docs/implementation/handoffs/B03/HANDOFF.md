@@ -97,3 +97,19 @@ Cloud receipts are recorded in `evidence.json` after this commit is pushed.
 These results do not claim approved operating hours, a real capacity plan,
 native acceptance or production readiness. Production ordering remains
 disabled.
+
+## Cloud receipts for 08ec897
+
+| Workflow | Run id | Result |
+| --- | --- | --- |
+| Agent verification evidence | 40189607798 | success, 5m14s |
+| Wandary checks | 40189607900 | success, 6m6s |
+| Dependency security gate | 40189607807 | failure, 33s |
+
+The dependency gate failure is the standing `node-forge@1.4.0` advisory
+`GHSA-86w9-cpqp-85rv`, reached through `apps__customer>expo>@expo/cli`, and it
+has no patched release. It is recorded, not waived.
+
+These receipts do not claim approved operating hours, a real capacity plan,
+native acceptance or production readiness, and production ordering stays
+disabled.
