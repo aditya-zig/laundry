@@ -369,18 +369,11 @@ describe('B10 durable dispatch', () => {
 
   it('keeps a booking committed when a notification consumer fails', async () => {
     const customer = await signin(customerPhone);
-    const { quote, order } = await bookOnce(customer);
-    const event = v2.domainEventSchema.parse({
-      eventId: randomUUID(),
-      eventType: 'order.confirmed.v2',
-      schemaVersion: 2,
-      aggregateId: order.id,
-      aggregateVersion: order.version,
-      occurredAt: now.toISOString(),
-      traceId: randomUUID(),
-      payload: { order, quote },
-    });
-    await publish(event);
+    const { order } = await bookOnce(customer);
+    // Booking itself must publish the event atomically, not a test-only helper.
+    const published = (await getPool().query('SELECT envelope FROM v2_outbox WHERE aggregate_id=$1', [order.id])).rows;
+    expect(published).toHaveLength(1);
+    expect(v2.domainEventSchema.parse(published[0].envelope)).toMatchObject({ eventType: 'order.confirmed.v2', aggregateId: order.id });
 
     let outage = true;
     const jobs = makeJobs([{

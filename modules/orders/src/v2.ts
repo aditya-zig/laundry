@@ -37,6 +37,8 @@ export interface OrdersOptions {
   catalog: CatalogService;
   availability: AvailabilityService;
   reconciliation?: OrdersReconciliation;
+  /** Coordinator-owned peer composition; must use this exact transaction. */
+  onBooked?: (order: v2.Order, transaction: PoolClient) => Promise<void>;
   clock?: () => Date;
   adjustmentMinutes?: number;
 }
@@ -468,8 +470,9 @@ export class OrdersService {
   async bookOrder(token: string, input: v2.BookingInput, key: string): Promise<v2.Order> {
     const parsed = v2.bookingInputSchema.parse(input);
     const customer = await this.actorOf(token, new Set<v2.ActorRole>(['CUSTOMER']));
+    const traceId = randomUUID();
     const result = await this.executor.execute(
-      { actor: customer, operation: 'orders.book', idempotencyKey: key, payload: parsed as unknown as v2.JsonValue, traceId: randomUUID() },
+      { actor: customer, operation: 'orders.book', idempotencyKey: key, payload: parsed as unknown as v2.JsonValue, traceId },
       async () => { await this.actor(token); },
       async scope => {
         const tx: PoolClient = scope.handle;
@@ -516,7 +519,12 @@ export class OrdersService {
           before: { quoteId: quoteRow.id, quoteVersion: quoteRow.version },
           after: { totalMinor: money(quoteRow.total_minor), lines: lines.length },
         });
-        return order(row, await this.timeline(orderId, tx)) as unknown as v2.JsonValue;
+        const booked = order(row, await this.timeline(orderId, tx));
+        await this.options.onBooked?.(booked, tx);
+        await scope.publish({ eventId: randomUUID(), eventType: 'order.confirmed.v2', schemaVersion: 2,
+          aggregateId: booked.id, aggregateVersion: booked.version, occurredAt: this.clock().toISOString(), traceId,
+          payload: { order: booked, quote: quote(quoteRow) } });
+        return booked as unknown as v2.JsonValue;
       },
     );
     return v2.orderSchema.parse(result);

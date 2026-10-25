@@ -1,6 +1,6 @@
 import 'reflect-metadata';
 import { readFileSync } from 'node:fs';
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { NestFactory } from '@nestjs/core';
 import type { NestExpressApplication } from '@nestjs/platform-express';
 import { randomBytes, randomUUID } from 'node:crypto';
@@ -193,7 +193,7 @@ describe('B07-01 ownership boundaries', () => {
     const orderId = await seedOrder(customerA.actor.id, randomUUID());
 
     await expect(intent(customerB.accessToken, { orderId })).rejects.toMatchObject({ code: 'NOT_FOUND' });
-    await expect(intent(facility.accessToken, { orderId })).rejects.toMatchObject({ code: 'FORBIDDEN' });
+    await expect(intent(facility.accessToken, { orderId })).rejects.toMatchObject({ code: 'NOT_FOUND' });
     await expect(intent(customerA.accessToken, { orderId })).resolves.toMatchObject({ maxBytes: 10_000_000 });
   });
 });
@@ -276,7 +276,7 @@ describe('B07-04 idempotent uploads and retention deletion', () => {
     const created = await intent(customer.accessToken);
     upload(created);
 
-    await expect(media.finalizeUpload(customerB.accessToken, created.uploadId, key())).rejects.toMatchObject({ code: 'FORBIDDEN' });
+    await expect(media.finalizeUpload(customerB.accessToken, created.uploadId, key())).rejects.toMatchObject({ code: 'NOT_FOUND' });
 
     const finalizeKey = key();
     const first = await media.finalizeUpload(customer.accessToken, created.uploadId, finalizeKey);
@@ -317,6 +317,77 @@ describe('B07-04 idempotent uploads and retention deletion', () => {
     expect((await getPool().query("SELECT count(*)::int AS n FROM v2_audit WHERE action='MEDIA_RETENTION_DELETED'")).rows[0].n).toBe(3);
     const renewed = await signin(customerAPhone);
     await expect(media.download(renewed.accessToken, available.created.uploadId, key())).rejects.toMatchObject({ code: 'RETENTION_EXPIRED' });
+  });
+});
+
+describe('B07 privacy and replay regressions', () => {
+  afterEach(() => vi.unstubAllEnvs());
+
+  it('refuses an explicitly supplied fake store in production', () => {
+    vi.stubEnv('NODE_ENV', 'production');
+    expect(() => new MediaService({ db: getPool(), storage: createMemoryStorage() })).toThrow(/private media storage|live/i);
+  });
+
+  it('never grants an unassigned rider a private upload, even without an order id', async () => {
+    await provisionStaff(riderPhone, 'RIDER');
+    const rider = await signin(riderPhone);
+    await expect(intent(rider.accessToken)).rejects.toMatchObject({ code: 'FORBIDDEN' });
+    expect((await getPool().query('SELECT count(*)::int AS n FROM media_objects')).rows[0].n).toBe(0);
+  });
+
+  it('does not replay a finalized reference after its bytes have been deleted', async () => {
+    const customer = await signin(customerAPhone), created = await intent(customer.accessToken), finalizeKey = key();
+    upload(created);
+    await media.finalizeUpload(customer.accessToken, created.uploadId, finalizeKey);
+    await getPool().query("UPDATE media_objects SET state='DELETED',deleted_at=$2 WHERE id=$1", [created.uploadId, now]);
+    await expect(media.finalizeUpload(customer.accessToken, created.uploadId, finalizeKey)).rejects.toMatchObject({ code: 'RETENTION_EXPIRED' });
+  });
+
+  it('rechecks current facility scope before replaying an upload capability', async () => {
+    const facilityId = randomUUID(), customer = await signin(customerAPhone);
+    await provisionStaff(facilityPhone, 'FACILITY', [facilityId]);
+    const facility = await signin(facilityPhone), orderId = await seedOrder(customer.actor.id, facilityId), uploadKey = key();
+    await intent(facility.accessToken, { orderId }, uploadKey);
+    await getPool().query('DELETE FROM identity_staff_facilities WHERE facility_id=$1', [facilityId]);
+    await expect(intent(facility.accessToken, { orderId }, uploadKey)).rejects.toMatchObject({ code: 'NOT_FOUND' });
+  });
+
+  it('does not retain the uploaders old facility access after reassignment', async () => {
+    const facilityId = randomUUID(), customer = await signin(customerAPhone);
+    await provisionStaff(facilityPhone, 'FACILITY', [facilityId]);
+    const facility = await signin(facilityPhone), orderId = await seedOrder(customer.actor.id, facilityId);
+    const { created } = await accepted(facility.accessToken, { orderId });
+    const downloadKey = key();
+    await media.download(facility.accessToken, created.uploadId, downloadKey);
+    await getPool().query('DELETE FROM identity_staff_facilities WHERE facility_id=$1', [facilityId]);
+    await expect(media.download(facility.accessToken, created.uploadId, downloadKey)).rejects.toMatchObject({ code: 'NOT_FOUND' });
+    await expect(media.download(facility.accessToken, created.uploadId, key())).rejects.toMatchObject({ code: 'NOT_FOUND' });
+  });
+
+  it('refuses to return a cached signed URL after the URL expires', async () => {
+    const customer = await signin(customerAPhone), { created } = await accepted(customer.accessToken), downloadKey = key();
+    await media.download(customer.accessToken, created.uploadId, downloadKey);
+    nextTime(6 * 60_000);
+    await expect(media.download(customer.accessToken, created.uploadId, downloadKey)).rejects.toMatchObject({ code: 'MEDIA_NOT_READY' });
+    expect(storage.verifyDownloadUrl((await media.download(customer.accessToken, created.uploadId, key())).url, now)).toBe(true);
+  });
+
+  it('keeps voice audio for no more than one day by default', async () => {
+    const customer = await signin(customerAPhone);
+    const { created } = await accepted(customer.accessToken, { kind: 'VOICE_NOTE', mimeType: 'audio/webm' });
+    expect((await mediaRow(created.uploadId)).retention_until.getTime()).toBe(now.getTime() + 24 * 60 * 60_000);
+  });
+
+  it('rejects invalid retention and unbounded sweep limits before touching storage', async () => {
+    for (const limit of [0, -1, 1.5, Infinity, 1001]) await expect(media.expireMedia(now, limit)).rejects.toMatchObject({ code: 'INVALID_INPUT' });
+    for (const days of [0, -1, NaN, Infinity]) expect(() => new MediaService({ db: getPool(), storage, retentionDays: { VOICE_NOTE: days } })).toThrow();
+  });
+
+  it('does not issue a download URL that outlives the objects retention', async () => {
+    const customer = await signin(customerAPhone), { created } = await accepted(customer.accessToken);
+    const deadline = new Date(now.getTime() + 60_000);
+    await getPool().query('UPDATE media_objects SET retention_until=$2 WHERE id=$1', [created.uploadId, deadline]);
+    expect((await media.download(customer.accessToken, created.uploadId, key())).expiresAt).toBe(deadline.toISOString());
   });
 });
 

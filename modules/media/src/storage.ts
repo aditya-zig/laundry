@@ -20,6 +20,7 @@ export interface ObjectStat {
 }
 
 export interface StoragePort {
+  readonly mode: 'FAKE' | 'LIVE';
   createUploadTarget(input: { key: string; mimeType: string; sizeBytes: number; expiresAt: Date }): Promise<StorageTarget>;
   createDownloadUrl(input: { key: string; expiresAt: Date }): Promise<StorageTarget>;
   stat(key: string): Promise<ObjectStat | null>;
@@ -82,6 +83,7 @@ export function createMemoryStorage(): MemoryStorage {
   }
 
   return {
+    mode: 'FAKE',
     async createUploadTarget(input) {
       return target('upload', input.key, input.expiresAt);
     },

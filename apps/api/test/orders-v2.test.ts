@@ -1,6 +1,10 @@
 import 'reflect-metadata';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { NestFactory } from '@nestjs/core';
+import { Module } from '@nestjs/common';
+import { ProductModule } from '../src/features/product.module';
+import { BillingService, createObligationForOrder } from '../../../modules/billing/src';
+import { LogisticsService } from '../../../modules/logistics/src';
 import type { NestExpressApplication } from '@nestjs/platform-express';
 import { randomBytes, randomUUID } from 'node:crypto';
 import { v2 } from '@laundry/contracts';
@@ -570,6 +574,61 @@ describe('B04 quality checks, evidence and access boundaries', () => {
     expect(await reservedCount(bucketId)).toBe(0);
     await expect(blocking.confirmCancellationBy(customer.actor, order.id, 'Reconciled with logistics'))
       .rejects.toMatchObject({ code: 'REQUIRES_APPROVAL' });
+  });
+});
+
+describe('transactional booking peer integration', () => {
+  it('serves one order, payment obligation, pickup leg and outbox event through composed real SDK routes', async () => {
+    const { serviceId, customer, addressId } = await seed();
+    const authenticate = (token: string) => identity.authenticate(token);
+    const billing = new BillingService({ db: getPool(), authenticate, clock });
+    const logistics = new LogisticsService({ db: getPool(), authenticate, clock });
+    const composed = new OrdersService({ db: getPool(), authenticate, catalog, availability, clock,
+      onBooked: async (booked, tx) => {
+        await createObligationForOrder(tx, { orderId: booked.id, clock });
+        await logistics.openLegAttempt(booked.id, 'PICKUP', { scheduledWindow: booked.pickupWindow }, tx);
+      },
+    });
+    class IntegratedBooking {}
+    Module({ imports: [OrdersModule.register(() => composed), ProductModule.register({ billing: () => billing, logistics: () => logistics })] })(IntegratedBooking);
+    const app = await NestFactory.create<NestExpressApplication>(IntegratedBooking, { logger: false, rawBody: true });
+    configureHttpBody(app);
+    app.useGlobalFilters(new EnvelopeFilter());
+    try {
+      await app.listen(0, '127.0.0.1');
+      const client = createV2Client({ baseUrl: (await app.getUrl()) + '/v2', getToken: () => customer.accessToken });
+      const quoted = await client.createQuote(quoteInput(serviceId, addressId));
+      const input: v2.BookingInput = { quoteId: quoted.id, expectedVersion: quoted.version, paymentModel: 'DUE_AT_RETURN' };
+      const idem = key();
+      const [first, second] = await Promise.all([client.bookOrder(input, { idempotencyKey: idem }), client.bookOrder(input, { idempotencyKey: idem })]);
+      expect(second.id).toBe(first.id);
+      const obligations = await client.listOrderObligations(first.id);
+      expect(obligations.items).toHaveLength(1);
+      expect(obligations.items[0]).toMatchObject({ orderId: first.id, status: 'OPEN', amountDueMinor: first.totalMinor, amountSettledMinor: 0 });
+      const legs = (await getPool().query('SELECT * FROM logistics_leg_attempts WHERE order_id=$1', [first.id])).rows;
+      expect(legs).toHaveLength(1);
+      expect(legs[0]).toMatchObject({ leg: 'PICKUP', status: 'BOOKED' });
+      const events = (await getPool().query('SELECT envelope FROM v2_outbox WHERE aggregate_id=$1', [first.id])).rows;
+      expect(events).toHaveLength(1);
+      expect(v2.domainEventSchema.parse(events[0].envelope)).toMatchObject({ eventType: 'order.confirmed.v2', aggregateId: first.id });
+      expect((await client.getCustodyReceipt(first.id)).orderId).toBe(first.id);
+    } finally { await app.close(); }
+  });
+
+  it('rolls back the order, reservation and peer rows if a booking integration fails', async () => {
+    const { bucketId, serviceId, customer, addressId } = await seed();
+    const composed = new OrdersService({ db: getPool(), authenticate: token => identity.authenticate(token), catalog, availability, clock,
+      onBooked: async (booked, tx) => {
+        await createObligationForOrder(tx, { orderId: booked.id, clock });
+        throw new Error('Synthetic peer failure');
+      },
+    });
+    const quoted = await composed.createQuote(customer.accessToken, quoteInput(serviceId, addressId), key());
+    await expect(composed.bookOrder(customer.accessToken, { quoteId: quoted.id, expectedVersion: quoted.version, paymentModel: 'DUE_AT_RETURN' }, key())).rejects.toThrow('Synthetic peer failure');
+    for (const table of ['orders_v2_orders', 'billing_obligations', 'v2_outbox']) expect((await getPool().query(`SELECT count(*)::int AS n FROM ${table}`)).rows[0].n).toBe(0);
+    expect((await getPool().query('SELECT status FROM orders_v2_quotes WHERE id=$1', [quoted.id])).rows[0].status).toBe('OPEN');
+    expect((await getPool().query('SELECT status FROM availability_holds WHERE id=$1', [quoted.holdReference])).rows[0].status).toBe('HELD');
+    expect(await reservedCount(bucketId)).toBe(1);
   });
 });
 

@@ -171,16 +171,16 @@ export class PaymentWebhookController {
   /**
    * The only provider route. A signature over the untouched request bytes is
    * verified before the service opens a transaction, so an unsigned body never
-   * reaches a write. The app must be created with `rawBody: true`; without it
-   * the adapter falls back to the re-serialized body, which is weaker but still
-   * requires the shared secret.
+   * reaches a write. The app must preserve the untouched request body; missing
+   * raw bytes fail closed rather than authenticating re-serialized JSON.
    */
   @Post(':provider')
   @HttpCode(200)
   webhook(@Param('provider') provider: string, @Body() body: unknown, @Headers('x-provider-signature') signature: string | undefined, @Req() request: RawRequest, @Res({ passthrough: true }) response: Response) {
     noStore(response);
-    const raw = request.rawBody ?? Buffer.from(JSON.stringify(body ?? {}));
-    return serviceOf(this.service).processWebhook(provider, raw, signature);
+    void body;
+    if (!Buffer.isBuffer(request.rawBody)) throw new BillingFault('UNAUTHENTICATED', 'Untouched provider request bytes are required');
+    return serviceOf(this.service).processWebhook(provider, request.rawBody, signature);
   }
 }
 

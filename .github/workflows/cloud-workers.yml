@@ -17,7 +17,7 @@ jobs:
       fail-fast: false
       max-parallel: 3
       matrix:
-        task: [C01, B05, B06, B08, B09, B10, D01, F00, E02]
+        task: [B01, D01, F00]
     services:
       postgres:
         image: postgres:17-alpine

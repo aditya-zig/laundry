@@ -16,6 +16,9 @@ export type OtpChallenge = z.infer<typeof otpChallengeSchema>;
 export const otpVerifySchema = z.object({
   challengeId: idSchema,
   code: z.string().regex(/^\d{6}$/),
+  // Customer verification remains compatible. Provisioned staff additionally
+  // prove their enrolled second factor before a privileged session is issued.
+  mfaCode: z.string().regex(/^\d{6}$/).optional(),
 }).strict();
 export type OtpVerify = z.infer<typeof otpVerifySchema>;
 

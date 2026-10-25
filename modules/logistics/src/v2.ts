@@ -475,10 +475,11 @@ export class LogisticsService {
     orderId: string,
     leg: v2.Leg,
     input: { provider?: string; providerReference?: string; scheduledWindow?: v2.ScheduleWindow; attemptNumber?: number } = {},
+    transaction?: PoolClient,
   ): Promise<v2.LegAttempt> {
     v2.idSchema.parse(orderId);
     const parsedLeg = v2.legSchema.parse(leg);
-    return this.tx(async tx => {
+    const work = async (tx: PoolClient) => {
       const order = await this.lockOrder(tx, orderId);
       if (order.status === 'DELIVERED' || order.status === 'CANCELLED') {
         throw new LogisticsFault('INVALID_INPUT', 'A terminal order cannot open a delivery leg');
@@ -502,13 +503,15 @@ export class LogisticsService {
         }
         throw error;
       }
-    });
+    };
+    return transaction ? work(transaction) : this.tx(work);
   }
 
   /** Ops route: assign a rider to a booked leg attempt. */
   async assign(token: string, input: v2.AssignmentInput, key: string): Promise<v2.Assignment> {
     const parsed = v2.assignmentInputSchema.parse(input);
     const actor = await this.actorOf(token, OPS);
+    if (!this.options.custodyNotifier) throw new LogisticsFault('PROVIDER_UNAVAILABLE', 'Custody-code delivery is not configured');
     let issued: { code: string; orderId: string; legAttemptId: string; riderId: string; expiresAt: string } | undefined;
     const result = await this.executor.execute(
       { actor, operation: 'logistics.ops.assign', idempotencyKey: key, payload: plain(parsed), traceId: randomUUID() },
@@ -578,6 +581,7 @@ export class LogisticsService {
   /** Ops route: release one active assignment and create its replacement. */
   async reassign(token: string, assignmentId: string, input: v2.ReassignmentInput, key: string): Promise<v2.Assignment> {
     const parsed = v2.reassignmentInputSchema.parse(input);
+    if (!this.options.custodyNotifier) throw new LogisticsFault('PROVIDER_UNAVAILABLE', 'Custody-code delivery is not configured');
     v2.idSchema.parse(assignmentId);
     const actor = await this.actorOf(token, OPS);
     let issued: { code: string; orderId: string; legAttemptId: string; riderId: string; expiresAt: string } | undefined;
@@ -909,7 +913,7 @@ export class LogisticsService {
             (id,action_id,request_hash,order_id,leg_attempt_id,assignment_id,leg,custody_kind,method,code_digest,
              code_expires_at,photo_media_id,captured_lat,captured_lng,container_ids,garment_count,condition,note,
              actor_id,actor_role,captured_at,accepted,result,created_at)
-            VALUES ($1,$2,$3,$4,$5,$6,$7,$8,'CODE',$9,$10,NULL,$11,$12,$13,$14,$15,$16,$17,$18,$19,true,$20,$19) RETURNING *`, [
+            VALUES ($1,$2,$3,$4,$5,$6,$7,$8,'CODE',$9,$10,NULL,$11,$12,$13,$14,$15,$16,$17,$18,$19,true,$20,$21) RETURNING *`, [
             handoverId, parsed.actionId, requestHash, order.id, attempt.id, assignment.id, attempt.leg, custodyKind,
             assignment.code_digest, assignment.code_expires_at,
             position?.lat ?? null, position?.lng ?? null,
@@ -1127,20 +1131,20 @@ export class LogisticsService {
         'SELECT * FROM logistics_positions WHERE leg_attempt_id=$1 ORDER BY reported_at DESC LIMIT 1', [attempt.id])).rows[0]
       : undefined;
     const fresh = position !== undefined && position.reported_at.getTime() >= this.clock().getTime() - this.freshMinutes * 60_000;
+    // Step ids are opaque UUIDs by contract. The sequence stays in the
+    // rendering order, never in the identifier format, so no caller can
+    // reconstruct logistics internals from a customer id.
+    // Only stored facts are shown: timeline events and the current status.
+    // Unreached milestones are never fabricated as feel-good steps.
     const steps: v2.TrackingStep[] = timeline.map((event, index) => ({
-      id: `timeline-${event.seq}`,
+      id: trackingId(order.id, String(event.seq)),
       label: event.label,
       at: event.occurred_at.toISOString(),
       state: index === timeline.length - 1 ? 'CURRENT' : 'DONE',
     }));
     if (steps.length === 0) {
-      steps.push({ id: 'status-current', label: `Status ${order.status}`, state: 'CURRENT' });
+      steps.push({ id: trackingId(order.id, `status:${order.status}`), label: `Status ${order.status}`, state: 'CURRENT' });
     }
-    const pending = PENDING_STEPS[order.status] ?? [];
-    pending.forEach((label, index) => {
-      const alreadyLogged = timeline.some(event => event.label === label);
-      if (!alreadyLogged) steps.push({ id: `pending-${index + 1}`, label, state: 'PENDING' });
-    });
     return v2.customerTrackingSchema.parse({
       orderId: order.id,
       status: order.status,
@@ -1181,23 +1185,14 @@ export class LogisticsService {
   }
 }
 
-/** Tracking labels for milestones that have not happened. They carry no time,
- * so the customer view never claims a state the order has not reached. */
-const PENDING_STEPS: Partial<Record<v2.OrderStatus, readonly string[]>> = {
-  CONFIRMED: ['Laundry collected', 'At the facility', 'In care', 'Quality check', 'On the way back'],
-  PICKUP_PENDING: ['At the facility', 'In care', 'Quality check', 'On the way back'],
-  AT_FACILITY: ['In care', 'Quality check', 'On the way back'],
-  AWAITING_ADJUSTMENT: ['In care', 'Quality check', 'On the way back'],
-  IN_CARE: ['Quality check', 'On the way back'],
-  QUALITY_CHECK: ['On the way back'],
-  READY_FOR_RETURN: ['On the way back'],
-  RETURNING: [],
-  DELIVERED: [],
-  CANCELLED: [],
-  ON_HOLD: [],
-  RESOLUTION_REQUIRED: [],
-  CANCEL_REQUESTED: [],
-};
+// Stable opaque GUIDs keep the same persisted milestone keyed across refreshes.
+function trackingId(orderId: string, milestone: string): string {
+  const bytes = createHash('sha256').update(`laundry-tracking-v1\0${orderId}\0${milestone}`).digest().subarray(0, 16);
+  bytes[6] = (bytes[6] & 0x0f) | 0x80;
+  bytes[8] = (bytes[8] & 0x3f) | 0x80;
+  const hex = bytes.toString('hex');
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+}
 
 function currentHandoff(status: v2.OrderStatus): string | undefined {
   const labels: Partial<Record<v2.OrderStatus, string>> = {

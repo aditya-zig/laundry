@@ -155,3 +155,31 @@ CREATE TABLE IF NOT EXISTS billing_reconciliation_entries (
   UNIQUE (period, provider, external_reference, kind)
 );
 CREATE INDEX IF NOT EXISTS billing_reconciliation_entries_period ON billing_reconciliation_entries (period, recorded_at);
+
+-- B05 amendment: durable idempotency binding.
+--
+-- The command-result cache can be pruned, and CONTRACTS-V2 requires that
+-- booking/payment/provider uniqueness survive response-cache expiration. The
+-- actor, key and request hash of the creating command are stored on the money
+-- rows themselves, so a replay after the cache is emptied returns the original
+-- outcome instead of moving money again. Adding these is a no-op if they
+-- already exist, so the proposal stays re-runnable against earlier states.
+ALTER TABLE billing_receipts ADD COLUMN IF NOT EXISTS command_actor uuid;
+ALTER TABLE billing_receipts ADD COLUMN IF NOT EXISTS command_key text;
+ALTER TABLE billing_receipts ADD COLUMN IF NOT EXISTS command_hash text;
+CREATE UNIQUE INDEX IF NOT EXISTS billing_receipts_command_key
+  ON billing_receipts (command_actor, command_key) WHERE command_key IS NOT NULL;
+
+-- One external reference is one real-world transaction for manual money too.
+-- Gateway captures dedupe on (provider, reference); manual cash and UPI
+-- confirmations dedupe on the bare reference, so two staff keys cannot settle
+-- the same UPI transaction twice.
+CREATE UNIQUE INDEX IF NOT EXISTS billing_receipts_manual_reference
+  ON billing_receipts (external_reference)
+  WHERE confirmed_via <> 'GATEWAY_CAPTURE' AND external_reference IS NOT NULL;
+
+ALTER TABLE billing_refunds ADD COLUMN IF NOT EXISTS command_actor uuid;
+ALTER TABLE billing_refunds ADD COLUMN IF NOT EXISTS command_key text;
+ALTER TABLE billing_refunds ADD COLUMN IF NOT EXISTS command_hash text;
+CREATE UNIQUE INDEX IF NOT EXISTS billing_refunds_command_key
+  ON billing_refunds (command_actor, command_key) WHERE command_key IS NOT NULL;

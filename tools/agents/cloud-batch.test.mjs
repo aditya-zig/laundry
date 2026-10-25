@@ -25,6 +25,7 @@ test('provider errors, failed exits, truncation, unexpected cost and empty outpu
   assert.equal(parseResult(good, 0).steps, 1);
   assert.throws(() => parseResult(good, 124));
   assert.throws(() => parseResult('', 0));
+  assert.throws(() => parseResult(good + '\n' + JSON.stringify({ type: 'text', part: { text: 'Maximum steps for this task have been reached. Work is incomplete.' } }), 0));
   for (const extra of [{ type: 'error', error: { message: 'Rate limited' } }, { type: 'step_finish', part: { reason: 'length' } }, { type: 'step_finish', part: { cost: 1 } }]) assert.throws(() => parseResult(good + '\n' + JSON.stringify(extra), 0));
 });
 test('dispatch is isolated, cannot cancel existing evidence, and has neither write permission nor inherited auth', async () => {

@@ -216,8 +216,8 @@ export function createV2Client(options: V2ClientOptions = {}) {
     requestOtp: (phone: string, opts?: V2MutatingOpts) =>
       call("identity.otp.request", v2.otpChallengeSchema, { body: v2.otpRequestSchema.parse({ phone }), opts }),
 
-    verifyOtp: (challengeId: string, code: string, opts?: V2MutatingOpts) =>
-      call("identity.otp.verify", v2.sessionSchema, { body: v2.otpVerifySchema.parse({ challengeId, code }), opts }),
+    verifyOtp: (challengeId: string, code: string, opts?: V2MutatingOpts & { mfaCode?: string }) =>
+      call("identity.otp.verify", v2.sessionSchema, { body: v2.otpVerifySchema.parse({ challengeId, code, ...(opts?.mfaCode === undefined ? {} : { mfaCode: opts.mfaCode }) }), opts }),
 
     refreshSession: (refreshToken: string, opts?: V2MutatingOpts) =>
       call("identity.session.refresh", v2.sessionSchema, { body: v2.sessionRefreshSchema.parse({ refreshToken }), opts }),

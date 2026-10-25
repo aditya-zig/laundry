@@ -108,6 +108,7 @@ interface ReceiptRow {
   provider: string | null;
   provider_event_id: string | null;
   issued_at: Date;
+  command_hash?: string | null;
 }
 
 interface RefundRow {
@@ -124,6 +125,7 @@ interface RefundRow {
   resolved_at: Date | null;
   external_reference: string | null;
   attempt_count: number;
+  command_hash?: string | null;
 }
 
 interface EventRow {
@@ -487,11 +489,23 @@ export class BillingService {
     const parsed = v2.manualPaymentConfirmationSchema.parse(input);
     v2.idSchema.parse(obligationId);
     const operator = await this.actorOf(token, STAFF);
+    const payload = { ...parsed, obligationId };
+    const commandHash = createHash('sha256').update(canonicalJson({ operation: 'billing.manual.confirm', payload })).digest('hex');
     const result = await this.executor.execute(
-      { actor: operator, operation: 'billing.manual.confirm', idempotencyKey: key, payload: { ...parsed, obligationId } as unknown as v2.JsonValue, traceId: randomUUID() },
+      { actor: operator, operation: 'billing.manual.confirm', idempotencyKey: key, payload: payload as unknown as v2.JsonValue, traceId: randomUUID() },
       async () => { await this.actorOf(token, STAFF); },
       async scope => {
         const tx: PoolClient = scope.handle;
+        const prior = (await tx.query<ReceiptRow>('SELECT * FROM billing_receipts WHERE command_actor=$1 AND command_key=$2', [operator.id, key])).rows[0];
+        if (prior) {
+          if (prior.command_hash !== commandHash) throw new BillingFault('IDEMPOTENCY_CONFLICT', 'This key belongs to a different money command');
+          return receiptOf(prior) as unknown as v2.JsonValue;
+        }
+        if ((await tx.query('SELECT 1 FROM billing_refunds WHERE command_actor=$1 AND command_key=$2', [operator.id, key])).rowCount) throw new BillingFault('IDEMPOTENCY_CONFLICT', 'This key belongs to a different money command');
+        if (parsed.externalReference) {
+          await tx.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))', [`billing-manual-reference:${parsed.externalReference}`]);
+          if ((await tx.query("SELECT 1 FROM billing_receipts WHERE external_reference=$1 AND confirmed_via <> 'GATEWAY_CAPTURE'", [parsed.externalReference])).rowCount) throw new BillingFault('INVALID_INPUT', 'This manual transaction reference has already been recorded');
+        }
         const row = (await tx.query<ObligationRow>(
           'SELECT * FROM billing_obligations WHERE id=$1 FOR UPDATE', [obligationId])).rows[0];
         if (!row) throw new BillingFault('NOT_FOUND', 'Obligation not found');
@@ -505,11 +519,11 @@ export class BillingService {
         }));
         const receipt = receiptOf((await tx.query<ReceiptRow>(
           `INSERT INTO billing_receipts
-            (id, obligation_id, order_id, amount_minor, currency, method, confirmed_by, confirmed_via, external_reference, provider, provider_event_id, issued_at)
-           VALUES ($1,$2,$3,$4,'INR',$5,$6,$7,$8,NULL,NULL,$9) RETURNING *`,
+            (id, obligation_id, order_id, amount_minor, currency, method, confirmed_by, confirmed_via, external_reference, provider, provider_event_id, issued_at, command_actor, command_key, command_hash)
+           VALUES ($1,$2,$3,$4,'INR',$5,$6,$7,$8,NULL,NULL,$9,$6,$10,$11) RETURNING *`,
           [
             randomUUID(), row.id, row.order_id, parsed.amountMinor, parsed.method, operator.id,
-            parsed.method === 'CASH' ? 'MANUAL_CASH' : 'MANUAL_UPI', parsed.externalReference ?? null, this.clock(),
+            parsed.method === 'CASH' ? 'MANUAL_CASH' : 'MANUAL_UPI', parsed.externalReference ?? null, this.clock(), key, commandHash,
           ],
         )).rows[0]);
         await tx.query(
@@ -534,11 +548,18 @@ export class BillingService {
   async requestRefund(token: string, input: v2.RefundRequest, key: string): Promise<v2.Refund> {
     const parsed = v2.refundRequestSchema.parse(input);
     const operator = await this.actorOf(token, STAFF);
+    const commandHash = createHash('sha256').update(canonicalJson({ operation: 'billing.refund.create', payload: parsed })).digest('hex');
     const result = await this.executor.execute(
       { actor: operator, operation: 'billing.refund.create', idempotencyKey: key, payload: parsed as unknown as v2.JsonValue, traceId: randomUUID() },
       async () => { await this.actorOf(token, STAFF); },
       async scope => {
         const tx: PoolClient = scope.handle;
+        const prior = (await tx.query<RefundRow>('SELECT * FROM billing_refunds WHERE command_actor=$1 AND command_key=$2', [operator.id, key])).rows[0];
+        if (prior) {
+          if (prior.command_hash !== commandHash) throw new BillingFault('IDEMPOTENCY_CONFLICT', 'This key belongs to a different money command');
+          return refundOf(prior) as unknown as v2.JsonValue;
+        }
+        if ((await tx.query('SELECT 1 FROM billing_receipts WHERE command_actor=$1 AND command_key=$2', [operator.id, key])).rowCount) throw new BillingFault('IDEMPOTENCY_CONFLICT', 'This key belongs to a different money command');
         const receipt = (await tx.query<ReceiptRow>(
           'SELECT * FROM billing_receipts WHERE id=$1 AND order_id=$2 FOR UPDATE', [parsed.paymentId, parsed.orderId])).rows[0];
         if (!receipt) throw new BillingFault('NOT_FOUND', 'Receipt not found for this order');
@@ -565,9 +586,9 @@ export class BillingService {
         }));
         const refund = refundOf((await tx.query<RefundRow>(
           `INSERT INTO billing_refunds
-            (id, order_id, receipt_id, obligation_id, status, amount_minor, currency, reason, requested_by, requested_at, resolved_at, external_reference, attempt_count)
-           VALUES ($1,$2,$3,$4,'REQUESTED',$5,'INR',$6,$7,$8,NULL,NULL,1) RETURNING *`,
-          [randomUUID(), parsed.orderId, receipt.id, obligation.id, parsed.amountMinor, parsed.reason, operator.id, this.clock()],
+            (id, order_id, receipt_id, obligation_id, status, amount_minor, currency, reason, requested_by, requested_at, resolved_at, external_reference, attempt_count, command_actor, command_key, command_hash)
+           VALUES ($1,$2,$3,$4,'REQUESTED',$5,'INR',$6,$7,$8,NULL,NULL,1,$7,$9,$10) RETURNING *`,
+          [randomUUID(), parsed.orderId, receipt.id, obligation.id, parsed.amountMinor, parsed.reason, operator.id, this.clock(), key, commandHash],
         )).rows[0]);
         await scope.audit({
           aggregateId: parsed.orderId,
@@ -775,7 +796,7 @@ export class BillingService {
       }
 
       const attempt = (await tx.query<AttemptRow>(
-        'SELECT * FROM billing_payment_attempts WHERE id=$1', [payload.paymentId])).rows[0];
+        'SELECT * FROM billing_payment_attempts WHERE id=$1 FOR UPDATE', [payload.paymentId])).rows[0];
       let applied = false;
       let duplicateReference = false;
       let note: string | null = null;
@@ -783,9 +804,14 @@ export class BillingService {
       if (!attempt) {
         note = 'No local payment attempt matches this provider payment';
       } else if (payload.outcome === 'PENDING') {
-        guard(() => v2.assertPaymentAttemptTransition(attempt.status, 'PENDING', {}));
-        await tx.query("UPDATE billing_payment_attempts SET status='PENDING', external_event_id=$2 WHERE id=$1", [attempt.id, payload.eventId]);
-        applied = true;
+        try {
+          guard(() => v2.assertPaymentAttemptTransition(attempt.status, 'PENDING', {}));
+          await tx.query("UPDATE billing_payment_attempts SET status='PENDING', external_event_id=$2 WHERE id=$1", [attempt.id, payload.eventId]);
+          applied = true;
+        } catch (error) {
+          if (!(error instanceof BillingFault)) throw error;
+          note = `Provider outcome PENDING ignored for attempt in ${attempt.status}`;
+        }
       } else if (payload.outcome === 'SUCCEEDED') {
         const already = (await tx.query<{ id: string }>(
           'SELECT id FROM billing_receipts WHERE provider=$1 AND external_reference=$2', [provider, payload.providerReference])).rows[0];

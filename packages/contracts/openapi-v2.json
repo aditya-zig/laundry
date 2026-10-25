@@ -10234,6 +10234,10 @@
           "code": {
             "type": "string",
             "pattern": "^\\d{6}$"
+          },
+          "mfaCode": {
+            "type": "string",
+            "pattern": "^\\d{6}$"
           }
         },
         "required": [

@@ -246,6 +246,20 @@ describe('B05-03 manual confirmation', () => {
     const obligationNow = await currentObligation(obligation.id);
     expect(obligationNow).toMatchObject({ status: 'PARTIALLY_SETTLED', amountSettledMinor: 2000 });
   });
+
+  it('records one manual receipt per external reference even under a new idempotency key', async () => {
+    const { obligation } = await seedBilling();
+    await billing.confirmManual(operatorToken, obligation.id, {
+      expectedVersion: 1, method: 'UPI', amountMinor: 2000, currency: 'INR',
+      externalReference: 'upi-same-txn', reason: 'First confirmation',
+    }, key());
+    await expect(billing.confirmManual(operatorToken, obligation.id, {
+      expectedVersion: 2, method: 'UPI', amountMinor: 2000, currency: 'INR',
+      externalReference: 'upi-same-txn', reason: 'Second staff member reuses the transaction reference',
+    }, key())).rejects.toMatchObject({ code: 'INVALID_INPUT' });
+    expect(await count('SELECT count(*)::int AS n FROM billing_receipts')).toBe(1);
+    expect((await currentObligation(obligation.id)).amountSettledMinor).toBe(2000);
+  });
 });
 
 describe('B05-01 duplicate provider events', () => {
@@ -307,6 +321,60 @@ describe('B05-01 duplicate provider events', () => {
   });
 });
 
+describe('B05-01 durable idempotency beyond the result cache', () => {
+  it('replays a manual confirmation with the same key after the command cache is emptied', async () => {
+    const { obligation } = await seedBilling();
+    const input: v2.ManualPaymentConfirmation = {
+      expectedVersion: 1, method: 'UPI', amountMinor: 2000, currency: 'INR',
+      externalReference: 'upi-cache-replay', reason: 'Part payment',
+    };
+    const confirmKey = key();
+    const first = await billing.confirmManual(operatorToken, obligation.id, input, confirmKey);
+    expect(await count('SELECT count(*)::int AS n FROM v2_command_results')).toBe(1);
+
+    await getPool().query('DELETE FROM v2_command_results');
+    expect(await billing.confirmManual(operatorToken, obligation.id, input, confirmKey)).toMatchObject({ id: first.id });
+    expect(await count('SELECT count(*)::int AS n FROM billing_receipts')).toBe(1);
+    expect((await currentObligation(obligation.id)).amountSettledMinor).toBe(2000);
+
+    await getPool().query('DELETE FROM v2_command_results');
+    await expect(billing.confirmManual(operatorToken, obligation.id, {
+      ...input, amountMinor: 4000, reason: 'Different intent under the same key',
+    }, confirmKey)).rejects.toMatchObject({ code: 'IDEMPOTENCY_CONFLICT' });
+    expect(await count('SELECT count(*)::int AS n FROM billing_receipts')).toBe(1);
+    expect((await currentObligation(obligation.id)).amountSettledMinor).toBe(2000);
+  });
+
+  it('replays a refund request with the same key after the command cache is emptied', async () => {
+    const { orderId, obligation } = await seedBilling();
+    const captured = await gatewayCapture(obligation, 6000);
+    const version = (await currentObligation(obligation.id)).version;
+    const request: v2.RefundRequest = {
+      expectedVersion: version, orderId, paymentId: captured.receiptId, obligationId: obligation.id,
+      amountMinor: 2000, currency: 'INR', reason: 'Damaged shirt',
+    };
+    const refundKey = key();
+    const first = await billing.requestRefund(operatorToken, request, refundKey);
+    expect(await count('SELECT count(*)::int AS n FROM v2_command_results')).toBe(1);
+
+    await getPool().query('DELETE FROM v2_command_results');
+    expect(await billing.requestRefund(operatorToken, request, refundKey)).toMatchObject({ id: first.id });
+    expect(await count('SELECT count(*)::int AS n FROM billing_refunds')).toBe(1);
+
+    await getPool().query('DELETE FROM v2_command_results');
+    await expect(billing.requestRefund(operatorToken, {
+      ...request, amountMinor: 4000, reason: 'Different refund intent under the same key',
+    }, refundKey)).rejects.toMatchObject({ code: 'IDEMPOTENCY_CONFLICT' });
+    expect(await count('SELECT count(*)::int AS n FROM billing_refunds')).toBe(1);
+
+    // 6000 captured - two 2000 reservations leaves exactly 2000 refundable.
+    await billing.requestRefund(operatorToken, { ...request, reason: 'Second claim' }, key());
+    await expect(billing.requestRefund(operatorToken, {
+      ...request, amountMinor: 2001, reason: 'Over the reserved funds',
+    }, key())).rejects.toMatchObject({ code: 'INVALID_INPUT' });
+  });
+});
+
 describe('B05-02 late capture', () => {
   it('reconciles a capture that arrives after the attempt timed out', async () => {
     const { orderId, obligation } = await seedBilling();
@@ -334,6 +402,28 @@ describe('B05-02 late capture', () => {
     });
     expect(reconciliation.entries).toHaveLength(1);
     expect(reconciliation.entries[0]).toMatchObject({ kind: 'CAPTURE', amountMinor: 6000, matched: true, externalReference: reference });
+  });
+
+  it('ignores a late pending event after the attempt succeeded and keeps the event log entry', async () => {
+    const { orderId, obligation } = await seedBilling();
+    const captured = await gatewayCapture(obligation, 6000);
+    const payload: v2.PaymentWebhook = {
+      eventId: `evt_pending_${randomUUID()}`, paymentId: captured.attempt.id, outcome: 'PENDING',
+      amountMinor: 6000, currency: 'INR', occurredAt: now.toISOString(), providerReference: captured.reference,
+    };
+    const { raw, signature } = signedEvent(payload);
+    expect(await billing.processWebhook('fake', raw, signature)).toEqual({ accepted: true, duplicate: false });
+
+    expect((await billing.listOrderAttempts(customerToken, orderId)).items[0]).toMatchObject({ status: 'SUCCEEDED' });
+    expect((await currentObligation(obligation.id)).amountSettledMinor).toBe(6000);
+    expect(await count('SELECT count(*)::int AS n FROM billing_receipts')).toBe(1);
+    const event = (await getPool().query<{ applied: boolean; duplicate_reference: boolean; note: string | null }>(
+      'SELECT applied, duplicate_reference, note FROM billing_provider_events WHERE event_id=$1', [payload.eventId],
+    )).rows[0];
+    expect(event.applied).toBe(false);
+    expect(event.note).toBeTruthy();
+    const reconciliation = await billing.reconcile(operatorToken, '2026-10', key());
+    expect(reconciliation).toMatchObject({ capturedMinor: 6000, unmatchedCount: 0, differenceMinor: 0 });
   });
 
   it('records an unknown provider reference without inventing money', async () => {

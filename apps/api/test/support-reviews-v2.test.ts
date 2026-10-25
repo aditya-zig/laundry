@@ -20,12 +20,14 @@ const CUSTOMER_A = '11111111-1111-4111-8111-111111111111';
 const CUSTOMER_B = '22222222-2222-4222-8222-222222222222';
 const OPERATOR_ID = '33333333-3333-4333-8333-333333333333';
 const SUPPORT_ID = '44444444-4444-4444-8444-444444444444';
+const RIDER_ID = '77777777-7777-4777-8777-777777777777';
 const SERVICE_ID = '55555555-5555-4555-8555-555555555555';
 const AREA_ID = '66666666-6666-4666-8666-666666666666';
 const TOKEN_A = 'A'.repeat(43);
 const TOKEN_B = 'B'.repeat(43);
 const TOKEN_OPERATOR = 'C'.repeat(43);
 const TOKEN_SUPPORT = 'D'.repeat(43);
+const TOKEN_RIDER = 'E'.repeat(43);
 const key = () => randomUUID();
 
 const actor = (id: string, role: v2.ActorRole): v2.Actor => ({ id, role, facilityIds: [], scope: { facilityIds: [] } });
@@ -34,6 +36,7 @@ const ACTORS: Record<string, v2.Actor> = {
   [TOKEN_B]: actor(CUSTOMER_B, 'CUSTOMER'),
   [TOKEN_OPERATOR]: actor(OPERATOR_ID, 'OPERATOR'),
   [TOKEN_SUPPORT]: actor(SUPPORT_ID, 'SUPPORT'),
+  [TOKEN_RIDER]: actor(RIDER_ID, 'RIDER'),
 };
 
 const authenticate = async (token: string) => {
@@ -334,6 +337,51 @@ describe('B08-05 public feed stays empty and moderation is audited once per deci
     const audit = (await getPool().query("SELECT count(*)::int AS n FROM v2_audit WHERE aggregate_id=$1 AND action='REVIEW_MODERATED'", [review.id])).rows[0].n;
     expect(audit).toBe(1);
     expect((await getPool().query('SELECT count(*)::int AS n FROM reviews_v2_moderation_events WHERE review_id=$1', [review.id])).rows[0].n).toBe(1);
+  });
+});
+
+describe('B08-06 cross-scope roles and unresolved incidents stay addressable only to authorized readers', () => {
+  it('refuses rider reads and writes and answers 404 for unknown incidents', async () => {
+    const orderId = await seedOrder();
+    const incident = await openIncident(orderId);
+
+    await expect(support.listMessages(TOKEN_RIDER, incident.id)).rejects.toMatchObject({ code: 'FORBIDDEN' });
+    await expect(support.appendMessage(TOKEN_RIDER, incident.id, { body: 'Rider writing', mediaIds: [] }, key()))
+      .rejects.toMatchObject({ code: 'FORBIDDEN' });
+
+    const missing = randomUUID();
+    await expect(support.listMessages(TOKEN_A, missing)).rejects.toMatchObject({ code: 'NOT_FOUND' });
+    await expect(support.listMessages(TOKEN_OPERATOR, missing)).rejects.toMatchObject({ code: 'NOT_FOUND' });
+    await expect(support.appendMessage(TOKEN_A, missing, { body: 'Ghost thread', mediaIds: [] }, key()))
+      .rejects.toMatchObject({ code: 'NOT_FOUND' });
+    await expect(support.appendMessage(TOKEN_OPERATOR, missing, { body: 'Ghost reply', mediaIds: [] }, key()))
+      .rejects.toMatchObject({ code: 'NOT_FOUND' });
+    await expect(support.resolveIncident(TOKEN_OPERATOR, missing, { expectedVersion: 1, outcome: 'NO_ACTION', reason: 'Ghost' }, key()))
+      .rejects.toMatchObject({ code: 'NOT_FOUND' });
+    await expect(support.requestRewash(TOKEN_A, missing, { expectedVersion: 1, reason: 'Ghost' }, key()))
+      .rejects.toMatchObject({ code: 'NOT_FOUND' });
+
+    expect((await getPool().query('SELECT count(*)::int AS n FROM support_v2_incident_messages')).rows[0].n).toBe(0);
+    expect((await getPool().query('SELECT count(*)::int AS n FROM support_v2_rewashes')).rows[0].n).toBe(0);
+  });
+
+  it('keeps one review row under a same-actor create race', async () => {
+    const orderId = await seedOrder();
+    const race = await Promise.allSettled([
+      reviews.create(TOKEN_A, orderId, {
+        orderId, expectedVersion: 3, overall: 5, comment: 'Race copy one', mediaIds: [], publishConsent: true,
+      }, key()),
+      reviews.create(TOKEN_A, orderId, {
+        orderId, expectedVersion: 3, overall: 4, comment: 'Race copy two', mediaIds: [], publishConsent: true,
+      }, key()),
+    ]);
+    const created = race.filter(entry => entry.status === 'fulfilled') as PromiseFulfilledResult<{ id: string }>[];
+    const refused = race.filter(entry => entry.status === 'rejected') as PromiseRejectedResult<{ code: string }>[];
+    expect(created).toHaveLength(1);
+    expect(refused).toHaveLength(1);
+    expect(refused[0].reason).toMatchObject({ code: 'INVALID_INPUT' });
+    expect((await getPool().query('SELECT count(*)::int AS n FROM reviews_v2')).rows[0].n).toBe(1);
+    expect(await reviews.eligibility(TOKEN_A, orderId)).toMatchObject({ eligible: false });
   });
 });
 

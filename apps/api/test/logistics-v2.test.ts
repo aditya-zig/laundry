@@ -157,6 +157,9 @@ beforeEach(async () => {
     db: getPool(),
     authenticate: token => identity.authenticate(token),
     clock,
+    // Shorter code lifetime keeps the expiry scenario inside the 15-minute
+    // access-token window of the test identity service.
+    custodyCodeMinutes: 5,
     custodyCodeSecret: 'b06-test-custody-code-secret',
     custodyNotifier: notifier,
     verifier,
@@ -315,7 +318,7 @@ describe('B06-03 handover proof and replay', () => {
     const { operator, riderOne, riderTwo, attempt, assignment } = await assignedPickup();
     const firstCode = notifier.latest()!.code;
     const oldJob = await logistics.getRiderJob(riderOne.token, attempt.id);
-    nextTime(21 * 60_000);
+    nextTime(6 * 60_000);
     await expect(logistics.recordHandover(riderOne.token, await handoverInput(oldJob, firstCode), key()))
       .rejects.toMatchObject({ code: 'INVALID_INPUT', message: 'The custody code has expired' });
 
@@ -328,6 +331,24 @@ describe('B06-03 handover proof and replay', () => {
     const result = await logistics.recordHandover(riderTwo.token, await handoverInput(job, secondCode), key());
     expect(result.accepted).toBe(true);
     expect(replacement.riderId).toBe(riderTwo.id);
+  });
+
+  it('locks custody proof entry after the bounded attempt count', async () => {
+    const { riderOne, orderId, attempt } = await assignedPickup();
+    const job = await logistics.getRiderJob(riderOne.token, attempt.id);
+    const code = notifier.latest()!.code;
+    const wrong = code === '000000' ? '111111' : '000000';
+    for (const guess of [1, 2, 3, 4, 5].map(() => wrong)) {
+      await expect(logistics.recordHandover(riderOne.token, await handoverInput(job, guess), key()))
+        .rejects.toMatchObject({ code: 'INVALID_INPUT', message: 'Custody code did not match' });
+    }
+    // Even the correct code is refused once the guess budget is spent.
+    await expect(logistics.recordHandover(riderOne.token, await handoverInput(job, code), key()))
+      .rejects.toMatchObject({ code: 'INVALID_INPUT', message: 'The custody code is locked after too many attempts' });
+    expect((await getPool().query('SELECT count(*)::int AS n FROM logistics_handovers')).rows[0].n).toBe(0);
+    expect((await getPool().query('SELECT code_attempts FROM logistics_assignments WHERE order_id=$1', [orderId])).rows[0].code_attempts).toBe(5);
+    expect((await getPool().query('SELECT status FROM orders_v2_orders WHERE id=$1', [orderId])).rows[0].status).toBe('CONFIRMED');
+    expect((await getPool().query('SELECT count(*)::int AS n FROM logistics_assignments WHERE order_id=$1 AND code_attempts>0', [orderId])).rows[0].n).toBe(1);
   });
 });
 
@@ -359,6 +380,17 @@ describe('B06-04 return custody', () => {
     expect(receipt).toMatchObject({ orderId, sealedContainerCount: 1, amountDueAtReturnMinor: 6000, currency: 'INR' });
     expect(receipt.currentHandoff).toBe('RETURNED');
     expect(receipt.countedQuantity).toBe(6);
+  });
+
+  it('refuses a second live attempt while the order leg still has one', async () => {
+    const who = await actors();
+    const orderId = await seedOrder({ customerId: who.customer.actor.id });
+    const first = await logistics.openLegAttempt(orderId, 'PICKUP');
+    await expect(logistics.openLegAttempt(orderId, 'PICKUP'))
+      .rejects.toMatchObject({ code: 'INVALID_INPUT', message: 'This order leg already has a live attempt' });
+    expect((await getPool().query(
+      "SELECT count(*)::int AS n FROM logistics_leg_attempts WHERE order_id=$1 AND leg='PICKUP'", [orderId])).rows[0].n).toBe(1);
+    expect(first.attemptNumber).toBe(1);
   });
 });
 
@@ -402,7 +434,7 @@ describe('B06-05 provider events and stale location', () => {
     expect(tracking.status).toBe('CONFIRMED');
     expect(tracking.locationUpdatedAt).toBe(now.toISOString());
     expect(tracking.locationSource).toBe('RIDER_REPORTED');
-    expect(tracking.steps[0]).toMatchObject({ id: 'status-current', label: 'Status CONFIRMED', state: 'CURRENT' });
+    expect(tracking.steps[0]).toMatchObject({ label: 'Status CONFIRMED', state: 'CURRENT' });
 
     nextTime(6 * 60_000);
     const later = await logistics.getTracking(who.customer.accessToken, orderId);
@@ -423,7 +455,11 @@ describe('B06 tracking and custody ownership', () => {
 
     const tracking = await logistics.getTracking(who.customer.accessToken, orderId);
     expect(tracking.status).toBe('CONFIRMED');
-    expect(tracking.steps).toEqual([{ id: 'status-current', label: 'Status CONFIRMED', state: 'CURRENT' }]);
+    // Step ids are contract GUIDs; only the label carries the milestone text.
+    expect(tracking.steps.map(step => ({ label: step.label, state: step.state })))
+      .toEqual([{ label: 'Status CONFIRMED', state: 'CURRENT' }]);
+    for (const step of tracking.steps) expect(v2.trackingStepSchema.parse(step)).toEqual(step);
+    expect((await logistics.getTracking(who.customer.accessToken, orderId)).steps).toEqual(tracking.steps);
     const receipt = await logistics.getCustodyReceipt(who.customer.accessToken, orderId);
     expect(receipt.currentHandoff).toBe('NONE');
     expect(receipt.amountDueAtReturnMinor).toBe(6000);

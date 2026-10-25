@@ -20,6 +20,12 @@ import { AvailabilityService } from "../../../modules/availability/src";
 import { OrdersService } from "../../../modules/orders/src";
 import { getPool } from "../../../modules/shared/src/db";
 import { demoMode } from "../../../modules/shared/src/auth";
+import { ProductModule } from './features/product.module';
+import { BillingService, BillingFault, createObligationForOrder } from '../../../modules/billing/src';
+import { LogisticsService } from '../../../modules/logistics/src';
+import { SupportService } from '../../../modules/support/src';
+import { ReviewsService } from '../../../modules/reviews/src';
+import { JobsService } from '../../../modules/jobs/src';
 
 @Controller()
 class MiscController {
@@ -76,10 +82,41 @@ function availabilityService(): AvailabilityService {
 }
 let orders: OrdersService | undefined;
 function ordersService(): OrdersService {
-  return (orders ??= new OrdersService({ db: getPool(), authenticate: authenticate(), catalog: catalogService(), availability: availabilityService() }));
+  return (orders ??= new OrdersService({ db: getPool(), authenticate: authenticate(), catalog: catalogService(), availability: availabilityService(),
+    onBooked: async (order, transaction) => {
+      await createObligationForOrder(transaction, { orderId: order.id });
+      await logisticsService().openLegAttempt(order.id, 'PICKUP', { scheduledWindow: order.pickupWindow }, transaction);
+    },
+  }));
+}
+
+let logistics: LogisticsService | undefined;
+function logisticsService(): LogisticsService {
+  // Tracking/custody reads and transactional leg creation do not require a
+  // dispatch provider. Assignment refuses missing custody-code delivery.
+  return (logistics ??= new LogisticsService({ db: getPool(), authenticate: authenticate() }));
+}
+let billing: BillingService | undefined;
+function billingService(): BillingService {
+  return (billing ??= new BillingService({ db: getPool(), authenticate: authenticate(), provider: {
+    async refund() { throw new BillingFault('PROVIDER_UNAVAILABLE', 'A live refund provider is not configured'); },
+  } }));
+}
+let support: SupportService | undefined;
+function supportService(): SupportService {
+  return (support ??= new SupportService({ db: getPool(), authenticate: authenticate() }));
+}
+let reviews: ReviewsService | undefined;
+function reviewsService(): ReviewsService {
+  return (reviews ??= new ReviewsService({ db: getPool(), authenticate: authenticate() }));
+}
+let jobs: JobsService | undefined;
+function jobsService(): JobsService {
+  return (jobs ??= new JobsService({ db: getPool(), authenticate: authenticate() }));
 }
 
 @Module({ imports: [
+  ProductModule.register({ billing: billingService, logistics: logisticsService, support: supportService, reviews: reviewsService, jobs: jobsService }),
   IdentityModule.register(identityService),
   CatalogModule.register(catalogService),
   AvailabilityModule.register(availabilityService),

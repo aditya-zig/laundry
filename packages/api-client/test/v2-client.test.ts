@@ -39,6 +39,27 @@ const moderation = { expectedVersion: 1, decision: "PUBLISH" as const, reason: "
 const rewash = { expectedVersion: 1, reason: "Synthetic quality issue" };
 const incidentInput = { orderId: id, category: "QUALITY" as const, summary: "Synthetic quality issue", mediaIds: [] };
 
+describe("staff OTP second-factor transport", () => {
+  const session = { sessionId: id, accessToken: 'synthetic-access', refreshToken: 'synthetic-refresh', expiresAt: challenge.expiresAt,
+    actor: { id, role: 'OPERATOR', facilityIds: [], scope: { facilityIds: [] } } };
+  it('carries an optional staff factor only in the verification body and retains the retry key', async () => {
+    const calls: Call[] = [];
+    const client = createV2Client({ fetchImpl: stub(calls, () => json(session)) });
+    await client.verifyOtp(id, '123456', { idempotencyKey: id, mfaCode: '654321' });
+    expect(JSON.parse(calls[0].init.body as string)).toEqual({ challengeId: id, code: '123456', mfaCode: '654321' });
+    expect((calls[0].init.headers as Record<string, string>)['Idempotency-Key']).toBe(id);
+    expect(JSON.stringify(calls[0].init.headers)).not.toContain('654321');
+  });
+  it('preserves customer body compatibility and refuses malformed second factors before fetch', async () => {
+    const calls: Call[] = [];
+    const client = createV2Client({ fetchImpl: stub(calls, () => json(session)) });
+    await client.verifyOtp(id, '123456');
+    expect(JSON.parse(calls[0].init.body as string)).toEqual({ challengeId: id, code: '123456' });
+    expect(() => client.verifyOtp(id, '123456', { mfaCode: 'bad' })).toThrow();
+    expect(calls).toHaveLength(1);
+  });
+});
+
 describe("v2 client headers", () => {
   it("sends an idempotency key on a mutation", async () => {
     const calls: Call[] = [];
