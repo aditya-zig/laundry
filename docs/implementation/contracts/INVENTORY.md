@@ -62,7 +62,7 @@ Billing units: 2.
 | Method | Path | Request | Response | Roles | Idempotency | Errors |
 |---|---|---|---|---|---|---|
 | `GET` | `/v2/availability/areas/{postalCode}` | - | `ServiceArea` | PUBLIC | NOT_APPLICABLE | NOT_FOUND, PROVIDER_UNAVAILABLE, PROVIDER_OUTCOME_UNKNOWN, RATE_LIMITED |
-| `GET` | `/v2/availability/slots` | - | `SlotPairList` | PUBLIC | NOT_APPLICABLE | INVALID_INPUT, PROVIDER_UNAVAILABLE, PROVIDER_OUTCOME_UNKNOWN, RATE_LIMITED |
+| `GET` | `/v2/availability/slots` | - | `SlotPairList` | PUBLIC | NOT_APPLICABLE | INVALID_INPUT, NOT_FOUND, PROVIDER_UNAVAILABLE, PROVIDER_OUTCOME_UNKNOWN, RATE_LIMITED |
 | `GET` | `/v2/ops/availability/calendar` | - | `OperationsCalendar` | OPERATOR, SUPPORT, ADMIN | NOT_APPLICABLE | FORBIDDEN, PROVIDER_UNAVAILABLE, PROVIDER_OUTCOME_UNKNOWN, RATE_LIMITED |
 | `PUT` | `/v2/ops/availability/capacity` | `CapacityUpdate` | `CapacityResult` | OPERATOR, ADMIN | REQUIRED | FORBIDDEN, VERSION_CONFLICT, PROVIDER_UNAVAILABLE, PROVIDER_OUTCOME_UNKNOWN, RATE_LIMITED |
 

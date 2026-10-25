@@ -2538,6 +2538,16 @@
               }
             }
           },
+          "404": {
+            "description": "NOT_FOUND. ",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
           "429": {
             "description": "RATE_LIMITED. ",
             "content": {
@@ -2579,7 +2589,35 @@
             "bearerSession": []
           }
         ],
-        "parameters": [],
+        "parameters": [
+          {
+            "name": "areaId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "description": "Contract-valid result. The runtime validates cross-field invariants and normalizes instants to UTC.",

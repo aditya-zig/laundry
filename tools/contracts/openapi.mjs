@@ -55,6 +55,12 @@ export function buildOpenApi() {
         { name: 'requestedReturnBy', in: 'query', required: false, schema: { type: 'string', format: 'date-time' } },
       );
     }
+    if (route.id === 'availability.calendar') {
+      operation.parameters.push(
+        { name: 'areaId', in: 'query', required: false, schema: { type: 'string', format: 'uuid' } },
+        ...['from', 'to'].map(name => ({ name, in: 'query', required: false, schema: { type: 'string', format: 'date-time' } })),
+      );
+    }
     const responseSchema = v2.getWireSchema(route.responseSchema);
     if (route.method === 'GET' && responseSchema instanceof z.ZodObject && responseSchema.shape.pageInfo) {
       operation.parameters.push(

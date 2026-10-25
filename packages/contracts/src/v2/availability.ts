@@ -47,3 +47,4 @@ export const operationsCalendarSchema = z.object({
   buckets: z.array(capacityBucketSchema),
   generatedAt: instantSchema,
 }).strict();
+export type OperationsCalendar = z.infer<typeof operationsCalendarSchema>;

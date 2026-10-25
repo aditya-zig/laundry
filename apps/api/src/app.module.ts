@@ -12,8 +12,10 @@ import { PilotController } from "./controllers/pilot.controller";
 import { DatabaseLifecycle } from "./database-lifecycle";
 import { IdentityModule } from "./features/identity/identity.module";
 import { CatalogModule } from "./features/catalog/catalog.module";
+import { AvailabilityModule } from "./features/availability/availability.module";
 import { identityFromEnvironment, type IdentityService } from "../../../modules/identity/src";
 import { CatalogService } from "../../../modules/catalog/src";
+import { AvailabilityService } from "../../../modules/availability/src";
 import { getPool } from "../../../modules/shared/src/db";
 import { demoMode } from "../../../modules/shared/src/auth";
 
@@ -63,6 +65,10 @@ function identityService(): IdentityService | null {
   CatalogModule.register(() => {
     const service = identityService();
     return new CatalogService({ db: getPool(), authenticate: service ? token => service.authenticate(token) : undefined });
+  }),
+  AvailabilityModule.register(() => {
+    const service = identityService();
+    return new AvailabilityService({ db: getPool(), authenticate: service ? token => service.authenticate(token) : undefined });
   }),
 ], controllers: [MiscController, AuthController, CatalogController, OrdersController, OpsController, PartnerController, BillingController, ConversationController, PilotController], providers: [DatabaseLifecycle] })
 export class AppModule {}
