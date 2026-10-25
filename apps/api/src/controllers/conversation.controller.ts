@@ -8,6 +8,7 @@ import { verifyWhatsappSignature, whatsappChallenge, retrieveWhatsappMedia } fro
 import { emitOutbox } from "../../../../modules/shared/src/idempotency";
 import { conversationMessageSchema, draftConfirmSchema } from "@laundry/contracts";
 import { AuthGuard, Public } from "../guards/auth.guard";
+import { LegacyDemoOnlyGuard } from '../guards/legacy-demo-only.guard';
 
 type WaMessage = {
   id: string; type: string; from?: string; timestamp?: string;
@@ -21,6 +22,7 @@ async function enqueueWhatsappReply(to: string, body: string, draftId: string): 
 }
 
 @Controller()
+@UseGuards(LegacyDemoOnlyGuard)
 export class ConversationController {
   @Post("v1/demo/conversations/messages")
   @UseGuards(AuthGuard)

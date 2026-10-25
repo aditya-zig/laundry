@@ -493,7 +493,12 @@ test("configured WhatsApp media retrieval and send use fixtures; duplicate audio
     const sent = await sendWhatsappText("919000000001", "hello from fixture");
     expect(sent.status).toBe("sent");
     expect(sent.id).toBe("wamid-out-1");
-    // Audio webhook through the same fixture: accepted once, outbox holds one notification.
+    // The transport adapter above is exercised in real-mode against a loopback
+    // provider fixture. The legacy HTTP/business path itself remains explicitly
+    // demo-only; it must not become a production integration through this test.
+    process.env.DEMO_MODE = 'true';
+    // Audio webhook still retrieves the actual loopback media fixture: accepted
+    // once, and its durable outbox holds exactly one notification.
     const secret = process.env.WHATSAPP_APP_SECRET as string;
     const wid = `wamid-audio-${randomUUID()}`;
     const payload = { entry: [{ changes: [{ value: { messages: [{ id: wid, type: "audio", audio: { id: "media123", mime_type: "audio/ogg" }, from: "919000000777", timestamp: String(Math.floor(Date.now() / 1000)) }] } }] }] };

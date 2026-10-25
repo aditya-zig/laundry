@@ -5,8 +5,10 @@ import { getPool } from "../../../../modules/shared/src/db";
 import { getPayment, listReceipts, requestRefund, reconciliation } from "../../../../modules/billing/src/billing";
 import { AuthGuard, Public } from "../guards/auth.guard";
 import { ApiError } from "../../../../modules/shared/src/errors";
+import { LegacyDemoOnlyGuard } from '../guards/legacy-demo-only.guard';
 
 @Controller()
+@UseGuards(LegacyDemoOnlyGuard)
 export class BillingController {
   @Get("v1/payments/:id")
   @UseGuards(AuthGuard)

@@ -52,6 +52,20 @@ test('legacy demo sessions cannot authenticate after switching to real mode', as
   expect(result.status).toBe(401);
   expect((await result.json()).code).toBe('UNAUTHENTICATED');
 });
+test('real mode cannot expose legacy demo catalog/serviceability or activate legacy provider callbacks', async () => {
+  process.env.DEMO_MODE = 'false';
+  for (const path of ['/v1/services', '/v1/services/' + randomUUID(), '/v1/service-areas/check', '/v1/webhooks/whatsapp']) {
+    const response = await fetch(base + path);
+    expect(response.status, path).toBe(503);
+    const value = await response.json();
+    expect(value.code).toBe('PROVIDER_UNAVAILABLE');
+    expect(JSON.stringify(value)).not.toContain('demo-area-bengaluru');
+    expect(response.headers.get('cache-control')).toBe('no-store');
+  }
+  const payment = await fetch(base + '/v1/webhooks/payments/razorpay', { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}' });
+  expect(payment.status).toBe(503);
+});
+
 test('real-mode OTP requests fail before persisting undeliverable or plaintext challenges', async () => {
   process.env.DEMO_MODE = 'false';
   const before = (await getPool().query('SELECT count(*)::int AS n FROM otp_challenges')).rows[0].n;

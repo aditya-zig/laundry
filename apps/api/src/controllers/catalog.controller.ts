@@ -6,8 +6,10 @@ import { submitReview, listServiceReviews, moderateReview } from "../../../../mo
 import { idSchema, reviewInputSchema } from "@laundry/contracts";
 import { AuthGuard, Public } from "../guards/auth.guard";
 import { ApiError } from "../../../../modules/shared/src/errors";
+import { LegacyDemoOnlyGuard } from '../guards/legacy-demo-only.guard';
 
 @Controller()
+@UseGuards(LegacyDemoOnlyGuard)
 export class CatalogController {
   @Public()
   @Get("v1/service-areas/check")

@@ -88,11 +88,14 @@ async function main() {
       (async()=>{
         const live=await fetch('http://127.0.0.1:4100/health');assert.equal(live.status,200);
         const ready=await fetch('http://127.0.0.1:4100/health/ready');assert.equal(ready.status,503);assert.equal((await ready.json()).productionReady,false);
+        for(const path of ['/v1/services','/v1/service-areas/check','/v1/webhooks/whatsapp']){
+          const legacy=await fetch('http://127.0.0.1:4100'+path);assert.equal(legacy.status,503);assert.equal((await legacy.json()).code,'PROVIDER_UNAVAILABLE');
+        }
         const auth=await fetch('http://127.0.0.1:4100/v2/identity/otp',{method:'POST',headers:{'content-type':'application/json','idempotency-key':'synthetic-container-check'},body:JSON.stringify({phone:'+919000019876'})});
         assert.equal(auth.status,503);assert.equal((await auth.json()).code,'PROVIDER_UNAVAILABLE');
         const db=new (appRequire('pg').Pool)({connectionString:process.env.DATABASE_URL});
         try{assert.equal((await db.query('SELECT count(*)::int AS n FROM identity_otp_challenges')).rows[0].n,0);}finally{await db.end();}
-        console.log(JSON.stringify({node:process.version,uid:process.getuid(),compiledStartup:true,developmentLoadersAbsent:true,productionDependenciesOnly:true,privateContextExcluded:true,unconfiguredIdentityClosed:true,productReady:false}));
+        console.log(JSON.stringify({node:process.version,uid:process.getuid(),compiledStartup:true,developmentLoadersAbsent:true,productionDependenciesOnly:true,privateContextExcluded:true,legacyDemoPublicRoutesClosed:true,unconfiguredIdentityClosed:true,productReady:false}));
       })().catch(()=>process.exit(1));
     `], 'Inspect the actual non-root, production-only runtime and fail-closed API'));
     proof = { testedSha: revision, dirty: false, checkedAt: new Date().toISOString(), imageId, runtime, legacyWorkerProductionClosed: true, compiledIdentityMaintenance: maintenance,
