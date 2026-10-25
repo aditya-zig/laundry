@@ -16,7 +16,7 @@ COPY apps/partner/package.json ./apps/partner/package.json
 COPY apps/ops/package.json ./apps/ops/package.json
 COPY apps/pilot-console/package.json ./apps/pilot-console/package.json
 COPY tools/build-node.mjs ./tools/build-node.mjs
-RUN pnpm install --frozen-lockfile --ignore-scripts
+RUN pnpm install --frozen-lockfile --ignore-scripts --filter @laundry/api... --filter @laundry/worker...
 RUN pnpm --filter @laundry/contracts build \
  && pnpm --filter @laundry/api build \
  && pnpm --filter @laundry/worker build \
