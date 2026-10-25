@@ -7,6 +7,11 @@ export class EnvelopeFilter implements ExceptionFilter {
   catch(exception: unknown, host: ArgumentsHost) {
     const res = host.switchToHttp().getResponse();
     const traceId = randomUUID();
+    const parserType = exception && typeof exception === 'object' && 'type' in exception ? exception.type : undefined;
+    if (parserType === 'entity.too.large' || parserType === 'entity.parse.failed') {
+      return res.status(parserType === 'entity.too.large' ? 413 : 400).json({ code: 'INVALID_INPUT',
+        message: parserType === 'entity.too.large' ? 'Request body is too large' : 'Request body must be valid JSON', traceId, retryable: false });
+    }
     if (exception instanceof ApiError) {
       return res.status(exception.status).json({ ...exception.toEnvelope(), traceId: exception.traceId });
     }

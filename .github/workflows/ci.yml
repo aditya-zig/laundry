@@ -48,6 +48,7 @@ jobs:
       - run: pnpm test:tooling
       - run: pnpm test
       - run: pnpm test:voice
+      - run: pnpm verify:container
       - run: pnpm exec playwright install --with-deps chromium
       - run: pnpm verify:browser
       - run: pnpm verify:restore

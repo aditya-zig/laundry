@@ -1,37 +1,38 @@
-# Laundry API + worker image (production).
-# Builds the NestJS API and background worker from this monorepo with pnpm,
-# then runs both under Node 24 with tsx against the compiled workspace.
-# Local demo/dev behavior is unchanged: `pnpm dev:api` still uses tsx watch.
-FROM node:24-alpine AS build
+# Actual compiled Node artifacts. API and worker are separate processes; this
+# image defaults to API only. It is not a production-v2 readiness certificate.
+FROM node:24.22.0-bookworm-slim AS build
 RUN corepack enable
 WORKDIR /app
-COPY package.json pnpm-workspace.yaml pnpm-lock.yaml ./
+COPY package.json pnpm-workspace.yaml pnpm-lock.yaml tsconfig.json tsconfig.base.json ./
+COPY patches ./patches
 COPY packages ./packages
 COPY modules ./modules
 COPY apps/api ./apps/api
 COPY apps/worker ./apps/worker
-COPY assets ./assets
-RUN pnpm install --frozen-lockfile
+# Keep the frozen workspace graph/patches reproducible without copying frontend
+# sources, browser recordings, credentials or developer caches into the context.
+COPY apps/customer/package.json ./apps/customer/package.json
+COPY apps/partner/package.json ./apps/partner/package.json
+COPY apps/ops/package.json ./apps/ops/package.json
+COPY apps/pilot-console/package.json ./apps/pilot-console/package.json
+COPY tools/build-node.mjs ./tools/build-node.mjs
+RUN pnpm install --frozen-lockfile --ignore-scripts
 RUN pnpm --filter @laundry/contracts build \
  && pnpm --filter @laundry/api build \
- && pnpm --filter @laundry/worker build
+ && pnpm --filter @laundry/worker build \
+ && pnpm --filter @laundry/api deploy --prod --legacy /out/api \
+ && pnpm --filter @laundry/worker deploy --prod --legacy /out/worker
 
-FROM node:24-alpine AS runtime
-ENV NODE_ENV=production
+FROM node:24.22.0-bookworm-slim AS runtime
+ENV NODE_ENV=production HOST=0.0.0.0
 WORKDIR /app
-RUN corepack enable
-COPY --from=build /app/package.json /app/pnpm-workspace.yaml /app/pnpm-lock.yaml ./
-COPY --from=build /app/packages ./packages
-COPY --from=build /app/modules ./modules
-COPY --from=build /app/apps ./apps
-COPY --from=build /app/assets ./assets
-RUN pnpm install --frozen-lockfile --prod=false
+COPY --from=build /out/api ./api
+COPY --from=build /out/worker ./worker
+COPY --from=build /app/modules/schema/migrations ./modules/schema/migrations
+COPY assets/services ./assets/services
+USER node
 EXPOSE 4100
-# The compiled dist/ is CommonJS while the workspace packages declare
-# `"type": "module"`, so plain `node dist/...` fails with
-# "exports is not defined in ES module scope". tsx resolves TS paths and
-# decorators the same way local `pnpm dev:api` does.
-# The entrypoint requires DATABASE_URL, DEMO_MODE=false, and live
-# WHATSAPP_*/RAZORPAY_* credentials; the API refuses to boot in
-# NODE_ENV=production without them (see apps/api/src/main.ts).
-CMD ["sh", "-c", "./node_modules/.bin/tsx --tsconfig apps/api/tsconfig.json apps/api/src/main.ts"]
+# Startup requires explicit TLS DB, HTTPS origins, non-demo identity/provider
+# configuration and send budget. No development TypeScript loader is required.
+# The legacy worker is not automatically launched or called production-v2 ready.
+CMD ["node", "api/dist/apps/api/src/main.js"]

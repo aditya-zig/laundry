@@ -32,6 +32,13 @@ test('OpenAPI exposes strict versioned booking and exact integer money limits', 
   assert.equal(schemas.ManualPaymentConfirmation.properties.amountMinor.maximum, Number.MAX_SAFE_INTEGER);
 });
 
+test('JSON commands publish transport size rejection separately from logical input errors', () => {
+  const responses = buildOpenApi().paths['/v2/identity/otp'].post.responses;
+  assert.equal(responses['413'].content['application/json'].schema.$ref, '#/components/schemas/ErrorEnvelope');
+  assert.ok(responses['400']);
+  assert.ok(responses['503']);
+});
+
 test('slot queries encode multiple service IDs as one comma-separated parameter', () => {
   const params = buildOpenApi().paths['/v2/availability/slots'].get.parameters;
   const ids = params.find(p => p.name === 'serviceIds');

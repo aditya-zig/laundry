@@ -77,7 +77,7 @@ importers:
   apps/api:
     dependencies:
       '@laundry/contracts':
-        specifier: file:../../packages/contracts
+        specifier: workspace:*
         version: link:../../packages/contracts
       '@nestjs/common':
         specifier: 11.2.8
@@ -322,7 +322,7 @@ importers:
   apps/worker:
     dependencies:
       '@laundry/contracts':
-        specifier: file:../../packages/contracts
+        specifier: workspace:*
         version: link:../../packages/contracts
       pg:
         specifier: 8.13.0

@@ -34,7 +34,10 @@ export function buildOpenApi() {
       'x-laundry-backend-acceptance': 'NOT_VERIFIED',
     };
     if (route.idempotency === 'REQUIRED') operation.parameters.push({ name: 'Idempotency-Key', in: 'header', required: true, schema: { type: 'string', minLength: 1, maxLength: 200 }, description: 'Persist with original intent. Same actor/key/payload replays; changed intent conflicts.' });
-    if (route.requestSchema) operation.requestBody = { required: true, content: { 'application/json': { schema: ref(route.requestSchema) } } };
+    if (route.requestSchema) {
+      operation.requestBody = { required: true, content: { 'application/json': { schema: ref(route.requestSchema) } } };
+      operation.responses['413'] = { description: 'Transport body limit exceeded (INVALID_INPUT); no command was executed.', content: { 'application/json': { schema: ref('ErrorEnvelope') } } };
+    }
     const codes = new Set([...route.errorCodes, 'INVALID_INPUT', ...(route.authentication === 'SESSION' ? ['UNAUTHENTICATED', 'NOT_FOUND'] : []), ...(route.idempotency === 'REQUIRED' ? ['IDEMPOTENCY_CONFLICT'] : [])]);
     for (const code of codes) {
       const status = String(v2.errorHttpStatus[code]);

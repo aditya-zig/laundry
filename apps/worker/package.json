@@ -3,14 +3,15 @@
   "private": true,
   "version": "0.1.0",
   "type": "module",
+  "files": ["dist"],
   "scripts": {
     "dev": "tsx watch src/main.ts",
-    "start": "tsx src/main.ts",
-    "build": "tsc -p tsconfig.build.json",
+    "start": "node dist/apps/worker/src/main.js",
+    "build": "tsc -p tsconfig.build.json && node ../../tools/build-node.mjs worker",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
-    "@laundry/contracts": "file:../../packages/contracts",
+    "@laundry/contracts": "workspace:*",
     "pg": "8.13.0",
     "zod": "4.6.7"
   },

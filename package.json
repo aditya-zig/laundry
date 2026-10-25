@@ -41,6 +41,7 @@
     "release:security": "pnpm audit --prod --audit-level moderate",
     "platform:verify": "node tools/cloud/verify-platform-live.mjs",
     "verify:restore": "node tools/verification/restore-rehearsal.mjs",
+    "verify:container": "node tools/cloud/verify-container.mjs",
     "verify:recording": "LAUNDRY_ISOLATED_RECORDING=true node tools/cloud/postgres.mjs exec --runtime docker --label hq-recording -- xvfb-run -a -s '-screen 0 1920x1080x24' node tools/verification/record-browser.mjs"
   },
   "devDependencies": {

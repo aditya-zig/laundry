@@ -85,7 +85,9 @@ function route<Id extends string>(definition: RouteDefinition & { id: Id }): Rou
     ...definition,
     authentication: definition.roles.includes("PROVIDER") ? "PROVIDER_SIGNATURE" : definition.roles.includes("PUBLIC") ? "PUBLIC" : "SESSION",
     roles: [...definition.roles],
-    errorCodes: [...definition.errorCodes],
+    // Operational failures/rate limits are part of every route's wire
+    // boundary, not evidence that a runtime handler or provider is enabled.
+    errorCodes: [...new Set([...definition.errorCodes, 'PROVIDER_UNAVAILABLE', 'PROVIDER_OUTCOME_UNKNOWN', 'RATE_LIMITED'])],
   });
   getWireSchema(parsed.responseSchema);
   if (parsed.requestSchema) getWireSchema(parsed.requestSchema);

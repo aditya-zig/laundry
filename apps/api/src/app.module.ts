@@ -1,4 +1,4 @@
-import { Module, Controller, Get, Post, Body, Req, UseGuards } from "@nestjs/common";
+import { Module, Controller, Get, Post, Body, Req, UseGuards, Header, HttpCode } from "@nestjs/common";
 import { z } from "zod";
 import { AuthController } from "./controllers/auth.controller";
 import { CatalogController } from "./controllers/catalog.controller";
@@ -10,19 +10,33 @@ import { ConversationController } from "./controllers/conversation.controller";
 import { Public, AuthGuard } from "./guards/auth.guard";
 import { PilotController } from "./controllers/pilot.controller";
 import { DatabaseLifecycle } from "./database-lifecycle";
+import { IdentityModule } from "./features/identity/identity.module";
+import { identityFromEnvironment } from "../../../modules/identity/src";
+import { getPool } from "../../../modules/shared/src/db";
+import { demoMode } from "../../../modules/shared/src/auth";
 
 @Controller()
 class MiscController {
   @Public()
   @Get("v1/health")
+  @Header('Cache-Control', 'no-store')
   health() {
-    return { ok: true, service: "laundry-api", demoMode: (process.env.DEMO_MODE ?? "true") !== "false" };
+    return { ok: true, service: "laundry-api", demoMode: demoMode(), productionReady: false };
   }
 
   @Public()
   @Get("health")
+  @Header('Cache-Control', 'no-store')
   rootHealth() {
-    return { ok: true, service: "laundry-api" };
+    return { ok: true, service: "laundry-api", productionReady: false };
+  }
+
+  @Public()
+  @Get('health/ready')
+  @HttpCode(503)
+  @Header('Cache-Control', 'no-store')
+  readiness() {
+    return { service: 'laundry-api', productionReady: false, productApiEnabled: false, code: 'PRODUCTION_NOT_ENABLED' };
   }
 
   @Post("v1/media/upload-intents")
@@ -34,5 +48,5 @@ class MiscController {
   }
 }
 
-@Module({ controllers: [MiscController, AuthController, CatalogController, OrdersController, OpsController, PartnerController, BillingController, ConversationController, PilotController], providers: [DatabaseLifecycle] })
+@Module({ imports: [IdentityModule.register(() => identityFromEnvironment(getPool()))], controllers: [MiscController, AuthController, CatalogController, OrdersController, OpsController, PartnerController, BillingController, ConversationController, PilotController], providers: [DatabaseLifecycle] })
 export class AppModule {}

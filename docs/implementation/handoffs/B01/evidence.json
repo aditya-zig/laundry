@@ -1,0 +1,31 @@
+{
+  "task": "B01",
+  "issue": 11,
+  "owner": "coordinator integration",
+  "baseSha": "a5dcc90097c7da1128d926ecb3caf3b90fa72f79",
+  "sourceSha": null,
+  "testedSha": null,
+  "scope": "Partial customer identity working-tree integration; clean revision receipts follow separately",
+  "contractVersion": "laundry-wire-v2.0.0-candidate",
+  "contractDigest": null,
+  "state": "BLOCKED_CONTRACT",
+  "providers": { "smsAcceptance": "FAKE", "commercialNetworkCalls": 0, "liveAcceptance": "BLOCKED_PROVIDER" },
+  "migrations": ["modules/schema/migrations/007_identity.sql"],
+  "commands": [
+    { "argv": ["pnpm", "check"], "exitCode": 0 },
+    { "argv": ["pnpm", "build"], "exitCode": 0 },
+    { "argv": ["pnpm", "test:tooling"], "exitCode": 0, "passed": 75 },
+    { "argv": ["node", "tools/cloud/postgres.mjs", "exec", "--runtime", "docker", "--label", "identity-compiled-all", "--", "pnpm", "test"], "exitCode": 0, "passed": 681 },
+    { "argv": ["node", "tools/cloud/postgres.mjs", "exec", "--runtime", "docker", "--label", "identity-compiled-browser", "--", "pnpm", "exec", "playwright", "test"], "exitCode": 0, "passed": 4 },
+    { "argv": ["docker", "build", "--file", "apps/api/Dockerfile", "--tag", "laundry-api-precommit:identity", "."], "exitCode": 0 }
+  ],
+  "scenarioScope": {
+    "B01-01": "Customer OTP persistence/rate/expiry/idempotency cases pass; delivery fake",
+    "B01-02": "Customer refresh/replay/logout/revocation through real SDK/API/PostgreSQL pass",
+    "B01-03": "Customer address ownership/version checks pass; staff/facility scope work remains",
+    "B01-04": "Actual compiled production bootstrap refuses missing identity configuration"
+  },
+  "recovery": { "sessions": 2, "ownedAddresses": 1, "encryptedReplay": true, "missingDeploymentKeysFailClosed": true, "canonicalCleanReceipt": "PENDING" },
+  "remaining": ["Staff invitation/MFA lifecycle", "Verified WhatsApp linking", "Shared internal-port review/freeze", "Identity retention-worker integration", "App session consumers", "Provider acceptance", "Native and physical fulfillment acceptance", "Approved operational policies"],
+  "productionReady": false
+}

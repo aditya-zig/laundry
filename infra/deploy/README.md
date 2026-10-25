@@ -7,6 +7,18 @@ with a default 5432 install. Redis maps to 6381.
 Production uses separate credentials, database, and buckets. Demo credentials
 in `.env.example` are development-only placeholders.
 
+## Compiled Node image and identity boundary
+
+`apps/api/Dockerfile` builds real CommonJS artifacts, installs only deployed production dependencies, and runs the API as UID 1000 under Node 24.22.0. It does not start the legacy worker automatically. API/worker `start` commands use compiled JavaScript; local `dev` commands retain tsx watch. Build before running the artifacts. The Docker context is allowlisted: private environment files, keys, logs, recordings, generated output and repository credentials must not even be transferred to the daemon.
+
+`pnpm verify:container` requires clean committed source and a local Unix-socket Docker context. It exercises Docker's actual ignore rules with synthetic private-file canaries, builds the real image, verifies production refusal without configured identity, starts the compiled API against an owned PostgreSQL context without demo credentials, inspects non-root/pruned runtime behavior, and removes only its owned resources. The receipt is `.verification/container.json`; it is not whole-product readiness.
+
+Production API startup requires `DEMO_MODE=false`, a PostgreSQL URL with `sslmode=verify-full`, exact HTTPS frontend origins and explicit Laundry-only identity/provider keys/send budget. SMS settings remain empty in `.env.example`; configuring them is not provider, template/DLT, privacy or commercial approval. No paid SMS was sent during implementation. Ordinary JSON is bounded separately from the explicit nonproduction base64 voice fixture. The new v2 customer identity API and SDK/PostgreSQL checks do not complete staff MFA, the business modules or the applications' v2 session consumers.
+
+`pnpm verify:restore` additionally restores synthetic v2 identity sessions/addresses and encrypted refresh replay. Independent deployment keys remain in process memory, not in the archive/receipt; missing keys fail closed. Production secret-vault/key recovery is a separate gate.
+
+Details and remaining scope: `docs/implementation/handoffs/B01/HANDOFF.md`.
+
 ## Cloudflare + Neon release-candidate preflight
 
 This is disabled-product staging infrastructure, **not a production application**.

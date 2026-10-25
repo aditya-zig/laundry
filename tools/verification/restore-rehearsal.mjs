@@ -5,6 +5,7 @@ import { mkdir, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import pg from 'pg';
 import { createTaskPostgres } from '../cloud/postgres.mjs';
+import { prepareIdentityRecovery } from './identity-recovery.mjs';
 
 const hash = value => createHash('sha256').update(value).digest('hex');
 const quote = name => '"' + name.replaceAll('"', '""') + '"';
@@ -50,6 +51,7 @@ async function main() {
     if (code !== 0 || signalled) throw new Error(`Source browser journey failed or interrupted (exit ${code})`);
     const a = new pg.Pool({ connectionString: source.databaseUrl, max: 1 }); pools.push(a);
     const b = new pg.Pool({ connectionString: target.databaseUrl, max: 1 }); pools.push(b);
+    const verifyIdentityRecovery = await prepareIdentityRecovery(a);
     const before = await fingerprint(a);
     const { rows: [facts] } = await a.query(`SELECT
       (SELECT count(*)::int FROM orders WHERE status='DELIVERED') AS delivered,
@@ -72,17 +74,18 @@ async function main() {
       '--no-owner', '--no-acl', '--exit-on-error'], { input: dump.stdout, maxBuffer: 2 * 1024 * 1024, timeout: 60000 });
     if (restore.error || restore.status !== 0) throw new Error('pg_restore failed; no recovery success claimed');
     assert.deepEqual(await fingerprint(b), before, 'Restored tables and sequences differ from the source');
+    const identity = await verifyIdentityRecovery(b);
     const restoredOrder = (await b.query('SELECT id,customer_id FROM orders LIMIT 1')).rows[0];
     await assert.rejects(b.query(`INSERT INTO reviews (order_id,customer_id,overall,comment,media_ids,consent)
       VALUES ($1,$2,5,'Synthetic duplicate after recovery','[]',true)`, [restoredOrder.id, restoredOrder.customer_id]), error => error.code === '23505');
     assert.equal((await b.query('SELECT count(*)::int AS n FROM reviews')).rows[0].n, 1, 'Recovery lost review uniqueness');
     if (signalled) throw new Error('Restore verification interrupted');
     await mkdir('.verification', { recursive: true });
-    const receipt = { testedSha: revision, dirty, checkedAt: new Date().toISOString(), scope: 'PostgreSQL 17 synthetic legacy web journey backup/restore, not cloud restore, physical fulfillment or production-v2 acceptance',
-      archive: { sha256: hash(dump.stdout), sizeBytes: dump.stdout.length, privateLocalPath: '.data/backups/fixture-restore.dump' }, facts, restoredTables: before.tables.length,
+    const receipt = { testedSha: revision, dirty, checkedAt: new Date().toISOString(), scope: 'PostgreSQL 17 synthetic legacy web and v2 customer identity backup/restore; fake external providers; not cloud restore, physical fulfillment or whole-product v2 acceptance',
+      archive: { sha256: hash(dump.stdout), sizeBytes: dump.stdout.length, privateLocalPath: '.data/backups/fixture-restore.dump' }, facts, identity, restoredTables: before.tables.length,
       fingerprints: before, duplicateReviewRejectedAfterRestore: true, productionReady: false };
     await writeFile('.verification/restore-rehearsal.json', JSON.stringify(receipt, null, 2));
-    console.log(`Recovery verified: ${before.tables.length} tables, all sequences, captures, both custody legs and review uniqueness.`);
+    console.log(`Recovery verified: ${before.tables.length} tables, all sequences, captures, both custody legs, review uniqueness and encrypted v2 identity recovery.`);
   } finally {
     for (const db of pools.reverse()) await db.end();
     // Always attempt all owned cleanup, including if one cleanup fails.
