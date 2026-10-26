@@ -65,7 +65,26 @@ describe("Laundry project naming", () => {
     }).parse(parse(read(".github/workflows/ci.yml")));
     expect(Object.keys(workflow.on).sort()).toEqual(["pull_request", "push"]);
     expect(Object.keys(workflow.jobs)).toEqual(["verify"]);
-    expect(Object.keys(workflow.jobs.verify.env).sort()).toEqual(["CI", "DATABASE_URL", "DEMO_MODE"]);
+    // Keep the complete allowlist exact: current-product acceptance is still
+    // synthetic, uses disposable PostgreSQL and must not acquire live secrets
+    // or deployment switches just because its browser coverage changed.
+    expect(workflow.jobs.verify.env).toEqual({
+      CI: "true",
+      DATABASE_URL: "postgres://laundry:laundry_dev_only@localhost:5448/laundry_verify_ci",
+      DEMO_MODE: "true",
+      VERIFY_WEB_SCOPE: "product",
+      VERIFY_HEAD_SHA: "${{ github.event.pull_request.head.sha || github.sha }}",
+      VERIFY_BASE_SHA: "${{ github.event.pull_request.base.sha || '' }}",
+      LAUNDRY_PG_RUNTIME: "docker",
+      LAUNDRY_RESTORE_SOURCE: "customer-v2",
+      LAUNDRY_VERIFY_OPS_FACILITY: "true",
+      LAUNDRY_VERIFY_RIDER: "true",
+      LAUNDRY_VERIFY_PICKUP: "true",
+    });
+    expect(workflow.jobs.verify.steps.flatMap(step => step.uses ? [step.uses] : [])).toEqual([
+      "actions/checkout@v4", "pnpm/action-setup@v4", "actions/setup-node@v4",
+      "actions/setup-python@v5", "actions/upload-artifact@v4",
+    ]);
     const commands = workflow.jobs.verify.steps.flatMap(step => step.run ? [step.run] : []);
     expect(commands).toEqual([
       "sudo apt-get update && sudo apt-get install -y ffmpeg xvfb",
