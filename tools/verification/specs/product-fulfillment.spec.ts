@@ -20,7 +20,8 @@ test('E2E-PRODUCT: current customer, pickup rider, facility, return rider and ma
   const receipt = JSON.parse(await readFile(resolve(root, 'result.json'), 'utf8'));
   expect(receipt).toMatchObject({ status: 'passed', sourceRevision: revision, sourceDirty: dirty,
     scope: 'customer-ops-rider', syntheticOnly: true, commercialCalls: 0,
-    pickupBrowserProven: true, pickupBagContinuity: true, orders: 1, legs: 2, obligations: 1,
+    pickupBrowserProven: true, pickupBagContinuity: true, customerDeepLinkReloadProven: true,
+    customerBagQuantityEditsProven: true, orders: 1, legs: 2, obligations: 1,
     accepted_decisions: 1, confirmed_events: 1, browserErrors: [],
     sameBookingKeyAndBody: true, sameAdjustmentKeyAndBody: true,
     sameReviewKeyAndBody: true, sameSupportCaseKeyAndBody: true, sameSupportMessageKeyAndBody: true,
@@ -47,7 +48,7 @@ test('E2E-PRODUCT: current customer, pickup rider, facility, return rider and ma
     expect((await readFile(source)).length).toBeGreaterThan(0);
     const target = testInfo.outputPath(`${role}.webm`);
     await copyFile(source, target);
-    await testInfo.attach('video', { path: target, contentType: 'video/webm' });
+    await testInfo.attach(`video-${role}`, { path: target, contentType: 'video/webm' });
   }
   await testInfo.attach('qualified-product-receipt', { body: JSON.stringify(receipt, null, 2), contentType: 'application/json' });
 });
