@@ -23,6 +23,7 @@ import {
 } from "../features/careActions";
 import { FacilityRecordForm } from "../features/FacilityRecordForm";
 import { DispatchSettlementPanel } from "../features/DispatchSettlementPanel";
+import { CatalogReadinessPanel } from "../features/CatalogReadinessPanel";
 import { useSyncedState } from "../features/useSyncedState";
 import type { PresentableError } from "../features/errors";
 import {
@@ -147,6 +148,7 @@ export function ProductOperationsApp(props: ProductOperationsAppProps = {}) {
       detail={detailState ?? { kind: "idle" }}
       attempt={attemptState ?? { phase: "idle" }}
       toolsPending={settlementBusy}
+      catalogTools={["OPERATOR", "ADMIN"].includes(currentActor.role) ? <CatalogReadinessPanel foundation={workspace.foundation} /> : null}
       onOpenOrder={(orderId) => {
         const attempt = workspace.care.getState();
         if (settlementBusy || attempt.phase === "sending" || attempt.phase === "unknown") return;
@@ -415,6 +417,7 @@ export interface OperationsWorkspaceViewProps {
   onSignOut?: () => void;
   detailTools?: (order: v2.Order, blocked: boolean) => ReactNode;
   toolsPending?: boolean;
+  catalogTools?: ReactNode;
 }
 
 function FreshnessLine(props: {
@@ -466,6 +469,7 @@ export function OperationsWorkspaceView(props: OperationsWorkspaceViewProps) {
       </header>
 
       <main className="ops-sheets">
+        {props.catalogTools && <div style={{ gridColumn: "1 / -1", minWidth: 0 }}>{props.catalogTools}</div>}
         <section className="ops-sheet" aria-label="Order queue">
           <div className="ops-sheet-head">
             <h2 className="ops-h2">Order queue</h2>

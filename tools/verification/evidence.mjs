@@ -20,7 +20,9 @@ function validateProductReceipt(receipt, testedSha, dirty) {
     scope: 'customer-ops-rider', syntheticOnly: true, commercialCalls: 0,
     orders: 1, legs: 2, obligations: 1, accepted_decisions: 1, confirmed_events: 1, browserErrors: [],
     pickupBrowserProven: true, pickupBagContinuity: true, customerDeepLinkReloadProven: true,
-    customerBagQuantityEditsProven: true, sameBookingKeyAndBody: true, sameAdjustmentKeyAndBody: true,
+    customerBagQuantityEditsProven: true, customerPieceQuantityEditsProven: true,
+    opsCatalogReadOnlyProven: true, opsCatalogFailedReadsNotEmptyOrZero: true,
+    sameBookingKeyAndBody: true, sameAdjustmentKeyAndBody: true,
     sameReviewKeyAndBody: true, sameSupportCaseKeyAndBody: true, sameSupportMessageKeyAndBody: true,
     ownedBillingRecordsVisible: true, manualReceiptNotGatewayCapture: true, failedReadNotZeroBalance: true });
   if (receipt.productionReady !== undefined && receipt.productionReady !== false) throw new Error('Product receipt cannot claim production readiness.');

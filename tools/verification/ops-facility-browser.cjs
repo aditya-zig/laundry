@@ -8,7 +8,7 @@ const { reviewViewport } = require('./viewports.mjs');
 const { recordingCheckpoint } = require('./recording-checkpoint.mjs');
 
 function opsFacilityJourney(fixture, withRider = false, withPickup = false) {
-  let context, page, pickupEvidence;
+  let context, page, pickupEvidence, catalogEvidence;
   const intakeCalls = [], qualityPassCalls = [], assignmentCalls = [], receiptCalls = [], errors = [];
   const output = resolve('.data/browser-evidence/customer-v2');
   const detail = () => page.locator('[aria-label="Selected order"]');
@@ -53,6 +53,7 @@ function opsFacilityJourney(fixture, withRider = false, withPickup = false) {
       const otp = JSON.parse(await readFile('.data/customer-v2-private-otp.json', 'utf8'));
       await page.getByLabel('6-digit one-time code', { exact: true }).fill(otp.code);
       await page.getByRole('button', { name: 'Verify and sign in', exact: true }).click();
+      catalogEvidence = await require('./ops-catalog-browser.cjs').opsCatalogJourney(page, output);
       await page.getByRole('button', { name: /^Open order/ }).first().click();
       if (withPickup) {
         const rider = await fixture.preparePickupRider();
@@ -163,7 +164,7 @@ function opsFacilityJourney(fixture, withRider = false, withPickup = false) {
         expect(errors).toEqual([]);
         await writeFile(resolve(output, 'ops-result.json'), JSON.stringify({ status: 'passed', ...facts, dispatch: dispatchFacts, sameIntakeRetry: true, sameQualityRetry: true, sameAssignmentRetry: true, sameReceiptRetry: true, riderBrowser: riderEvidence, pickupRiderBrowser: pickupEvidence ?? null, pickupBagContinuity: withPickup, browserErrors: errors, realStaffMfaProven: false, physicalCustodyProven: false, realPaymentProven: false }, null, 2));
         console.log('PASS: actual ops intake/care/QC/rework and dispatch/manual-UPI-receipt UI with customer consent; post-commit reply-loss retries preserve each body/key. Exactly one return assignment, synthetic custody handover and manual receipt; actual completion coordinator delivers only after both. Synthetic local providers only: no physical transfer, live payment, rider-device or staff-MFA claim.');
-        return { video: relative(output, await page.video().path()), rider: riderEvidence, pickup: pickupEvidence, pickupBagContinuity: withPickup };
+        return { video: relative(output, await page.video().path()), rider: riderEvidence, pickup: pickupEvidence, pickupBagContinuity: withPickup, ...catalogEvidence };
       } catch (error) {
         await captureFailure();
         throw error;

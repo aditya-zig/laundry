@@ -11,7 +11,7 @@ await mkdir(root, { recursive: true });
 const git = (...args) => execFileSync('git', args, { encoding: 'utf8' }).trim();
 const testedSha = git('rev-parse', 'HEAD');
 const headSha = process.env.VERIFY_HEAD_SHA || testedSha;
-const baseSha = process.env.VERIFY_BASE_SHA || git('merge-base', 'HEAD', 'origin/chore/cloud-agent-workflow');
+const baseSha = process.env.VERIFY_BASE_SHA || git('merge-base', 'HEAD', 'origin/main');
 const dirty = Boolean(git('status', '--porcelain'));
 const apiPort = Number(process.env.PILOT_VERIFY_API_PORT || 4110);
 const consolePort = Number(process.env.PILOT_VERIFY_CONSOLE_PORT || 5185);

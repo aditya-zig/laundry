@@ -23,9 +23,25 @@ async function main(proposeAdjustment, finishOps, captureOpsFailure, replyToSupp
   try {
     await page.goto('http://127.0.0.1:4219',{waitUntil:'networkidle'});
     await expect(page.getByLabel(/^Synthetic wash and fold\..*Open details$/)).toBeVisible();
-    await expect(page.getByText('Indicative demo rate — not approved launch pricing')).toBeVisible();
+    await expect(page.getByText('Indicative demo rate — not approved launch pricing')).toHaveCount(2);
     await page.screenshot({path:resolve(output,'catalog-desktop.png'),fullPage:true});
     await page.setViewportSize(reviewViewport({width:390,height:844}));
+    await page.getByLabel(/^Synthetic dry cleaning\..*Open details$/).click();
+    await expect(page).toHaveURL(url => /^\/services\/[0-9a-f-]+$/.test(url.pathname));
+    await page.reload({waitUntil:'networkidle'});
+    await page.getByRole('button',{name:'Add one Synthetic shirt',exact:true}).click();
+    await page.getByRole('button',{name:'Add one Synthetic shirt',exact:true}).click();
+    await page.getByRole('button',{name:'Review bag',exact:true}).click();
+    const pieces = page.getByLabel('Count for Synthetic shirt',{exact:true});
+    await expect(pieces).toHaveValue('2');
+    await pieces.fill('3');
+    await expect(page.getByText('Synthetic dry cleaning · 3 items',{exact:true})).toBeVisible();
+    await pieces.fill('2');
+    await expect(page.getByText('Synthetic dry cleaning · 2 items',{exact:true})).toBeVisible();
+    await page.screenshot({path:resolve(output,'bag-pieces-mobile.png'),fullPage:true});
+    await page.getByRole('button',{name:'Remove Synthetic shirt from bag',exact:true}).click();
+    await expect(page.getByText('Your bag is empty',{exact:true})).toBeVisible();
+    await page.getByRole('button',{name:'Browse services',exact:true}).click();
     await page.getByLabel(/^Synthetic wash and fold\..*Open details$/).click();
     await expect(page).toHaveURL(url => /^\/services\/[0-9a-f-]+$/.test(url.pathname));
     await page.reload({waitUntil:'networkidle'});
@@ -138,7 +154,7 @@ async function main(proposeAdjustment, finishOps, captureOpsFailure, replyToSupp
     const completedEvidence = finishOps ? await (await fetch('http://127.0.0.1:4499/__synthetic_evidence')).json() : finalEvidence;
     expect(completedEvidence).toEqual({ ...finalEvidence, legs: finishOps ? 2 : 1 });
     expect(errors).toEqual([]);
-    await writeFile(resolve(output,'result.json'),JSON.stringify({status:'passed',sourceRevision:execFileSync('git',['rev-parse','HEAD'],{encoding:'utf8'}).trim(),sourceDirty:Boolean(execFileSync('git',['status','--porcelain'],{encoding:'utf8'}).trim()),syntheticOnly:true,commercialCalls:0,customerDeepLinkReloadProven:true,customerBagQuantityEditsProven:true,sameBookingKeyAndBody:true,sameAdjustmentKeyAndBody:true,sameReviewKeyAndBody:finishOps?true:null,...supportEvidence,...billingEvidence,scope:opsEvidence?.rider?'customer-ops-rider':finishOps?'customer-and-ops':'customer',riderBrowser:opsEvidence?.rider??null,pickupRiderBrowser:opsEvidence?.pickup??null,pickupBrowserProven:opsEvidence?.pickup?.pickupBrowserProven===true,pickupBagContinuity:opsEvidence?.pickupBagContinuity===true,recordings:{customer:relative(output,await page.video().path()),ops:opsEvidence?.video,rider:opsEvidence?.rider?.video,pickupRider:opsEvidence?.pickup?.video},...completedEvidence,browserErrors:errors},null,2));
+    await writeFile(resolve(output,'result.json'),JSON.stringify({status:'passed',sourceRevision:execFileSync('git',['rev-parse','HEAD'],{encoding:'utf8'}).trim(),sourceDirty:Boolean(execFileSync('git',['status','--porcelain'],{encoding:'utf8'}).trim()),syntheticOnly:true,commercialCalls:0,customerDeepLinkReloadProven:true,customerBagQuantityEditsProven:true,customerPieceQuantityEditsProven:true,opsCatalogReadOnlyProven:opsEvidence?.opsCatalogReadOnlyProven===true,opsCatalogFailedReadsNotEmptyOrZero:opsEvidence?.opsCatalogFailedReadsNotEmptyOrZero===true,sameBookingKeyAndBody:true,sameAdjustmentKeyAndBody:true,sameReviewKeyAndBody:finishOps?true:null,...supportEvidence,...billingEvidence,scope:opsEvidence?.rider?'customer-ops-rider':finishOps?'customer-and-ops':'customer',riderBrowser:opsEvidence?.rider??null,pickupRiderBrowser:opsEvidence?.pickup??null,pickupBrowserProven:opsEvidence?.pickup?.pickupBrowserProven===true,pickupBagContinuity:opsEvidence?.pickupBagContinuity===true,recordings:{customer:relative(output,await page.video().path()),ops:opsEvidence?.video,rider:opsEvidence?.rider?.video,pickupRider:opsEvidence?.pickup?.video},...completedEvidence,browserErrors:errors},null,2));
     if(finishOps) {
       console.log('PASS: owner review after recorded delivery, no default rating or publication consent, one private review after reply loss and navigation/retry, and no second-review form.');
       console.log('PASS: one customer support case and one customer message after committed reply loss/navigation/retry, exact keys/bodies, compiled-service synthetic staff reply visible, and no order status/version change. No staffed-console or live-notification claim.');

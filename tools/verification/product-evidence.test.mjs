@@ -20,6 +20,7 @@ function receipt() {
     sameSupportCaseKeyAndBody: true, sameSupportMessageKeyAndBody: true, ownedBillingRecordsVisible: true,
     manualReceiptNotGatewayCapture: true, failedReadNotZeroBalance: true,
     customerDeepLinkReloadProven: true, customerBagQuantityEditsProven: true,
+    customerPieceQuantityEditsProven: true, opsCatalogReadOnlyProven: true, opsCatalogFailedReadsNotEmptyOrZero: true,
     pickupRiderBrowser: leg('PICKUP', 'PICKUP_PENDING', 1), riderBrowser: leg('RETURN', 'RETURNING', 2),
     recordings: Object.fromEntries(roles.map(role => [role, `videos/${role}.webm`])) };
 }
@@ -78,6 +79,8 @@ test('current-product receipts cannot omit or contradict app, custody, financial
       p => { p.syntheticOnly = false; }, p => { p.commercialCalls = 1; }, p => { p.orders = 2; },
       p => { p.productionReady = true; },
       p => { p.pickupBagContinuity = false; }, p => { p.customerBagQuantityEditsProven = false; },
+      p => { p.customerPieceQuantityEditsProven = false; }, p => { p.opsCatalogReadOnlyProven = false; },
+      p => { p.opsCatalogFailedReadsNotEmptyOrZero = false; },
       p => { p.customerDeepLinkReloadProven = false; }, p => { p.manualReceiptNotGatewayCapture = false; },
       p => { p.sameBookingKeyAndBody = false; }, p => { p.failedReadNotZeroBalance = false; },
       p => { p.pickupRiderBrowser.actualRiderBrowser = false; },
