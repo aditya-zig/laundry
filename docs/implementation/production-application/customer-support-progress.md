@@ -1,6 +1,6 @@
 # Customer support implementation checkpoint
 
-Status: **in progress, not acceptance, deployment, or issue closure**. Continuation of the unattended production recovery plan.
+Status: **scoped local browser/recovery acceptance passed; not deployment, production readiness or issue closure**. Continuation of the unattended production recovery plan.
 
 ## Scope
 
@@ -30,7 +30,7 @@ Regression `bebc19fc4` failed against the frozen pre-fix export: both `emptyCase
 
 ## Browser and recovery evidence
 
-`b9798b1f3` restored **91 tables and all sequences**, preserved exactly one support case with one customer message and one synthetic operator reply, and refused a duplicate per-case message sequence after restore. It also preserved the previous delivered order, accepted return handover, one manual receipt, zero gateway receipts and one private unpublished review. Encrypted identity recovery passed. This first repaired browser/restore receipt is explicitly **dirty**; a clean committed-revision rerun remains required. Desktop and mobile support screenshots were inspected.
+`b9798b1f3` restored **91 tables and all sequences**, preserved exactly one support case with one customer message and one synthetic operator reply, and refused a duplicate per-case message sequence after restore. It also preserved the previous delivered order, accepted return handover, one manual receipt, zero gateway receipts and one private unpublished review. Encrypted identity recovery passed. This first repaired receipt was explicitly **dirty**. Clean rerun `b79f5a795` then passed on **`e2413d932672475929ae147e77fa08743cba4bec`**, with clean worktree checks before and after. Both browser and restore receipts name that exact SHA with `dirty=false`; case/message counts, duplicate-sequence rejection, absence of false empty-state claims and zero browser errors were rechecked. Desktop and mobile support screenshots were inspected. Customer and ops WebM paths are indexed by the private browser receipt; these headless test recordings are not the original 1080p legacy demo recording or a native/physical fulfillment claim.
 
 Diagnostic runs are not silently relabelled: `ba4fb485e` rebuilt/exported successfully but ran only the baseline journey because the facility option was misspelled; it is not support evidence. `b60b7dff1` used the right facility option but omitted the ops build API URL and correctly stopped at “Operations console is not configured”. `b8a7d4d94` corrected that configuration and passed the functional journey before visual review found the empty-state defect above.
 
