@@ -29,6 +29,8 @@ async function startFixture({ withOps = false } = {}) {
   const { OrdersService } = load('modules/orders/src/index.js');
   const { BillingService, createObligationForOrder, reconcileObligationForReturn } = load('modules/billing/src/index.js');
   const { LogisticsService } = load('modules/logistics/src/index.js');
+  const { ReviewsService } = load('modules/reviews/src/index.js');
+  const reviews = new ReviewsService({ db, authenticate, clock });
   const catalog = new CatalogService({ db, authenticate, clock });
   const availability = new AvailabilityService({ db, authenticate, clock });
   const { completeReturnWhenSettled } = load('modules/orders/src/completion.js');
@@ -61,7 +63,7 @@ async function startFixture({ withOps = false } = {}) {
   const { OrdersModule } = load('apps/api/src/features/orders/orders.module.js');
   const { ProductModule } = load('apps/api/src/features/product.module.js');
   class Fixture {}
-  Module({imports:[IdentityModule.register(()=>identity),CatalogModule.register(()=>catalog),AvailabilityModule.register(()=>availability),OrdersModule.register(()=>orders),ProductModule.register({billing:()=>billing,logistics:()=>logistics})]})(Fixture);
+  Module({imports:[IdentityModule.register(()=>identity),CatalogModule.register(()=>catalog),AvailabilityModule.register(()=>availability),OrdersModule.register(()=>orders),ProductModule.register({billing:()=>billing,logistics:()=>logistics,reviews:()=>reviews})]})(Fixture);
   const app = await NestFactory.create(Fixture,{logger:false,rawBody:true});
   load('apps/api/src/http-body.js').configureHttpBody(app);
   app.useGlobalFilters(new (load('apps/api/src/filters/http-exception.filter.js').EnvelopeFilter)());
@@ -90,8 +92,15 @@ async function startFixture({ withOps = false } = {}) {
       (SELECT status FROM orders_v2_orders LIMIT 1) AS order_status`);
     response.json({ syntheticOnly: true, ...rows[0] });
   });
+  app.getHttpAdapter().get('/__synthetic_reviews_evidence', async (_request, response) => {
+    const { rows } = await db.query(`SELECT
+      (SELECT COUNT(*)::int FROM reviews_v2) AS reviews,
+      (SELECT COUNT(*)::int FROM reviews_v2 WHERE publish_consent) AS publication_consents,
+      (SELECT COUNT(*)::int FROM reviews_v2 WHERE publication='PUBLISHED') AS public_reviews`);
+    response.json({ syntheticOnly: true, ...rows[0] });
+  });
   let dropNextBooking = true, dropNextDecision = true, dropNextIntake = withOps, dropNextQualityPass = withOps,
-    dropNextAssignment = withOps, dropNextReceipt = withOps;
+    dropNextAssignment = withOps, dropNextReceipt = withOps, dropNextReview = withOps;
   app.use((request,response,next)=>{ const json=response.json.bind(response); response.json=body=>{
     const booking = request.path === '/v2/orders' && dropNextBooking;
     const decision = request.path.endsWith('/adjustments/decision') && dropNextDecision;
@@ -99,10 +108,11 @@ async function startFixture({ withOps = false } = {}) {
     const quality = request.path.endsWith('/quality-check') && body?.status === 'READY_FOR_RETURN' && dropNextQualityPass;
     const assignment = request.path === '/v2/ops/logistics/assignments' && dropNextAssignment;
     const receipt = request.path.endsWith('/confirm-manual') && dropNextReceipt;
-    if(request.method==='POST' && body?.id && (booking || decision || intake || quality || assignment || receipt)) {
+    const review = request.path.endsWith('/reviews') && dropNextReview;
+    if(request.method==='POST' && body?.id && (booking || decision || intake || quality || assignment || receipt || review)) {
       if (booking) dropNextBooking = false; if (decision) dropNextDecision = false;
       if (intake) dropNextIntake = false; if (quality) dropNextQualityPass = false;
-      if (assignment) dropNextAssignment = false; if (receipt) dropNextReceipt = false;
+      if (assignment) dropNextAssignment = false; if (receipt) dropNextReceipt = false; if (review) dropNextReview = false;
       response.status(503); return json({code:'PROVIDER_OUTCOME_UNKNOWN',message:'Synthetic post-commit response loss',traceId:randomUUID(),retryable:true});
     } return json(body);
   }; next(); });

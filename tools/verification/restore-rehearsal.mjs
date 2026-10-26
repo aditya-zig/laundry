@@ -82,7 +82,10 @@ async function main() {
         (SELECT count(*)::int FROM orders_v2_orders WHERE status='DELIVERED') AS delivered_orders,
         (SELECT count(*)::int FROM logistics_handovers WHERE leg='RETURN' AND accepted) AS accepted_return_handovers,
         (SELECT count(*)::int FROM billing_receipts WHERE confirmed_via <> 'GATEWAY_CAPTURE') AS manual_receipts,
-        (SELECT count(*)::int FROM billing_receipts WHERE confirmed_via = 'GATEWAY_CAPTURE') AS gateway_receipts`));
+        (SELECT count(*)::int FROM billing_receipts WHERE confirmed_via = 'GATEWAY_CAPTURE') AS gateway_receipts,
+        (SELECT count(*)::int FROM reviews_v2) AS recorded_reviews,
+        (SELECT count(*)::int FROM reviews_v2 WHERE publish_consent) AS publication_consents,
+        (SELECT count(*)::int FROM reviews_v2 WHERE publication='PUBLISHED') AS public_reviews`));
       assert.equal(facts.orders, 1); assert.equal(facts.accepted_decisions, 1);
       assert.equal(facts.obligations, 1); assert.equal(facts.pickup_legs, 1);
       const withOps = process.env.LAUNDRY_VERIFY_OPS_FACILITY === 'true';
@@ -91,6 +94,9 @@ async function main() {
       assert.equal(facts.accepted_return_handovers, withOps ? 1 : 0);
       assert.equal(facts.manual_receipts, withOps ? 1 : 0);
       assert.equal(facts.gateway_receipts, 0, 'Manual collection must never become a gateway capture');
+      assert.equal(facts.recorded_reviews, withOps ? 1 : 0);
+      assert.equal(facts.publication_consents, 0, 'Private feedback must retain its original consent');
+      assert.equal(facts.public_reviews, 0);
     }
     assert.equal((await b.query("SELECT count(*)::int AS n FROM pg_tables WHERE schemaname='public'")).rows[0].n, 0, 'Restore target must start empty');
     const sourceState = source.describe(), targetState = target.describe();
@@ -117,6 +123,15 @@ async function main() {
     } else {
       await assert.rejects(b.query('INSERT INTO orders_v2_orders SELECT * FROM orders_v2_orders'), error => error.code === '23505');
       assert.equal((await b.query('SELECT count(*)::int AS n FROM orders_v2_orders')).rows[0].n, 1, 'Recovery lost order uniqueness');
+      if (facts.recorded_reviews) {
+        await assert.rejects(b.query(`INSERT INTO reviews_v2
+          (id,order_id,customer_id,overall,service_score,delivery_score,comment,media_ids,publish_consent,
+           publication,moderation_reason,moderated_by,moderated_at,version,created_at,updated_at)
+          SELECT $1::uuid,order_id,customer_id,overall,service_score,delivery_score,comment,media_ids,publish_consent,
+           publication,moderation_reason,moderated_by,moderated_at,version,created_at,updated_at
+          FROM reviews_v2 LIMIT 1`, [randomUUID()]), error => error.code === '23505');
+        assert.equal((await b.query('SELECT count(*)::int AS n FROM reviews_v2')).rows[0].n, 1, 'Recovery lost one-review-per-order uniqueness');
+      }
     }
     if (signalled) throw new Error('Restore verification interrupted');
     await mkdir('.verification', { recursive: true });
@@ -125,7 +140,7 @@ async function main() {
       runtime: { source: sourceState.runtime, target: targetState.runtime },
       scope: `Synthetic ${sourceJourney} application rows and encrypted identity backup/restore; fake external providers; not cloud restore, physical fulfillment or whole-product v2 acceptance`,
       archive: { sha256: hash(dump.stdout), sizeBytes: dump.stdout.length, privateLocalPath: archivePath }, facts, identity, restoredTables: before.tables.length,
-      fingerprints: before, duplicateReviewRejectedAfterRestore: sourceJourney === 'legacy', duplicateOrderRejectedAfterRestore: sourceJourney === 'customer-v2', productionReady: false };
+      fingerprints: before, duplicateReviewRejectedAfterRestore: sourceJourney === 'legacy' || Boolean(facts.recorded_reviews), duplicateOrderRejectedAfterRestore: sourceJourney === 'customer-v2', productionReady: false };
     await writeFile('.verification/restore-rehearsal.json', JSON.stringify(receipt, null, 2));
     console.log(`Recovery verified (${sourceJourney}, PostgreSQL ${serverVersion}): ${before.tables.length} tables, all sequences, selected application facts, uniqueness and encrypted identity recovery. Production readiness NOT claimed.`);
   } finally {

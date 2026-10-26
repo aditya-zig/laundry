@@ -8,13 +8,14 @@ async function main(proposeAdjustment, finishOps, captureOpsFailure) {
   const output=resolve('.data/browser-evidence/customer-v2'); await mkdir(output,{recursive:true});
   const browser=await chromium.launch({headless:true});
   const context=await browser.newContext({viewport:{width:1280,height:900},recordVideo:{dir:resolve(output,'videos'),size:{width:1280,height:900}}});
-  const page=await context.newPage(); const mutations=[], decisions=[], errors=[];
+  const page=await context.newPage(); const mutations=[], decisions=[], reviews=[], errors=[];
   page.on('pageerror',error=>errors.push(error.message));
   page.on('request',request=>{
     if(request.method() !== 'POST') return;
     const record = {key:request.headers()['idempotency-key'],body:request.postData()};
     if(request.url()==='http://127.0.0.1:4499/v2/orders') mutations.push(record);
     if(request.url().endsWith('/adjustments/decision')) decisions.push(record);
+    if(request.url().endsWith('/reviews')) reviews.push(record);
   });
   try {
     await page.goto('http://127.0.0.1:4219',{waitUntil:'networkidle'});
@@ -77,10 +78,40 @@ async function main(proposeAdjustment, finishOps, captureOpsFailure) {
     const finalEvidence=await (await fetch('http://127.0.0.1:4499/__synthetic_evidence')).json();
     expect(finalEvidence).toEqual({...evidence,accepted_decisions:1});
     const opsEvidence = finishOps ? await finishOps() : null;
+    if (finishOps) {
+      await page.getByRole('button',{name:'Refresh',exact:true}).click();
+      await expect(page.getByText('DELIVERED',{exact:true})).toBeVisible();
+      await expect(page.getByRole('button',{name:'Submit review',exact:true})).toBeDisabled();
+      const consent = page.getByRole('checkbox',{name:'Allow publication after moderation',exact:true});
+      await expect(consent).not.toBeChecked();
+      await page.getByRole('radio',{name:'Rate 4 out of 5',exact:true}).click();
+      await page.getByLabel('Review feedback',{exact:true}).fill('Synthetic private feedback after recorded delivery.');
+      await page.screenshot({path:resolve(output,'review-mobile.png'),fullPage:true});
+      await page.setViewportSize({width:1280,height:900});
+      await page.screenshot({path:resolve(output,'review-desktop.png'),fullPage:true});
+      expect(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth)).toBe(true);
+      await page.setViewportSize({width:390,height:844});
+      await page.getByRole('button',{name:'Submit review',exact:true}).click();
+      await expect(page.getByRole('button',{name:'Check original review',exact:true})).toBeVisible();
+      await page.goBack();
+      await page.getByRole('button',{name:'View order',exact:true}).click();
+      await page.getByRole('button',{name:'Check original review',exact:true}).click();
+      await expect(page.getByText('Review recorded',{exact:true})).toBeVisible();
+      await expect(page.getByText(/You did not consent to publication; this review is not public\./)).toBeVisible();
+      expect(reviews).toHaveLength(2); expect(reviews[0].key).toBeTruthy(); expect(reviews[0]).toEqual(reviews[1]);
+      expect(JSON.parse(reviews[0].body)).toMatchObject({overall:4,publishConsent:false,mediaIds:[]});
+      const reviewEvidence=await (await fetch('http://127.0.0.1:4499/__synthetic_reviews_evidence')).json();
+      expect(reviewEvidence).toEqual({syntheticOnly:true,reviews:1,publication_consents:0,public_reviews:0});
+      await page.getByRole('button',{name:'Refresh',exact:true}).click();
+      await expect(page.getByText(/A review is already recorded for this order/)).toBeVisible();
+      await expect(page.getByRole('button',{name:'Submit review',exact:true})).toHaveCount(0);
+      await page.screenshot({path:resolve(output,'review-recorded-mobile.png'),fullPage:true});
+    }
     const completedEvidence = finishOps ? await (await fetch('http://127.0.0.1:4499/__synthetic_evidence')).json() : finalEvidence;
     expect(completedEvidence).toEqual({ ...finalEvidence, legs: finishOps ? 2 : 1 });
     expect(errors).toEqual([]);
-    await writeFile(resolve(output,'result.json'),JSON.stringify({status:'passed',sourceRevision:execFileSync('git',['rev-parse','HEAD'],{encoding:'utf8'}).trim(),sourceDirty:Boolean(execFileSync('git',['status','--porcelain'],{encoding:'utf8'}).trim()),syntheticOnly:true,commercialCalls:0,sameBookingKeyAndBody:true,sameAdjustmentKeyAndBody:true,scope:finishOps?'customer-and-ops':'customer',recordings:{customer:relative(output,await page.video().path()),ops:opsEvidence?.video},...completedEvidence,browserErrors:errors},null,2));
+    await writeFile(resolve(output,'result.json'),JSON.stringify({status:'passed',sourceRevision:execFileSync('git',['rev-parse','HEAD'],{encoding:'utf8'}).trim(),sourceDirty:Boolean(execFileSync('git',['status','--porcelain'],{encoding:'utf8'}).trim()),syntheticOnly:true,commercialCalls:0,sameBookingKeyAndBody:true,sameAdjustmentKeyAndBody:true,sameReviewKeyAndBody:finishOps?true:null,scope:finishOps?'customer-and-ops':'customer',recordings:{customer:relative(output,await page.video().path()),ops:opsEvidence?.video},...completedEvidence,browserErrors:errors},null,2));
+    if(finishOps) console.log('PASS: owner review after recorded delivery, no default rating or publication consent, one private review after reply loss and navigation/retry, and no second-review form.');
     console.log('PASS: actual customer UI + SDK + compiled HTTP services + disposable PostgreSQL. First committed reply replaced by 503/unknown; navigation/retry reused key/body; exactly one order/obligation/pickup/event. Explicit intake-adjustment acceptance also survives reply loss/navigation with one decision audit. Synthetic OTP/prices/capacity only.');
   } catch(error) {
     await captureOpsFailure?.();
