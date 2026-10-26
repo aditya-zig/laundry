@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "expo start --port 8082",
     "web": "expo start --web --port 8082",
-    "build": "expo export --platform web",
+    "build": "expo export --platform web --clear",
     "test": "vitest run",
     "check": "tsc --noEmit -p tsconfig.json"
   },
