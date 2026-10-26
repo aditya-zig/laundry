@@ -78,10 +78,19 @@ async function main() {
         (SELECT count(*)::int FROM v2_audit WHERE action='ADJUSTMENT_ACCEPTED') AS accepted_decisions,
         (SELECT count(*)::int FROM billing_obligations) AS obligations,
         (SELECT count(*)::int FROM logistics_leg_attempts WHERE leg='PICKUP') AS pickup_legs,
-        (SELECT count(*)::int FROM logistics_leg_attempts WHERE leg='RETURN') AS return_legs`));
+        (SELECT count(*)::int FROM logistics_leg_attempts WHERE leg='RETURN') AS return_legs,
+        (SELECT count(*)::int FROM orders_v2_orders WHERE status='DELIVERED') AS delivered_orders,
+        (SELECT count(*)::int FROM logistics_handovers WHERE leg='RETURN' AND accepted) AS accepted_return_handovers,
+        (SELECT count(*)::int FROM billing_receipts WHERE confirmed_via <> 'GATEWAY_CAPTURE') AS manual_receipts,
+        (SELECT count(*)::int FROM billing_receipts WHERE confirmed_via = 'GATEWAY_CAPTURE') AS gateway_receipts`));
       assert.equal(facts.orders, 1); assert.equal(facts.accepted_decisions, 1);
       assert.equal(facts.obligations, 1); assert.equal(facts.pickup_legs, 1);
-      assert.equal(facts.return_legs, process.env.LAUNDRY_VERIFY_OPS_FACILITY === 'true' ? 1 : 0);
+      const withOps = process.env.LAUNDRY_VERIFY_OPS_FACILITY === 'true';
+      assert.equal(facts.return_legs, withOps ? 1 : 0);
+      assert.equal(facts.delivered_orders, withOps ? 1 : 0);
+      assert.equal(facts.accepted_return_handovers, withOps ? 1 : 0);
+      assert.equal(facts.manual_receipts, withOps ? 1 : 0);
+      assert.equal(facts.gateway_receipts, 0, 'Manual collection must never become a gateway capture');
     }
     assert.equal((await b.query("SELECT count(*)::int AS n FROM pg_tables WHERE schemaname='public'")).rows[0].n, 0, 'Restore target must start empty');
     const sourceState = source.describe(), targetState = target.describe();

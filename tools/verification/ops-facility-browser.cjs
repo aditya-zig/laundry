@@ -6,7 +6,7 @@ const { resolve, relative } = require('node:path');
 
 function opsFacilityJourney(fixture) {
   let context, page;
-  const intakeCalls = [], qualityPassCalls = [], errors = [];
+  const intakeCalls = [], qualityPassCalls = [], assignmentCalls = [], receiptCalls = [], errors = [];
   const output = resolve('.data/browser-evidence/customer-v2');
   const detail = () => page.locator('[aria-label="Selected order"]');
   const sameRetry = calls => {
@@ -39,6 +39,8 @@ function opsFacilityJourney(fixture) {
         const record = { key: request.headers()['idempotency-key'], body: request.postData() };
         if (request.url().endsWith('/intake')) intakeCalls.push(record);
         if (request.url().endsWith('/quality-check') && request.postDataJSON().passed) qualityPassCalls.push(record);
+        if (request.url().endsWith('/ops/logistics/assignments')) assignmentCalls.push(record);
+        if (request.url().endsWith('/confirm-manual')) receiptCalls.push(record);
       });
       await page.goto('http://127.0.0.1:4220', { waitUntil: 'networkidle' });
       await page.getByLabel('Staff phone', { exact: true }).fill(phone);
@@ -95,8 +97,43 @@ function opsFacilityJourney(fixture) {
         await page.screenshot({ path: resolve(output, 'ops-quality-desktop.png'), fullPage: true });
         await page.setViewportSize({ width: 390, height: 844 });
         await page.screenshot({ path: resolve(output, 'ops-quality-mobile.png'), fullPage: true });
-        await writeFile(resolve(output, 'ops-result.json'), JSON.stringify({ status: 'passed', ...facts, sameIntakeRetry: true, sameQualityRetry: true, browserErrors: errors, realStaffMfaProven: false, physicalCustodyProven: false }, null, 2));
-        console.log('PASS: actual ops intake + care + QC/rework UI, customer consent, post-commit reply-loss retries, one reconciled return obligation/leg/event. Synthetic local providers only; no physical custody or staff-MFA claim.');
+        const rider = await fixture.prepareReturnRider();
+        const assignForm = page.getByRole('form', { name: 'Assign return rider', exact: true });
+        await assignForm.getByLabel('Provisioned rider ID', { exact: true }).fill(rider.riderId);
+        await assignForm.getByLabel('Assignment reason', { exact: true }).fill('Synthetic return route assigned by dispatcher');
+        await page.screenshot({ path: resolve(output, 'ops-dispatch-mobile.png'), fullPage: true });
+        expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+        await assignForm.getByRole('button', { name: 'Assign rider', exact: true }).click();
+        await expect(page.getByRole('button', { name: 'Retry retained command', exact: true })).toBeVisible();
+        await expect(page.getByRole('button', { name: /^Open order/ }).first()).toBeDisabled();
+        await page.getByRole('button', { name: 'Retry retained command', exact: true }).click();
+        await expect(assignForm).toHaveCount(0);
+        sameRetry(assignmentCalls);
+        await fixture.acceptSyntheticReturnCustody();
+        await detail().getByRole('button', { name: 'Refresh', exact: true }).first().click();
+        const payment = page.getByRole('form', { name: 'Record payment at return', exact: true });
+        await payment.getByLabel('Received by', { exact: true }).selectOption('UPI');
+        await payment.getByLabel('Transaction reference (required)', { exact: true }).fill('SYNTHETIC-UPI-RETURN-001');
+        await payment.getByLabel('Collection reason', { exact: true }).fill('Synthetic transfer verified at return');
+        await payment.getByRole('checkbox').check();
+        await page.screenshot({ path: resolve(output, 'ops-payment-mobile.png'), fullPage: true });
+        expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+        await page.setViewportSize({ width: 1280, height: 1000 });
+        await page.screenshot({ path: resolve(output, 'ops-payment-desktop.png'), fullPage: true });
+        await payment.getByRole('button', { name: 'Record received payment', exact: true }).click();
+        await expect(page.getByRole('button', { name: 'Retry retained command', exact: true })).toBeVisible();
+        await expect(page.getByRole('button', { name: /^Open order/ }).first()).toBeDisabled();
+        await page.getByRole('button', { name: 'Retry retained command', exact: true }).click();
+        await expect(payment).toHaveCount(0);
+        // Delivery must not hide the ledger/reconciliation surface. An old
+        // command may still need its original result after a status change.
+        await expect(page.getByRole('region', { name: 'Dispatch and payment at return', exact: true })).toBeVisible();
+        sameRetry(receiptCalls);
+        const dispatchFacts = await (await fetch('http://127.0.0.1:4499/__synthetic_dispatch_evidence')).json();
+        expect(dispatchFacts).toEqual({ syntheticOnly: true, return_assignments: 1, return_handovers: 1, manual_receipts: 1, gateway_receipts: 0, amount_settled_minor: 10000, order_status: 'DELIVERED' });
+        expect(errors).toEqual([]);
+        await writeFile(resolve(output, 'ops-result.json'), JSON.stringify({ status: 'passed', ...facts, dispatch: dispatchFacts, sameIntakeRetry: true, sameQualityRetry: true, sameAssignmentRetry: true, sameReceiptRetry: true, browserErrors: errors, realStaffMfaProven: false, physicalCustodyProven: false, realPaymentProven: false }, null, 2));
+        console.log('PASS: actual ops intake/care/QC/rework and dispatch/manual-UPI-receipt UI with customer consent; post-commit reply-loss retries preserve each body/key. Exactly one return assignment, synthetic custody handover and manual receipt; actual completion coordinator delivers only after both. Synthetic local providers only: no physical transfer, live payment, rider-device or staff-MFA claim.');
         return { video: relative(output, await page.video().path()) };
       } catch (error) {
         await captureFailure();

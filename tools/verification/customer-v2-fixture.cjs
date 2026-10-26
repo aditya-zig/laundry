@@ -31,9 +31,16 @@ async function startFixture({ withOps = false } = {}) {
   const { LogisticsService } = load('modules/logistics/src/index.js');
   const catalog = new CatalogService({ db, authenticate, clock });
   const availability = new AvailabilityService({ db, authenticate, clock });
-  const billing = new BillingService({ db, authenticate, clock });
-  const logistics = new LogisticsService({ db, authenticate, clock });
+  const { completeReturnWhenSettled } = load('modules/orders/src/completion.js');
+  const { RecordingCustodyCodeNotifier } = load('modules/logistics/src/index.js');
+  const custodyNotifier = new RecordingCustodyCodeNotifier();
+  const billing = new BillingService({ db, authenticate, clock,
+    onSettled: (id, tx, context) => completeReturnWhenSettled(tx, id, context) });
+  const logistics = new LogisticsService({ db, authenticate, clock, custodyNotifier,
+    custodyCodeSecret: randomBytes(32).toString('hex'),
+    onReturnAccepted: (id, tx, context) => completeReturnWhenSettled(tx, id, context) });
   const orders = new OrdersService({ db, authenticate, catalog, availability, clock,
+    loadDeliveryLegs: (ids, tx) => logistics.orderLegSummaries(ids, tx),
     onBooked: async (order, tx) => { await createObligationForOrder(tx, { orderId: order.id, clock }); await logistics.openLegAttempt(order.id,'PICKUP',{ scheduledWindow: order.pickupWindow },tx); },
     onReady: async (order, tx) => {
       const obligation = await reconcileObligationForReturn(tx, { orderId: order.id, clock });
@@ -73,15 +80,29 @@ async function startFixture({ withOps = false } = {}) {
       (SELECT amount_due_minor::int FROM billing_obligations LIMIT 1) AS amount_due_minor`);
     response.json({ syntheticOnly: true, ...rows[0] });
   });
-  let dropNextBooking = true, dropNextDecision = true, dropNextIntake = withOps, dropNextQualityPass = withOps;
+  app.getHttpAdapter().get('/__synthetic_dispatch_evidence', async (_request, response) => {
+    const { rows } = await db.query(`SELECT
+      (SELECT COUNT(*)::int FROM logistics_assignments WHERE leg='RETURN') AS return_assignments,
+      (SELECT COUNT(*)::int FROM logistics_handovers WHERE leg='RETURN' AND accepted) AS return_handovers,
+      (SELECT COUNT(*)::int FROM billing_receipts WHERE confirmed_via <> 'GATEWAY_CAPTURE') AS manual_receipts,
+      (SELECT COUNT(*)::int FROM billing_receipts WHERE confirmed_via = 'GATEWAY_CAPTURE') AS gateway_receipts,
+      (SELECT amount_settled_minor::int FROM billing_obligations LIMIT 1) AS amount_settled_minor,
+      (SELECT status FROM orders_v2_orders LIMIT 1) AS order_status`);
+    response.json({ syntheticOnly: true, ...rows[0] });
+  });
+  let dropNextBooking = true, dropNextDecision = true, dropNextIntake = withOps, dropNextQualityPass = withOps,
+    dropNextAssignment = withOps, dropNextReceipt = withOps;
   app.use((request,response,next)=>{ const json=response.json.bind(response); response.json=body=>{
     const booking = request.path === '/v2/orders' && dropNextBooking;
     const decision = request.path.endsWith('/adjustments/decision') && dropNextDecision;
     const intake = request.path.endsWith('/intake') && dropNextIntake;
     const quality = request.path.endsWith('/quality-check') && body?.status === 'READY_FOR_RETURN' && dropNextQualityPass;
-    if(request.method==='POST' && body?.id && (booking || decision || intake || quality)) {
+    const assignment = request.path === '/v2/ops/logistics/assignments' && dropNextAssignment;
+    const receipt = request.path.endsWith('/confirm-manual') && dropNextReceipt;
+    if(request.method==='POST' && body?.id && (booking || decision || intake || quality || assignment || receipt)) {
       if (booking) dropNextBooking = false; if (decision) dropNextDecision = false;
       if (intake) dropNextIntake = false; if (quality) dropNextQualityPass = false;
+      if (assignment) dropNextAssignment = false; if (receipt) dropNextReceipt = false;
       response.status(503); return json({code:'PROVIDER_OUTCOME_UNKNOWN',message:'Synthetic post-commit response loss',traceId:randomUUID(),retryable:true});
     } return json(body);
   }; next(); });
@@ -116,6 +137,36 @@ async function startFixture({ withOps = false } = {}) {
   shutdown.proposeAdjustment = async () => {
     const { picked } = await shutdown.prepareOps();
     return orders.recordIntake(staffSession.accessToken, picked.id, { expectedVersion: picked.version, lines: [{ orderLineId: picked.lines[0].orderLineId, measuredWeightGrams: 2400, condition: 'GOOD' }], containers: [{ id: randomUUID(), sealed: true, condition: 'GOOD', garmentCount: 12 }], mediaIds: [] }, randomUUID());
+  };
+  let returnRider;
+  shutdown.prepareReturnRider = async () => {
+    if (!withOps) throw Error('Ops journey opt-in required');
+    if (!returnRider) {
+      // The customer browser signs in with ...007. A rider must have its own
+      // identity; sharing that phone both crosses roles and trips the OTP guard.
+      const phone = '+919600000006';
+      await db.query('INSERT INTO identity_staff(id,phone,role,created_at) VALUES($1,$2,$3,$4)', [randomUUID(), phone, 'RIDER', clock()]);
+      const challenge = await identity.requestOtp({ phone }, randomUUID(), 'synthetic-return-rider');
+      returnRider = await identity.verifyOtp({ challengeId: challenge.challengeId, code: deliveries.get(challenge.challengeId).code }, randomUUID(), 'synthetic-return-rider');
+    }
+    return { riderId: returnRider.actor.id };
+  };
+  shutdown.acceptSyntheticReturnCustody = async () => {
+    // Real compiled custody rules, synthetic notifier/rider facts. This proves
+    // no device behaviour, physical transfer, location or production channel.
+    if (!withOps || !returnRider) throw Error('Prepare the synthetic rider first');
+    const jobs = await logistics.listRiderJobs(returnRider.accessToken);
+    const job = jobs.find(item => item.leg === 'RETURN');
+    if (!job) throw Error('Return assignment must come from the actual ops UI');
+    const code = custodyNotifier.latest();
+    if (!code || code.legAttemptId !== job.id) throw Error('No matching synthetic custody notification');
+    await logistics.acceptJob(returnRider.accessToken, job.id, { expectedVersion: job.version }, randomUUID());
+    return logistics.recordHandover(returnRider.accessToken, {
+      jobId: job.id, legAttemptId: job.id, expectedVersion: job.version,
+      actionId: randomUUID(), method: 'CODE', code: code.code,
+      capturedAt: clock().toISOString(), containerIds: job.containerIds,
+      garmentCount: 12, condition: 'GOOD',
+    }, randomUUID());
   };
   return shutdown;
 }
