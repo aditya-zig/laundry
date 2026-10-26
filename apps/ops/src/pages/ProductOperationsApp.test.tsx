@@ -19,6 +19,7 @@ import {
   nextStaffCareAction,
 } from "../features/careActions";
 import { formatWindow, formatInrMinor, shortId } from "../features/format";
+import { parseFacilityRecord, type FacilityDraft } from "../features/FacilityRecordForm";
 import { OperationsWorkspaceView, SignInView } from "./ProductOperationsApp";
 
 type RecordedCall = {
@@ -152,6 +153,179 @@ function sessionOf(actor: v2.Actor): v2.Session {
     actor,
   };
 }
+
+describe("facility intake and quality commands", () => {
+  const bag: v2.Container = { id: "88000000-0000-4000-8000-000000000001", sealId: "PHYSICAL-SEAL-1", sealed: true, condition: "GOOD", garmentCount: 9 };
+  const intake: Omit<v2.IntakeRecord, "expectedVersion"> = {
+    lines: [{ orderLineId: LINE_ID, measuredWeightGrams: 4700, countedQuantity: 9, condition: "GOOD" }],
+    containers: [bag], mediaIds: [],
+  };
+
+  it("records measured intake through the SDK with the current version, not the estimate", async () => {
+    const h = harness();
+    const foundation = await authedFoundationWith(h, facilityActor);
+    h.on(r => r.path.endsWith("/intake"), r => {
+      expect(r.body).toEqual({ ...intake, expectedVersion: 3 });
+      expect(r.headers["Idempotency-Key"]).toBe("intake-key");
+      return { ok: true, json: orderOf({ status: "AWAITING_ADJUSTMENT", version: 4 }) };
+    });
+    const controller = createCareActionController({ runAuthorized: run => foundation.authorized(run), generateKey: () => "intake-key" });
+    const result = await controller.recordIntake(orderOf({ status: "PICKUP_PENDING" }), "FACILITY", intake);
+    expect(result?.status).toBe("AWAITING_ADJUSTMENT");
+    expect(h.calls).toHaveLength(1);
+  });
+
+  it("retains immutable measured facts and command identity after an unknown intake outcome", async () => {
+    const h = harness();
+    const foundation = await authedFoundationWith(h, facilityActor);
+    const edited = structuredClone(intake);
+    h.on(r => r.path.endsWith("/intake"), () => ({ fail: true }));
+    h.on(r => r.path.endsWith("/intake"), () => ({ ok: true, json: orderOf({ version: 4 }) }));
+    const controller = createCareActionController({ runAuthorized: run => foundation.authorized(run), generateKey: () => "same-intake-key" });
+    expect(await controller.recordIntake(orderOf({ status: "PICKUP_PENDING" }), "FACILITY", edited)).toBeNull();
+    const pending = controller.getState();
+    expect(pending.phase).toBe("unknown");
+    if (pending.phase !== "unknown" || !("kind" in pending.input) || pending.input.kind !== "INTAKE") throw new Error("Expected retained intake command");
+    expect(Object.isFrozen(pending.input.record.lines[0])).toBe(true);
+    expect(Object.isFrozen(pending.input.record.containers[0])).toBe(true);
+    edited.lines[0].measuredWeightGrams = 9000;
+    edited.containers[0].sealId = "EDITED";
+    expect(await controller.recordIntake(orderOf({ status: "PICKUP_PENDING" }), "FACILITY", edited)).toBeNull();
+    expect(await controller.retry()).not.toBeNull();
+    expect(h.calls[1].body).toEqual(h.calls[0].body);
+    expect(h.calls[1].headers["Idempotency-Key"]).toBe(h.calls[0].headers["Idempotency-Key"]);
+  });
+
+  it.each([503, 500, 408, 429])("retains an intake command after an HTTP %s error envelope instead of issuing a new identity", async status => {
+    const h = harness();
+    const foundation = await authedFoundationWith(h, facilityActor);
+    h.on(r => r.path.endsWith("/intake"), () => ({ ok: false, status, json: { code: "PROVIDER_OUTCOME_UNKNOWN", message: "The committed reply was lost", traceId: "intake-lost-reply", retryable: true } }));
+    h.on(r => r.path.endsWith("/intake"), () => ({ ok: true, json: orderOf({ version: 4 }) }));
+    let generated = 0;
+    const controller = createCareActionController({ runAuthorized: run => foundation.authorized(run), generateKey: () => `intake-key-${++generated}` });
+    expect(await controller.recordIntake(orderOf({ status: "PICKUP_PENDING" }), "FACILITY", intake)).toBeNull();
+    expect(controller.getState().phase).toBe("unknown");
+    expect(await controller.recordIntake(orderOf({ status: "PICKUP_PENDING" }), "FACILITY", intake)).toBeNull();
+    expect(await controller.retry()).not.toBeNull();
+    expect(generated).toBe(1);
+    expect(h.calls[1].body).toEqual(h.calls[0].body);
+    expect(h.calls[1].headers["Idempotency-Key"]).toBe(h.calls[0].headers["Idempotency-Key"]);
+  });
+
+  it("records a failed quality check with its reason and preserves rework instead of inventing readiness", async () => {
+    const h = harness();
+    const foundation = await authedFoundationWith(h, operatorActor);
+    const qc = { passed: false, note: "Visible stain; rewash required", containers: [bag], mediaIds: [] };
+    h.on(r => r.path.endsWith("/quality-check"), r => {
+      expect(r.body).toEqual({ ...qc, expectedVersion: 3 });
+      return { ok: true, json: orderOf({ status: "IN_CARE", version: 4 }) };
+    });
+    const controller = createCareActionController({ runAuthorized: run => foundation.authorized(run), generateKey: () => "qc-key" });
+    expect((await controller.recordQualityCheck(orderOf({ status: "QUALITY_CHECK" }), "OPERATOR", qc))?.status).toBe("IN_CARE");
+  });
+
+  it("blocks wrong roles/states and rejects invalid measured facts before sending", async () => {
+    const h = harness();
+    const foundation = await authedFoundationWith(h, facilityActor);
+    const controller = createCareActionController({ runAuthorized: run => foundation.authorized(run), generateKey: () => "must-not-send" });
+    expect(await controller.recordIntake(orderOf({ status: "PICKUP_PENDING" }), "CUSTOMER", intake)).toBeNull();
+    expect(await controller.recordIntake(orderOf({ status: "CONFIRMED" }), "FACILITY", intake)).toBeNull();
+    expect(await controller.recordIntake(orderOf({ status: "PICKUP_PENDING" }), "FACILITY", { ...intake, lines: [{ orderLineId: LINE_ID, condition: "GOOD" }] })).toBeNull();
+    expect(await controller.recordQualityCheck(orderOf({ status: "QUALITY_CHECK" }), "FACILITY", { passed: false, containers: [bag], mediaIds: [] })).toBeNull();
+    expect(h.calls).toHaveLength(0);
+    expect(controller.getState().phase).toBe("rejected");
+  });
+
+  it("does not silently upgrade physical facts from a stale form after a detail refresh", async () => {
+    const h = harness();
+    const foundation = await authedFoundationWith(h, facilityActor);
+    const controller = createCareActionController({ runAuthorized: run => foundation.authorized(run), generateKey: () => "must-not-send" });
+    const stale = { ...intake, expectedVersion: 2 };
+    expect(await controller.recordIntake(orderOf({ status: "PICKUP_PENDING", version: 3 }), "FACILITY", stale)).toBeNull();
+    expect(controller.getState()).toMatchObject({ phase: "rejected", code: "VERSION_CONFLICT", currentVersion: 3 });
+    expect(h.calls).toHaveLength(0);
+  });
+
+  it("retires a denied QC command and uses a fresh key/version after a server refresh", async () => {
+    const h = harness();
+    const foundation = await authedFoundationWith(h, operatorActor);
+    let generated = 0;
+    const controller = createCareActionController({ runAuthorized: run => foundation.authorized(run), generateKey: () => `qc-key-${++generated}` });
+    const qc = { passed: true, containers: [bag], mediaIds: [] };
+    h.on(r => r.path.endsWith("/quality-check"), () => ({ ok: false, status: 409, json: { code: "VERSION_CONFLICT", message: "Order changed", traceId: "qc-version-conflict", retryable: true, currentVersion: 4 } }));
+    expect(await controller.recordQualityCheck(orderOf({ status: "QUALITY_CHECK" }), "OPERATOR", qc)).toBeNull();
+    expect(controller.getState()).toMatchObject({ phase: "rejected", code: "VERSION_CONFLICT", currentVersion: 4 });
+    expect(await controller.retry()).toBeNull();
+    h.on(r => r.path.endsWith("/quality-check"), () => ({ ok: true, json: orderOf({ status: "READY_FOR_RETURN", version: 5 }) }));
+    expect((await controller.recordQualityCheck(orderOf({ status: "QUALITY_CHECK", version: 4 }), "OPERATOR", qc))?.status).toBe("READY_FOR_RETURN");
+    expect(h.calls[0].headers["Idempotency-Key"]).toBe("qc-key-1");
+    expect(h.calls[1].headers["Idempotency-Key"]).toBe("qc-key-2");
+    expect(h.calls[1].body).toMatchObject({ expectedVersion: 4 });
+  });
+
+  it("shows a physical measurement form only to permitted staff at pickup intake", () => {
+    const selected = orderOf({ status: "PICKUP_PENDING" });
+    const html = (actor: v2.Actor) => renderToStaticMarkup(createElement(OperationsWorkspaceView, {
+      actor, queue: { kind: "idle" }, detail: { kind: "ready", orderId: selected.id, order: selected, loadedAt: "2026-10-12T05:00:00Z", stale: false }, attempt: { phase: "idle" },
+    }));
+    expect(html(facilityActor)).toContain('data-testid="ops-intake-form"');
+    expect(html(facilityActor)).toContain("Measured weight (grams)");
+    expect(html(facilityActor)).toContain('>Condition</label><select');
+    expect(html({ ...facilityActor, role: "CUSTOMER" })).not.toContain('data-testid="ops-intake-form"');
+    const qc = orderOf({ status: "QUALITY_CHECK" });
+    const qcHtml = renderToStaticMarkup(createElement(OperationsWorkspaceView, {
+      actor: facilityActor, queue: { kind: "idle" }, detail: { kind: "ready", orderId: qc.id, order: qc, loadedAt: "2026-10-12T05:00:00Z", stale: false }, attempt: { phase: "idle" },
+    }));
+    expect(qcHtml).toContain('>Inspection result</label><select');
+  });
+});
+
+describe("physical facility record validation", () => {
+  function draft(): FacilityDraft {
+    return {
+      confirmed: true, result: "", note: "",
+      bags: [{ id: "88000000-0000-4000-8000-000000000001", sealId: "SEAL-A", sealed: true, condition: "GOOD", garmentCount: "9", weightGrams: "" }],
+      lines: [{ orderLineId: LINE_ID, quantity: "4700", countedQuantity: "9", condition: "GOOD", note: "" }],
+    };
+  }
+  it("keeps measured PIECE quantity separate from an accessory-inclusive count", () => {
+    const order = orderOf({ lines: [{ orderLineId: LINE_ID, serviceId: SERVICE_ID, billingUnit: "PIECE", garmentTypeId: "77000000-0000-4000-8000-000000000012", pieceQuantity: 2, unitPriceMinor: 10000, lineTotalMinor: 20000, provisional: false }] });
+    const input = draft(); input.lines[0].quantity = "3"; input.lines[0].countedQuantity = "8";
+    const record = parseFacilityRecord("INTAKE", order, input);
+    expect(record.kind).toBe("INTAKE");
+    if (record.kind !== "INTAKE") throw new Error("wrong command");
+    expect(record.record.lines[0]).toMatchObject({ measuredPieceQuantity: 3, countedQuantity: 8 });
+    expect(record.record.lines[0]).not.toHaveProperty("measuredWeightGrams");
+    expect(record.record.mediaIds).toEqual([]);
+  });
+  it.each(["", " ", "-1", "1.5", "1e3", "9007199254740992"])("rejects invalid physical integer %j instead of inventing a zero or estimate", text => {
+    const input = draft(); input.lines[0].quantity = text;
+    expect(() => parseFacilityRecord("INTAKE", orderOf(), input)).toThrow();
+  });
+  it("requires explicit physical confirmation, conditions and each line exactly once", () => {
+    const input = draft(); input.confirmed = false;
+    expect(() => parseFacilityRecord("INTAKE", orderOf(), input)).toThrow("Confirm the physical");
+    input.confirmed = true; input.lines[0].condition = "";
+    expect(() => parseFacilityRecord("INTAKE", orderOf(), input)).toThrow();
+    input.lines = [];
+    expect(() => parseFacilityRecord("INTAKE", orderOf(), input)).toThrow("each order line");
+  });
+  it("requires distinct physical bag labels rather than accepting duplicated inventory", () => {
+    const input = draft(); input.bags.push({ ...input.bags[0], id: "88000000-0000-4000-8000-000000000002" });
+    expect(() => parseFacilityRecord("INTAKE", orderOf(), input)).toThrow("labels must be unique");
+    input.bags[1].sealId = "SEAL-B";
+    expect(parseFacilityRecord("INTAKE", orderOf(), input).record.containers).toHaveLength(2);
+  });
+  it("requires an explicit QC result and a reason for rework", () => {
+    const input = draft();
+    expect(() => parseFacilityRecord("QUALITY_CHECK", orderOf(), input)).toThrow("actual inspection");
+    input.result = "REWORK";
+    expect(() => parseFacilityRecord("QUALITY_CHECK", orderOf(), input)).toThrow();
+    input.note = "Stain still visible";
+    const result = parseFacilityRecord("QUALITY_CHECK", orderOf(), input);
+    expect(result.record).toMatchObject({ passed: false, note: "Stain still visible", expectedVersion: 3 });
+  });
+});
 
 describe("sign-in controller (OTP + optional TOTP)", () => {
   it("keeps failed local credential erasure visible instead of announcing successful logout", async () => {

@@ -1,10 +1,9 @@
-// F04 staff action controller. The one server-permitted mutation wired in this
-// bounded slice is the care advance (start care to IN_CARE, or progress to
-// QUALITY_CHECK) because the current Order DTO fully determines the command.
+// Versioned staff care, measured intake and quality-check commands.
 // The command key and frozen input survive unknown outcomes so a retry replays
 // the identical server command; a definitive rejection retires the key.
 import { UnknownOutcomeError, V2ApiError, type V2Client } from "@laundry/api-client";
-import type { v2 } from "@laundry/contracts";
+import { v2 } from "@laundry/contracts";
+import { isMutationOutcomePending } from "@laundry/app-foundation";
 import { describeError } from "./errors";
 
 export type StaffCareTarget = v2.CareUpdate["target"];
@@ -51,9 +50,8 @@ export function nextStaffCareAction(order: v2.Order, role: v2.Actor["role"]): St
       return { label: "Send to quality check", target: "QUALITY_CHECK" };
     case "QUALITY_CHECK":
       return {
-        label: "Mark ready for return",
-        blockedReason:
-          "Recording a passed quality check is a separate intake tool, not wired in this slice.",
+        label: "Record quality check",
+        blockedReason: "Record the actual inspection result and sealed bags below.",
       };
     case "READY_FOR_RETURN":
       return {
@@ -67,12 +65,9 @@ export function nextStaffCareAction(order: v2.Order, role: v2.Actor["role"]): St
           "Return custody acceptance and payment settlement gate the final handover; custody tools are not wired in this slice.",
       };
     case "CONFIRMED":
+      return { label: "Await pickup", blockedReason: "Intake requires the pickup workflow to start first." };
     case "PICKUP_PENDING":
-      return {
-        label: "Record facility intake",
-        blockedReason:
-          "Facility intake is recorded through the intake tool, which is not wired in this slice.",
-      };
+      return { label: "Record facility intake", blockedReason: "Enter actual measured quantities and received bags below." };
     case "ON_HOLD":
       return {
         label: "Resume care",
@@ -99,14 +94,34 @@ export interface CareCommandInput {
   readonly expectedVersion: number;
 }
 
+export type FacilityRecordInput =
+  | { kind: "INTAKE"; orderId: string; record: v2.IntakeRecord }
+  | { kind: "QUALITY_CHECK"; orderId: string; record: v2.QualityCheck };
+export type StaffCommandInput = CareCommandInput | FacilityRecordInput;
+
+export function facilityRecordMode(order: v2.Order, role: v2.Actor["role"]): "INTAKE" | "QUALITY_CHECK" | undefined {
+  if (!STAFF_CARE_ROLES.has(role)) return undefined;
+  if (order.status === "PICKUP_PENDING") return "INTAKE";
+  if (order.status === "QUALITY_CHECK") return "QUALITY_CHECK";
+  return undefined;
+}
+
+function freezeFacts<T>(value: T): T {
+  if (value && typeof value === "object") {
+    for (const child of Object.values(value)) freezeFacts(child);
+    Object.freeze(value);
+  }
+  return value;
+}
+
 export type CareAttempt =
   | { phase: "idle" }
-  | { phase: "sending"; commandKey: string; input: CareCommandInput }
+  | { phase: "sending"; commandKey: string; input: StaffCommandInput }
   | {
       /** Unknown outcome: retained for retry with the SAME key and input. */
       phase: "unknown";
       commandKey: string;
-      input: CareCommandInput;
+      input: StaffCommandInput;
       at: string;
       detail: string;
     }
@@ -170,6 +185,36 @@ export class CareActionController {
     return this.send(input, this.deps.generateKey());
   }
 
+  async recordIntake(order: v2.Order, role: v2.Actor["role"], facts: Omit<v2.IntakeRecord, "expectedVersion">): Promise<v2.Order | null> {
+    return this.record(order, role, "INTAKE", facts);
+  }
+
+  async recordQualityCheck(order: v2.Order, role: v2.Actor["role"], facts: Omit<v2.QualityCheck, "expectedVersion">): Promise<v2.Order | null> {
+    return this.record(order, role, "QUALITY_CHECK", facts);
+  }
+
+  private async record(order: v2.Order, role: v2.Actor["role"], kind: FacilityRecordInput["kind"], facts: Omit<v2.IntakeRecord, "expectedVersion"> | Omit<v2.QualityCheck, "expectedVersion">): Promise<v2.Order | null> {
+    if (this.state.phase === "sending" || this.state.phase === "unknown" || facilityRecordMode(order, role) !== kind) return null;
+    // A refresh must not silently upgrade facts confirmed on an older form.
+    if ("expectedVersion" in facts && facts.expectedVersion !== order.version) {
+      this.set({ phase: "rejected", code: "VERSION_CONFLICT", message: "The order changed. Refresh and confirm the physical facts again.", traceId: undefined, currentVersion: order.version });
+      return null;
+    }
+    const parsed = kind === "INTAKE"
+      ? v2.intakeRecordSchema.safeParse({ ...facts, expectedVersion: order.version })
+      : v2.qualityCheckSchema.safeParse({ ...facts, expectedVersion: order.version });
+    if (!parsed.success) {
+      this.set({ phase: "rejected", code: "INVALID_INPUT", message: parsed.error.issues.map(issue => issue.message).join(" "), traceId: undefined, currentVersion: undefined });
+      return null;
+    }
+    // Schema parsing clones nested measurements/bags. Freeze the clone so neither
+    // edits nor a caller inspecting state can alter an ambiguous command's retry.
+    const input: FacilityRecordInput = kind === "INTAKE"
+      ? { kind, orderId: order.id, record: v2.intakeRecordSchema.parse(parsed.data) }
+      : { kind, orderId: order.id, record: v2.qualityCheckSchema.parse(parsed.data) };
+    return this.send(freezeFacts(input), this.deps.generateKey());
+  }
+
   /** Retry the retained attempt with the identical key and input. */
   async retry(): Promise<v2.Order | null> {
     const current = this.state;
@@ -178,16 +223,18 @@ export class CareActionController {
   }
 
   private async send(
-    input: CareCommandInput,
+    input: StaffCommandInput,
     idempotencyKey: string,
   ): Promise<v2.Order | null> {
     const seq = ++this.seq;
     this.set({ phase: "sending", commandKey: idempotencyKey, input });
     try {
       const updated = await this.deps.runAuthorized((client: V2Client) =>
-        client.advanceCare(input.orderId, input.target, input.expectedVersion, {
-          idempotencyKey,
-        }),
+        "kind" in input
+          ? input.kind === "INTAKE"
+            ? client.recordIntake(input.orderId, input.record, input.record.expectedVersion, { idempotencyKey })
+            : client.recordQualityCheck(input.orderId, input.record, input.record.expectedVersion, { idempotencyKey })
+          : client.advanceCare(input.orderId, input.target, input.expectedVersion, { idempotencyKey }),
       );
       if (seq !== this.seq) return null;
       this.set({ phase: "idle" });
@@ -195,7 +242,7 @@ export class CareActionController {
     } catch (error) {
       if (seq !== this.seq) return null;
       const described = describeError(error);
-      if (described.unknownOutcome) {
+      if (isMutationOutcomePending(error)) {
         // Retain BOTH the key and the exact input; the UI explains that the
         // server outcome is unknown until this exact command is replayed.
         this.set({
