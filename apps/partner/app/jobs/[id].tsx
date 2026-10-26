@@ -17,6 +17,7 @@ import {
   handoverEligible,
   handoverResultState,
   pendingHandoverForJob,
+  resolveHandoverContainers,
   validateHandoverDraft,
   type HandoverCondition,
   type HandoverDraft,
@@ -165,7 +166,7 @@ function JobDetailContent() {
             <Text style={styles.bodyMuted}>
               Window {windowLabel(job.window.start, job.window.end)} ({job.window.timezone})
             </Text>
-            <Text style={styles.bodyMuted}>Containers: {job.containerCount}</Text>
+            <Text style={styles.bodyMuted}>Containers recorded on order: {job.containerCount}</Text>
             <Text style={styles.bodyMuted}>Next: {nextActionLabel(job)}</Text>
           </View>
         </Card>
@@ -292,10 +293,18 @@ function HandoverPanel(props: {
 
   async function submit() {
     if (inFlight.current || outcomePending || codeLocked || acceptedIdentity !== acceptanceIdentity) return;
+    let containerIds: string[];
+    try {
+      const observed = draft.containerIdsText.trim() ? draft.containerIdsText.trim().split(/[\s,]+/) : [];
+      containerIds = resolveHandoverContainers(props.job, observed);
+    } catch (error) {
+      setFormError(error instanceof Error ? error.message : 'The physical bag labels could not be validated.');
+      return;
+    }
     const issue = validateHandoverDraft({
       code: draft.code,
       garmentCount: draft.garmentCount,
-      containerIds: props.job.containerIds,
+      containerIds,
     });
     if (issue) {
       setFormError(issue.message);
@@ -311,6 +320,7 @@ function HandoverPanel(props: {
         actionId: draft.actionId,
         code: draft.code,
         garmentCount: Number(draft.garmentCount),
+        containerIds,
         condition: draft.condition,
         note: draft.note.trim() === "" ? undefined : draft.note.trim(),
       });
@@ -381,6 +391,10 @@ function HandoverPanel(props: {
 
       {uiState.kind !== "CONFIRMED_ONLINE" && !outcomePending ? (
         <>
+          {props.job.leg === 'PICKUP' && props.job.containerIds.length === 0 ? <Field label="Pickup bag-label UUIDs" hint="Enter each existing UUID from the physical sealed-bag labels, separated by commas or newlines (up to 100). This app does not generate IDs or verify a physical seal.">
+            <Input value={draft.containerIdsText} onChangeText={value => setDraft(d => ({ ...d, containerIdsText: value }))}
+              accessibilityLabel="Pickup bag-label UUIDs" multiline maxLength={4000} placeholder="UUIDs printed on the bags" />
+          </Field> : null}
           <Field label="Custody code (six digits)">
             <Input
               value={draft.code}

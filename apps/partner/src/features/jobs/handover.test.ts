@@ -57,6 +57,33 @@ describe("handover eligibility and draft validation", () => {
 });
 
 describe("typed handover DTO construction", () => {
+  const pickup: v2.RiderJob = { ...job, leg: 'PICKUP', containerIds: [], containerCount: 0 };
+  const bag = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
+  const observed = { actionId: '33333333-3333-4333-8333-333333333333', code: '123456', garmentCount: 6, containerIds: [bag] };
+
+  it('requires explicit bag facts for a pickup instead of sending an empty bag set', () => {
+    expect(() => buildHandoverBody(pickup, { ...observed, containerIds: [] })).toThrow(/bag|container/i);
+  });
+
+  it('carries explicitly observed pickup bag labels into the typed handover', () => {
+    expect(buildHandoverBody(pickup, observed).containerIds).toEqual([bag]);
+    expect(pickup.containerIds).toEqual([]);
+  });
+
+  it.each([
+    { containerIds: ['not-a-bag-uuid'] },
+    { containerIds: [bag, bag] },
+    { containerIds: Array.from({ length: 101 }, (_, i) => `00000000-0000-4000-8000-${i.toString(16).padStart(12, '0')}`) },
+  ])('rejects invalid, duplicate or oversized pickup bag facts', ({ containerIds }) => {
+    expect(() => buildHandoverBody(pickup, { ...observed, containerIds })).toThrow(/bag|container/i);
+  });
+
+  it('cannot replace the facility return bag set with rider-provided IDs', () => {
+    const returning: v2.RiderJob = { ...job, leg: 'RETURN' };
+    expect(buildHandoverBody(returning, observed).containerIds).toEqual(job.containerIds);
+    expect(() => buildHandoverBody({ ...returning, containerIds: [] }, observed)).toThrow(/bag|container/i);
+  });
+
   it("builds the exact rider DTO preserving actionId and job version", () => {
     const actionId = "33333333-3333-4333-8333-333333333333";
     const capturedAt = "2026-10-25T06:00:00.000Z";

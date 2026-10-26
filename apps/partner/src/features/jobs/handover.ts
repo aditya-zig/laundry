@@ -40,6 +40,7 @@ export type HandoverCondition = v2.GarmentCondition;
 export interface HandoverDraft {
   code: string;
   garmentCount: string;
+  containerIdsText: string;
   condition: HandoverCondition;
   note: string;
   actionId: string;
@@ -52,6 +53,7 @@ export function emptyHandoverDraft(): HandoverDraft {
   return {
     code: "",
     garmentCount: "",
+    containerIdsText: "",
     condition: "GOOD",
     note: "",
     actionId: crypto.randomUUID(),
@@ -100,10 +102,20 @@ const TERMINAL: ReadonlySet<v2.RiderJob["status"]> = new Set([
   "BOOKING_UNKNOWN",
 ]);
 
+/** Only an unregistered pickup may supply labels observed on the actual bags. */
+export function resolveHandoverContainers(job: v2.RiderJob, observedIds: readonly string[] = []): string[] {
+  if (job.containerIds.length > 0) return [...job.containerIds];
+  if (job.leg !== 'PICKUP') throw new Error('Return containers must come from the facility record; ask dispatch to reconcile the bags.');
+  if (observedIds.length === 0 || observedIds.length > 100 || new Set(observedIds).size !== observedIds.length || observedIds.some(id => !v2.idSchema.safeParse(id).success)) {
+    throw new Error('Record 1–100 distinct bag-label UUIDs from the physical pickup bags; do not invent container IDs.');
+  }
+  return [...observedIds];
+}
+
 /** Builds the exact typed DTO; never embeds the expected code server-side. */
 export function buildHandoverBody(
   job: v2.RiderJob,
-  args: { actionId: string; code: string; garmentCount: number; condition?: HandoverCondition; note?: string; capturedAt?: string },
+  args: { actionId: string; code: string; garmentCount: number; containerIds?: readonly string[]; condition?: HandoverCondition; note?: string; capturedAt?: string },
 ): Omit<v2.RiderHandover, "jobId"> {
   return {
     legAttemptId: job.id,
@@ -112,7 +124,7 @@ export function buildHandoverBody(
     method: "CODE",
     code: args.code,
     capturedAt: args.capturedAt ?? new Date().toISOString(),
-    containerIds: [...job.containerIds],
+    containerIds: resolveHandoverContainers(job, args.containerIds),
     garmentCount: args.garmentCount,
     condition: args.condition ?? "GOOD",
     ...(args.note ? { note: args.note } : {}),

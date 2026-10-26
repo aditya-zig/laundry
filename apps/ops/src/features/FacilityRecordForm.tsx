@@ -39,6 +39,7 @@ function quantity(text: string, label: string): number {
 export function parseFacilityRecord(mode: Mode, order: v2.Order, draft: FacilityDraft): FacilityRecordInput {
   if (!draft.confirmed) throw new Error("Confirm the physical measurements, bag identities and inspection before recording.");
   const containers = draft.bags.map(bag => {
+    if (!v2.idSchema.safeParse(bag.id).success) throw new Error("Enter a valid bag inventory UUID, preserving the ID from pickup.");
     if (!bag.sealId.trim()) throw new Error("Enter the physical seal or bag label for every bag.");
     return { id: bag.id, sealId: bag.sealId.trim(), sealed: bag.sealed, condition: bag.condition,
       garmentCount: quantity(bag.garmentCount, "Bag garment count"),
@@ -131,8 +132,12 @@ export function FacilityRecordForm(props: {
             <textarea id="qc-note" className="ops-input" required={draft.result === "REWORK"} maxLength={2000} value={draft.note} onChange={e => setDraft(value => ({ ...value, confirmed: false, note: e.target.value }))} />
           </label>
         </>}
-        {draft.bags.map((bag, index) => <fieldset className="ops-record-group" key={bag.id}>
+        {draft.bags.map((bag, index) => <fieldset className="ops-record-group" key={index}>
           <legend>Physical bag {index + 1}</legend>
+          <label className="ops-label" htmlFor={`inventory-${index}`}>Bag inventory UUID
+            <input className="ops-input" id={`inventory-${index}`} required maxLength={36} value={bag.id} readOnly={mode === "QUALITY_CHECK"} onChange={e => updateBag(index, { id: e.target.value.trim() })} />
+          </label>
+          <p className="ops-mini ops-muted">Keep the UUID from the pickup bag. A new bag must be labelled with its assigned UUID before confirmation. This ID is separate from the seal label below.</p>
           <label className="ops-label" htmlFor={`seal-${bag.id}`}>Seal or bag label
             <input className="ops-input" id={`seal-${bag.id}`} required maxLength={200} value={bag.sealId} onChange={e => updateBag(index, { sealId: e.target.value })} />
           </label>

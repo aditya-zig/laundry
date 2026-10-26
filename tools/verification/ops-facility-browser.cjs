@@ -1,11 +1,12 @@
 // Synthetic-only extension of the customer v2 HTTP/PostgreSQL browser journey.
-// Staff MFA, actual pickup custody, physical QC and live providers are NOT proved.
+// Browser custody may be exercised with explicit flags; physical transfer,
+// real staff MFA, physical QC and live providers are never proved here.
 const { expect } = require('@playwright/test');
 const { readFile, writeFile } = require('node:fs/promises');
 const { resolve, relative } = require('node:path');
 
-function opsFacilityJourney(fixture, withRider = false) {
-  let context, page;
+function opsFacilityJourney(fixture, withRider = false, withPickup = false) {
+  let context, page, pickupEvidence;
   const intakeCalls = [], qualityPassCalls = [], assignmentCalls = [], receiptCalls = [], errors = [];
   const output = resolve('.data/browser-evidence/customer-v2');
   const detail = () => page.locator('[aria-label="Selected order"]');
@@ -50,6 +51,21 @@ function opsFacilityJourney(fixture, withRider = false) {
       await page.getByLabel('6-digit one-time code', { exact: true }).fill(otp.code);
       await page.getByRole('button', { name: 'Verify and sign in', exact: true }).click();
       await page.getByRole('button', { name: /^Open order/ }).first().click();
+      if (withPickup) {
+        const rider = await fixture.preparePickupRider();
+        const assign = page.getByRole('form', { name: 'Assign pickup rider', exact: true });
+        await assign.getByLabel('Provisioned rider ID', { exact: true }).fill(rider.riderId);
+        await assign.getByLabel('Assignment reason', { exact: true }).fill('Synthetic pickup route; no physical transfer claim');
+        await expect(page.getByRole('button', { name: 'Record received payment', exact: true })).toBeDisabled();
+        await assign.getByRole('button', { name: 'Assign rider', exact: true }).click();
+        await expect(page.getByRole('button', { name: 'Retry retained command', exact: true })).toBeVisible();
+        await expect(page.getByRole('button', { name: /^Open order/ }).first()).toBeDisabled();
+        await page.getByRole('button', { name: 'Retry retained command', exact: true }).click();
+        await expect(assign).toHaveCount(0);
+        sameRetry(assignmentCalls);
+        pickupEvidence = await require('./rider-custody-browser.cjs').riderCustodyJourney(browser, fixture, output, 'PICKUP');
+        await detail().getByRole('button', { name: 'Refresh', exact: true }).first().click();
+      }
       const form = page.getByTestId('ops-intake-form');
       await expect(form).toBeVisible();
       await form.getByLabel('Measured weight (grams)', { exact: true }).fill('2400');
@@ -57,6 +73,7 @@ function opsFacilityJourney(fixture, withRider = false) {
       const line = form.getByRole('group', { name: /^Line 1/ });
       await line.getByLabel('Condition', { exact: true }).selectOption('GOOD');
       const bag = form.getByRole('group', { name: 'Physical bag 1', exact: true });
+      if (withPickup) await bag.getByLabel('Bag inventory UUID', { exact: true }).fill(fixture.pickupBagId);
       await bag.getByLabel('Seal or bag label', { exact: true }).fill('SYNTHETIC-SEAL-A');
       await bag.getByLabel('Garments in this bag', { exact: true }).fill('12');
       await bag.getByLabel('Condition', { exact: true }).selectOption('GOOD');
@@ -70,6 +87,7 @@ function opsFacilityJourney(fixture, withRider = false) {
       await form.getByRole('button', { name: 'Submit measured intake', exact: true }).click();
       await retryUnknown();
       sameRetry(intakeCalls);
+      if (withPickup) expect(await fixture.syntheticBagEvidence()).toEqual({ pickup: [fixture.pickupBagId], facility: [fixture.pickupBagId], returned: [] });
       await expect(detail().getByRole('button', { name: 'Start care', exact: true })).toBeDisabled();
       await expect(detail().getByText(/customer must accept or decline/i)).toBeVisible();
     },
@@ -108,7 +126,8 @@ function opsFacilityJourney(fixture, withRider = false) {
         await expect(page.getByRole('button', { name: /^Open order/ }).first()).toBeDisabled();
         await page.getByRole('button', { name: 'Retry retained command', exact: true }).click();
         await expect(assignForm).toHaveCount(0);
-        sameRetry(assignmentCalls);
+        sameRetry(assignmentCalls.slice(withPickup ? 2 : 0));
+        expect(assignmentCalls).toHaveLength(withPickup ? 4 : 2);
         const riderEvidence = withRider
           ? await require('./rider-custody-browser.cjs').riderCustodyJourney(context.browser(), fixture, output)
           : (await fixture.acceptSyntheticReturnCustody(), null);
@@ -133,10 +152,11 @@ function opsFacilityJourney(fixture, withRider = false) {
         sameRetry(receiptCalls);
         const dispatchFacts = await (await fetch('http://127.0.0.1:4499/__synthetic_dispatch_evidence')).json();
         expect(dispatchFacts).toEqual({ syntheticOnly: true, return_assignments: 1, return_handovers: 1, manual_receipts: 1, gateway_receipts: 0, amount_settled_minor: 10000, order_status: 'DELIVERED' });
+        if (withPickup) expect(await fixture.syntheticBagEvidence()).toEqual({ pickup: [fixture.pickupBagId], facility: [fixture.pickupBagId], returned: [fixture.pickupBagId] });
         expect(errors).toEqual([]);
-        await writeFile(resolve(output, 'ops-result.json'), JSON.stringify({ status: 'passed', ...facts, dispatch: dispatchFacts, sameIntakeRetry: true, sameQualityRetry: true, sameAssignmentRetry: true, sameReceiptRetry: true, riderBrowser: riderEvidence, browserErrors: errors, realStaffMfaProven: false, physicalCustodyProven: false, realPaymentProven: false }, null, 2));
+        await writeFile(resolve(output, 'ops-result.json'), JSON.stringify({ status: 'passed', ...facts, dispatch: dispatchFacts, sameIntakeRetry: true, sameQualityRetry: true, sameAssignmentRetry: true, sameReceiptRetry: true, riderBrowser: riderEvidence, pickupRiderBrowser: pickupEvidence ?? null, pickupBagContinuity: withPickup, browserErrors: errors, realStaffMfaProven: false, physicalCustodyProven: false, realPaymentProven: false }, null, 2));
         console.log('PASS: actual ops intake/care/QC/rework and dispatch/manual-UPI-receipt UI with customer consent; post-commit reply-loss retries preserve each body/key. Exactly one return assignment, synthetic custody handover and manual receipt; actual completion coordinator delivers only after both. Synthetic local providers only: no physical transfer, live payment, rider-device or staff-MFA claim.');
-        return { video: relative(output, await page.video().path()), rider: riderEvidence };
+        return { video: relative(output, await page.video().path()), rider: riderEvidence, pickup: pickupEvidence, pickupBagContinuity: withPickup };
       } catch (error) {
         await captureFailure();
         throw error;

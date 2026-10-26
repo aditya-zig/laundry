@@ -310,6 +310,16 @@ describe("physical facility record validation", () => {
     input.lines = [];
     expect(() => parseFacilityRecord("INTAKE", orderOf(), input)).toThrow("each order line");
   });
+  it('preserves an explicitly entered pickup inventory UUID separately from the physical seal label', () => {
+    const input = draft();
+    input.bags[0].id = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
+    expect(parseFacilityRecord('INTAKE', orderOf(), input).record.containers[0]).toMatchObject({ id: input.bags[0].id, sealId: 'SEAL-A' });
+  });
+  it.each(['', 'SEAL-A', 'not-a-uuid'])('rejects an invalid inventory UUID %j without allocating a replacement', id => {
+    const input = draft(); input.bags[0].id = id;
+    expect(() => parseFacilityRecord('INTAKE', orderOf(), input)).toThrow('bag inventory UUID');
+    expect(input.bags[0].id).toBe(id);
+  });
   it("requires distinct physical bag labels rather than accepting duplicated inventory", () => {
     const input = draft(); input.bags.push({ ...input.bags[0], id: "88000000-0000-4000-8000-000000000002" });
     expect(() => parseFacilityRecord("INTAKE", orderOf(), input)).toThrow("labels must be unique");

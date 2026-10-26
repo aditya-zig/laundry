@@ -10,6 +10,12 @@ type Intent = (
 ) & { retainedKey?: string };
 type Facts = { legs: v2.LegAttempt[]; obligations: v2.Obligation[]; retained: QueuedMutationRecord[] };
 
+export function canAssignRider(status: v2.Order['status'], leg: Pick<v2.LegAttempt, 'leg' | 'status'>): boolean {
+  return leg.status === 'BOOKED' && (leg.leg === 'PICKUP'
+    ? status === 'CONFIRMED' || status === 'PICKUP_PENDING'
+    : status === 'READY_FOR_RETURN');
+}
+
 /** Persisted data can only select these two approved SDK commands, never a URL. */
 function restoreIntent(record: QueuedMutationRecord, facts: Facts): Intent | null {
   try {
@@ -109,8 +115,8 @@ export function DispatchSettlementPanel(props: {
   const returnLeg = facts?.legs.find(leg => leg.leg === "RETURN");
   const collectingAtReturn = order.status === "RETURNING" && returnLeg !== undefined && ["IN_TRANSIT", "COMPLETED"].includes(returnLeg.status);
   return <section className="ops-command-panel" aria-label="Dispatch and payment at return">
-    <h3 className="ops-h3">Dispatch & payment at return</h3>
-    <p className="ops-mini">Operator tools. Sealed-bag custody and payment remain separate server records. Keep this console open until uncertain commands are reconciled.</p>
+    <h3 className="ops-h3">Rider dispatch & payment at return</h3>
+    <p className="ops-mini">Assign booked pickup legs or ready-for-return legs. Collection remains return-only. Sealed-bag custody and payment remain separate server records. Keep this console open until uncertain commands are reconciled.</p>
     {message && <p role="status" className="ops-notice">{message}</p>}
     {pending && <div className="ops-notice" role="alert">
       A retained {pending.routeId === "logistics.ops.assign" ? "assignment" : "manual receipt"} has not been reconciled.
@@ -124,7 +130,7 @@ export function DispatchSettlementPanel(props: {
         {facts.legs.map(leg => <div className="ops-record-group" key={`${leg.id}:${leg.version}`}>
           <p><strong>{leg.leg === "RETURN" ? "Return" : "Pickup"}</strong> · {leg.status} · attempt {leg.attemptNumber} · version {leg.version}</p>
           {leg.assignedTo && <p className="ops-mini">Assigned rider {shortId(leg.assignedTo)}</p>}
-          {leg.leg === "RETURN" && leg.status === "BOOKED" && order.status === "READY_FOR_RETURN" && <AssignmentForm leg={leg} disabled={blocked} onSubmit={body => void send({ routeId: "logistics.ops.assign", body })} />}
+          {canAssignRider(order.status, leg) && <AssignmentForm leg={leg} disabled={blocked} onSubmit={body => void send({ routeId: "logistics.ops.assign", body })} />}
         </div>)}
         <h4 className="ops-h3">Manual payment ledger</h4>
         <p className="ops-mini">This panel does not reconcile online attempts. Resolve any pending or unknown online payment before collecting cash or manual UPI.</p>
