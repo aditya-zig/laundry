@@ -14,10 +14,12 @@ type CommandArgs = {
   'logistics.ops.assign': { body: v2.AssignmentInput };
   'billing.manual.confirm': { params: { obligationId: string }; body: v2.ManualPaymentConfirmation };
   'billing.refund.create': { body: v2.RefundRequest };
+  'reviews.create': { body: v2.ReviewInput };
 };
 type CommandResults = {
   'orders.book': v2.Order; 'orders.quote': v2.Quote; 'orders.adjustment.decide': v2.Order; 'identity.address.create': v2.Address;
   'logistics.rider.handover': v2.HandoverResult; 'logistics.ops.assign': v2.Assignment; 'billing.manual.confirm': v2.Receipt; 'billing.refund.create': v2.Refund;
+  'reviews.create': v2.Review;
 };
 type CommandRoute = keyof CommandArgs;
 export type QueuedMutationDescriptor<K extends CommandRoute = CommandRoute> = { routeId: K; params?: Record<string, string>; /** Require this exact retained actor-bound key; never mint a replacement. */ retainedKey?: string } & CommandArgs[K];
@@ -87,6 +89,7 @@ function sendRecord(client: V2Client, record: QueuedMutationRecord): Promise<unk
     case 'logistics.ops.assign': return client.assignDelivery(body, opts);
     case 'billing.manual.confirm': return client.confirmManualPayment(record.params.obligationId, body, opts);
     case 'billing.refund.create': return client.createRefund(body, opts);
+    case 'reviews.create': return client.createReview(v2.reviewInputSchema.parse(body), opts);
     default: return Promise.reject(new UnknownOutcomeError('No approved replay sender exists; reconcile the retained intent', undefined, record.idempotencyKey));
   }
 }

@@ -67,6 +67,24 @@ describe('F00 restore, revocation and secure persistence', () => {
   });
 });
 describe('F00 refresh and stable command identities', () => {
+  it('retains an explicit post-delivery review and its publication consent after reply loss', async () => {
+    const h = new Harness(), f = await h.signedIn();
+    const body = v2.reviewInputSchema.parse({ ...fixtures.ReviewInput, overall: 4, comment: 'Synthetic private feedback', mediaIds: [], publishConsent: false });
+    const descriptor = { routeId: 'reviews.create' as const, body };
+    h.handle = req => req.path.endsWith('/reviews') ? response({ code: 'PROVIDER_UNAVAILABLE', message: 'Reply lost after commit', traceId: 'synthetic', retryable: true }, 503) : h.defaultHandle(req);
+    await expect(f.enqueueMutation(descriptor)).rejects.toMatchObject({ status: 503 });
+    const [pending] = await f.listQueuedMutations();
+    expect(JSON.parse(pending.bodyJson!)).toEqual(body);
+    const reopened = h.build(); await reopened.initialize();
+    await expect(reopened.enqueueMutation({ ...descriptor, body: { ...body, publishConsent: true }, retainedKey: pending.idempotencyKey })).rejects.toBeInstanceOf(StorageError);
+    h.handle = req => req.path.endsWith('/reviews') ? response({ ...fixtures.Review, ...body }) : h.defaultHandle(req);
+    expect(await reopened.enqueueMutation({ ...descriptor, retainedKey: pending.idempotencyKey })).toMatchObject({ overall: 4, publishConsent: false });
+    const calls = h.calls.filter(req => req.path.endsWith('/reviews'));
+    expect(calls).toHaveLength(2);
+    expect(calls[0].body).toEqual(calls[1].body);
+    expect(calls[0].headers.get('idempotency-key')).toBe(calls[1].headers.get('idempotency-key'));
+    expect(await reopened.listQueuedMutations()).toEqual([]);
+  });
   it.each(['ACCEPT', 'DECLINE'] as const)('replays an explicit %s adjustment decision with the original terms and command key after navigation', async decision => {
     const h = new Harness(), f = await h.signedIn();
     const body = v2.adjustmentDecisionSchema.parse({ adjustmentId: fixtures.Order.id, adjustmentVersion: 1, expectedVersion: fixtures.Order.version, decision });
