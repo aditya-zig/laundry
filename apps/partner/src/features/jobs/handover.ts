@@ -1,7 +1,8 @@
 // Custody handover feature logic (F03).
 // Types/explicit states: CONFIRMED_ONLINE, OUTCOME_UNKNOWN, PENDING_SYNC,
 // REJECTED. Receipt copy is derived only from the authoritative HandoverResult.
-import { UnknownOutcomeError, V2ApiError } from "@laundry/api-client";
+import { V2ApiError } from "@laundry/api-client";
+import { isMutationOutcomePending } from "@laundry/app-foundation";
 import { v2 } from "@laundry/contracts";
 import type { QueuedMutationRecord } from "@laundry/app-foundation";
 import { assignmentState } from "./access";
@@ -19,6 +20,12 @@ export type HandoverUiState =
   | { kind: "OUTCOME_UNKNOWN"; actionId: string }
   | { kind: "PENDING_SYNC"; pending: HandoverPending }
   | { kind: "REJECTED"; actionId: string; message: string; canRetryWithSameDetails: boolean };
+
+export function handoverResultState(receipt: v2.HandoverResult, actionId: string): HandoverUiState {
+  return receipt.accepted
+    ? { kind: 'CONFIRMED_ONLINE', receipt }
+    : { kind: 'REJECTED', actionId, message: `${receipt.reason ?? 'Custody was not accepted'}. Attempt count: ${receipt.attemptCount}.`, canRetryWithSameDetails: receipt.nextAttemptAllowed };
+}
 
 export interface HandoverPending {
   jobId: string;
@@ -118,10 +125,7 @@ export type HandoverFailure =
 
 /** Unknown outcomes are never reclassified as confirmations or failures. */
 export function classifyHandoverFailure(error: unknown, actionId: string): HandoverFailure {
-  if (
-    error instanceof UnknownOutcomeError ||
-    (error instanceof V2ApiError && error.status >= 500)
-  ) {
+  if (isMutationOutcomePending(error)) {
     return { kind: "OUTCOME_UNKNOWN", actionId, canRetryWithSameDetails: false };
   }
   if (error instanceof V2ApiError) {

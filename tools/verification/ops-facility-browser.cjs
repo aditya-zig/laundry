@@ -4,7 +4,7 @@ const { expect } = require('@playwright/test');
 const { readFile, writeFile } = require('node:fs/promises');
 const { resolve, relative } = require('node:path');
 
-function opsFacilityJourney(fixture) {
+function opsFacilityJourney(fixture, withRider = false) {
   let context, page;
   const intakeCalls = [], qualityPassCalls = [], assignmentCalls = [], receiptCalls = [], errors = [];
   const output = resolve('.data/browser-evidence/customer-v2');
@@ -109,7 +109,9 @@ function opsFacilityJourney(fixture) {
         await page.getByRole('button', { name: 'Retry retained command', exact: true }).click();
         await expect(assignForm).toHaveCount(0);
         sameRetry(assignmentCalls);
-        await fixture.acceptSyntheticReturnCustody();
+        const riderEvidence = withRider
+          ? await require('./rider-custody-browser.cjs').riderCustodyJourney(context.browser(), fixture, output)
+          : (await fixture.acceptSyntheticReturnCustody(), null);
         await detail().getByRole('button', { name: 'Refresh', exact: true }).first().click();
         const payment = page.getByRole('form', { name: 'Record payment at return', exact: true });
         await payment.getByLabel('Received by', { exact: true }).selectOption('UPI');
@@ -132,9 +134,9 @@ function opsFacilityJourney(fixture) {
         const dispatchFacts = await (await fetch('http://127.0.0.1:4499/__synthetic_dispatch_evidence')).json();
         expect(dispatchFacts).toEqual({ syntheticOnly: true, return_assignments: 1, return_handovers: 1, manual_receipts: 1, gateway_receipts: 0, amount_settled_minor: 10000, order_status: 'DELIVERED' });
         expect(errors).toEqual([]);
-        await writeFile(resolve(output, 'ops-result.json'), JSON.stringify({ status: 'passed', ...facts, dispatch: dispatchFacts, sameIntakeRetry: true, sameQualityRetry: true, sameAssignmentRetry: true, sameReceiptRetry: true, browserErrors: errors, realStaffMfaProven: false, physicalCustodyProven: false, realPaymentProven: false }, null, 2));
+        await writeFile(resolve(output, 'ops-result.json'), JSON.stringify({ status: 'passed', ...facts, dispatch: dispatchFacts, sameIntakeRetry: true, sameQualityRetry: true, sameAssignmentRetry: true, sameReceiptRetry: true, riderBrowser: riderEvidence, browserErrors: errors, realStaffMfaProven: false, physicalCustodyProven: false, realPaymentProven: false }, null, 2));
         console.log('PASS: actual ops intake/care/QC/rework and dispatch/manual-UPI-receipt UI with customer consent; post-commit reply-loss retries preserve each body/key. Exactly one return assignment, synthetic custody handover and manual receipt; actual completion coordinator delivers only after both. Synthetic local providers only: no physical transfer, live payment, rider-device or staff-MFA claim.');
-        return { video: relative(output, await page.video().path()) };
+        return { video: relative(output, await page.video().path()), rider: riderEvidence };
       } catch (error) {
         await captureFailure();
         throw error;

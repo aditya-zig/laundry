@@ -24,6 +24,7 @@ export interface PartnerApi {
   actor(): Actor | null;
   listAssignedJobs(): Promise<v2.RiderJob[]>;
   getAssignedJob(jobId: string): Promise<v2.RiderJob>;
+  acceptAssignment(jobId: string, expectedVersion: number, retainedKey?: string): Promise<v2.Assignment>;
   requestChallenge(phone: string): Promise<v2.OtpChallenge>;
   verifyAndAdoptSession(args: {
     challengeId: string;
@@ -35,6 +36,7 @@ export interface PartnerApi {
     jobId: string,
     body: Omit<v2.RiderHandover, "jobId">,
   ): Promise<v2.HandoverResult>;
+  retryHandover(jobId: string, retainedKey: string): Promise<v2.HandoverResult>;
   queuedMutations(): Promise<QueuedMutationRecord[]>;
   flushQueue(): Promise<FlushReport>;
   signOut(): ReturnType<SessionFoundation["logout"]>;
@@ -57,6 +59,10 @@ export function createPartnerApi(options: PartnerApiOptions): PartnerApi {
     actor,
     listAssignedJobs: () => authorized(client => client.listJobs()),
     getAssignedJob: jobId => authorized(client => client.getJob(jobId)),
+    acceptAssignment: (jobId, expectedVersion, retainedKey) => foundation.enqueueMutation({
+      routeId: "logistics.rider.accept", params: { jobId }, body: { expectedVersion },
+      ...(retainedKey === undefined ? {} : { retainedKey }),
+    }),
     requestChallenge: phone => plain().requestOtp(phone),
     verifyAndAdoptSession: async args => {
       // Public OTP verification happens on the plain client; a session only
@@ -74,6 +80,13 @@ export function createPartnerApi(options: PartnerApiOptions): PartnerApi {
         params: { jobId },
         body,
       } satisfies HandoverMutation),
+    retryHandover: async (jobId, retainedKey) => {
+      const records = await foundation.listQueuedMutations();
+      const record = records.find(r => r.actorId === actor()?.id && r.routeId === 'logistics.rider.handover' && r.params.jobId === jobId && r.idempotencyKey === retainedKey);
+      if (!record) throw new Error('The original actor-bound handover is unavailable; reconcile it without creating a replacement');
+      const body = v2.riderHandoverSchema.omit({ jobId: true }).parse(JSON.parse(record.bodyJson ?? 'null'));
+      return foundation.enqueueMutation({ routeId: 'logistics.rider.handover', params: { jobId }, body, retainedKey });
+    },
     queuedMutations: () => foundation.listQueuedMutations(),
     flushQueue: () => foundation.flushQueuedMutations(),
     signOut: () => foundation.logout(),

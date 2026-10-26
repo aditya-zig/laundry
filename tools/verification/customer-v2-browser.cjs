@@ -115,7 +115,7 @@ async function main(proposeAdjustment, finishOps, captureOpsFailure, replyToSupp
     const completedEvidence = finishOps ? await (await fetch('http://127.0.0.1:4499/__synthetic_evidence')).json() : finalEvidence;
     expect(completedEvidence).toEqual({ ...finalEvidence, legs: finishOps ? 2 : 1 });
     expect(errors).toEqual([]);
-    await writeFile(resolve(output,'result.json'),JSON.stringify({status:'passed',sourceRevision:execFileSync('git',['rev-parse','HEAD'],{encoding:'utf8'}).trim(),sourceDirty:Boolean(execFileSync('git',['status','--porcelain'],{encoding:'utf8'}).trim()),syntheticOnly:true,commercialCalls:0,sameBookingKeyAndBody:true,sameAdjustmentKeyAndBody:true,sameReviewKeyAndBody:finishOps?true:null,...supportEvidence,...billingEvidence,scope:finishOps?'customer-and-ops':'customer',recordings:{customer:relative(output,await page.video().path()),ops:opsEvidence?.video},...completedEvidence,browserErrors:errors},null,2));
+    await writeFile(resolve(output,'result.json'),JSON.stringify({status:'passed',sourceRevision:execFileSync('git',['rev-parse','HEAD'],{encoding:'utf8'}).trim(),sourceDirty:Boolean(execFileSync('git',['status','--porcelain'],{encoding:'utf8'}).trim()),syntheticOnly:true,commercialCalls:0,sameBookingKeyAndBody:true,sameAdjustmentKeyAndBody:true,sameReviewKeyAndBody:finishOps?true:null,...supportEvidence,...billingEvidence,scope:opsEvidence?.rider?'customer-ops-rider':finishOps?'customer-and-ops':'customer',riderBrowser:opsEvidence?.rider??null,recordings:{customer:relative(output,await page.video().path()),ops:opsEvidence?.video,rider:opsEvidence?.rider?.video},...completedEvidence,browserErrors:errors},null,2));
     if(finishOps) {
       console.log('PASS: owner review after recorded delivery, no default rating or publication consent, one private review after reply loss and navigation/retry, and no second-review form.');
       console.log('PASS: one customer support case and one customer message after committed reply loss/navigation/retry, exact keys/bodies, compiled-service synthetic staff reply visible, and no order status/version change. No staffed-console or live-notification claim.');
@@ -131,8 +131,9 @@ async function main(proposeAdjustment, finishOps, captureOpsFailure, replyToSupp
 }
 async function run() {
   const withOps = process.env.LAUNDRY_VERIFY_OPS_FACILITY === 'true';
-  const close = await startFixture({ withOps });
-  const ops = withOps ? require('./ops-facility-browser.cjs').opsFacilityJourney(close) : null;
+  const withRider = process.env.LAUNDRY_VERIFY_RIDER === 'true';
+  const close = await startFixture({ withOps, withRider });
+  const ops = withOps ? require('./ops-facility-browser.cjs').opsFacilityJourney(close, withRider) : null;
   try { await main(ops ? ops.proposeAdjustment : close.proposeAdjustment, ops?.finish, ops?.captureFailure, close.replyToSupport); } finally { await close(); }
 }
 run().catch(error=>{console.error(error);process.exit(1);});

@@ -11,7 +11,8 @@ req('reflect-metadata');
 const { NestFactory } = req('@nestjs/core');
 const { Module } = req('@nestjs/common');
 const load = path => require(resolve(compiled, path));
-async function startFixture({ withOps = false } = {}) {
+async function startFixture({ withOps = false, withRider = false } = {}) {
+  if (withRider && !withOps) throw Error('Rider browser verification requires the ops journey');
   if (process.env.LAUNDRY_SYNTHETIC_ACCEPTANCE !== 'true') throw Error('Explicit synthetic acceptance opt-in required');
   const url = new URL(process.env.DATABASE_URL || '');
   if (!['127.0.0.1','localhost'].includes(url.hostname) || !url.pathname.startsWith('/laundry_verify_') || process.env.NODE_ENV === 'production') throw Error('Disposable local verification database only');
@@ -69,7 +70,7 @@ async function startFixture({ withOps = false } = {}) {
   const app = await NestFactory.create(Fixture,{logger:false,rawBody:true});
   load('apps/api/src/http-body.js').configureHttpBody(app);
   app.useGlobalFilters(new (load('apps/api/src/filters/http-exception.filter.js').EnvelopeFilter)());
-  app.enableCors({origin: withOps ? ['http://127.0.0.1:4219', 'http://127.0.0.1:4220'] : 'http://127.0.0.1:4219'});
+  app.enableCors({origin: withOps ? ['http://127.0.0.1:4219', 'http://127.0.0.1:4220', ...(withRider ? ['http://127.0.0.1:4221'] : [])] : 'http://127.0.0.1:4219'});
   app.getHttpAdapter().get('/__synthetic_evidence', async (_request, response) => {
     const { rows } = await db.query(`SELECT (SELECT COUNT(*)::int FROM orders_v2_orders) AS orders, (SELECT COUNT(*)::int FROM billing_obligations) AS obligations, (SELECT COUNT(*)::int FROM logistics_leg_attempts) AS legs, (SELECT COUNT(*)::int FROM v2_outbox WHERE event_type='order.confirmed.v2') AS confirmed_events, (SELECT COUNT(*)::int FROM v2_audit WHERE action='ADJUSTMENT_ACCEPTED') AS accepted_decisions`);
     response.json({ syntheticOnly: true, ...rows[0] });
@@ -115,7 +116,8 @@ async function startFixture({ withOps = false } = {}) {
   });
   let dropNextBooking = true, dropNextDecision = true, dropNextIntake = withOps, dropNextQualityPass = withOps,
     dropNextAssignment = withOps, dropNextReceipt = withOps, dropNextReview = withOps,
-    dropNextIncident = withOps, dropNextMessage = withOps;
+    dropNextIncident = withOps, dropNextMessage = withOps,
+    dropNextRiderAcceptance = withRider, dropNextRiderHandover = withRider;
   app.use((request,response,next)=>{ const json=response.json.bind(response); response.json=body=>{
     const booking = request.path === '/v2/orders' && dropNextBooking;
     const decision = request.path.endsWith('/adjustments/decision') && dropNextDecision;
@@ -126,11 +128,14 @@ async function startFixture({ withOps = false } = {}) {
     const review = request.path.endsWith('/reviews') && dropNextReview;
     const incident = /^\/v2\/orders\/[^/]+\/incidents$/.test(request.path) && dropNextIncident;
     const message = request.path.startsWith('/v2/incidents/') && request.path.endsWith('/messages') && dropNextMessage;
-    if(request.method==='POST' && body?.id && (booking || decision || intake || quality || assignment || receipt || review || incident || message)) {
+    const riderAcceptance = request.path.startsWith('/v2/rider/jobs/') && request.path.endsWith('/accept') && dropNextRiderAcceptance;
+    const riderHandover = request.path === '/v2/rider/handovers' && body?.accepted === true && dropNextRiderHandover;
+    if(request.method==='POST' && (body?.id || riderHandover) && (booking || decision || intake || quality || assignment || receipt || review || incident || message || riderAcceptance || riderHandover)) {
       if (booking) dropNextBooking = false; if (decision) dropNextDecision = false;
       if (intake) dropNextIntake = false; if (quality) dropNextQualityPass = false;
       if (assignment) dropNextAssignment = false; if (receipt) dropNextReceipt = false; if (review) dropNextReview = false;
       if (incident) dropNextIncident = false; if (message) dropNextMessage = false;
+      if (riderAcceptance) dropNextRiderAcceptance = false; if (riderHandover) dropNextRiderHandover = false;
       response.status(503); return json({code:'PROVIDER_OUTCOME_UNKNOWN',message:'Synthetic post-commit response loss',traceId:randomUUID(),retryable:true});
     } return json(body);
   }; next(); });
@@ -141,7 +146,10 @@ async function startFixture({ withOps = false } = {}) {
   console.log('TASK-ONLY synthetic browser fixture ready: http://127.0.0.1:4219; first booking reply intentionally replaced by post-commit 503/unknown. No commercial SMS or production ordering.');
   const opsPreview = withOps ? await createPreviewServer(resolve(root,'apps/ops/dist')) : null;
   if (opsPreview) await new Promise(resolve => opsPreview.listen(4220, '127.0.0.1', resolve));
+  const riderPreview = withRider ? await createPreviewServer(resolve(root, 'apps/partner/dist')) : null;
+  if (riderPreview) await new Promise(resolve => riderPreview.listen(4221, '127.0.0.1', resolve));
   async function shutdown() {
+    if (riderPreview) await new Promise(resolve => riderPreview.close(resolve));
     if (opsPreview) await new Promise(resolve => opsPreview.close(resolve));
     await new Promise(resolve=>preview.close(resolve)); await app.close(); await closePool();
   }
@@ -183,15 +191,42 @@ async function startFixture({ withOps = false } = {}) {
       // identity; sharing that phone both crosses roles and trips the OTP guard.
       const phone = '+919600000006';
       await db.query('INSERT INTO identity_staff(id,phone,role,created_at) VALUES($1,$2,$3,$4)', [randomUUID(), phone, 'RIDER', clock()]);
-      const challenge = await identity.requestOtp({ phone }, randomUUID(), 'synthetic-return-rider');
-      returnRider = await identity.verifyOtp({ challengeId: challenge.challengeId, code: deliveries.get(challenge.challengeId).code }, randomUUID(), 'synthetic-return-rider');
+      if (withRider) {
+        // Provision only: the actual rider UI must request and verify its own
+        // OTP. Signing in here too correctly trips the real 60-second cooldown.
+        const profileId = randomUUID();
+        await db.query('INSERT INTO identity_profiles(id,phone,created_at) VALUES($1,$2,$3)', [profileId, phone, clock()]);
+        returnRider = { actor: { id: profileId } };
+      } else {
+        const challenge = await identity.requestOtp({ phone }, randomUUID(), 'synthetic-return-rider');
+        returnRider = await identity.verifyOtp({ challengeId: challenge.challengeId, code: deliveries.get(challenge.challengeId).code }, randomUUID(), 'synthetic-return-rider');
+      }
     }
     return { riderId: returnRider.actor.id };
   };
+  shutdown.syntheticRiderProof = async () => {
+    if (!withRider || !returnRider) throw Error('Explicit rider browser opt-in and provisioning required');
+    const job = (await db.query(`SELECT leg_attempt_id AS id FROM logistics_assignments
+      WHERE rider_id=$1 AND leg='RETURN' AND released_at IS NULL AND cancelled_at IS NULL`, [returnRider.actor.id])).rows[0];
+    const notification = custodyNotifier.latest();
+    if (!job || notification?.legAttemptId !== job.id) throw Error('No matching synthetic return task/code');
+    return { jobId: job.id, code: notification.code, phone: '+919600000006' };
+  };
+  shutdown.syntheticRiderOtp = () => {
+    if (!withRider) throw Error('Explicit rider browser opt-in required');
+    const latest = [...deliveries.values()].filter(item => item.phone === '+919600000006').at(-1);
+    if (!latest) throw Error('No synthetic rider OTP was requested');
+    return latest.code;
+  };
+  shutdown.syntheticRiderEvidence = async () => (await db.query(`SELECT
+    (SELECT COUNT(*)::int FROM v2_audit WHERE action='LOGISTICS_ASSIGNMENT_ACCEPTED') AS accepted_audits,
+    (SELECT COALESCE(SUM(code_attempts),0)::int FROM logistics_assignments WHERE leg='RETURN') AS code_attempts,
+    (SELECT COUNT(*)::int FROM logistics_handovers WHERE leg='RETURN') AS return_handovers,
+    (SELECT status FROM orders_v2_orders LIMIT 1) AS order_status`)).rows[0];
   shutdown.acceptSyntheticReturnCustody = async () => {
     // Real compiled custody rules, synthetic notifier/rider facts. This proves
     // no device behaviour, physical transfer, location or production channel.
-    if (!withOps || !returnRider) throw Error('Prepare the synthetic rider first');
+    if (!withOps || !returnRider || withRider) throw Error('Service-only custody is forbidden when the actual rider browser is selected');
     const jobs = await logistics.listRiderJobs(returnRider.accessToken);
     const job = jobs.find(item => item.leg === 'RETURN');
     if (!job) throw Error('Return assignment must come from the actual ops UI');

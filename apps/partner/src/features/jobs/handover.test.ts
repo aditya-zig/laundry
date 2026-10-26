@@ -13,6 +13,7 @@ import {
   describePendingHandover,
   emptyHandoverDraft,
   handoverEligible,
+  handoverResultState,
   validateHandoverDraft,
   type HandoverPending,
 } from "./handover";
@@ -84,6 +85,13 @@ describe("explicit online / unknown / pending / rejected state", () => {
     expect(result.actionId).toBe("33333333-3333-4333-8333-333333333333");
   });
 
+  it.each([
+    [429, 'RATE_LIMITED'], [408, 'PROVIDER_OUTCOME_UNKNOWN'], [409, 'PROVIDER_OUTCOME_UNKNOWN'],
+  ] as const)('keeps HTTP %s %s unresolved when the shared foundation retains the handover', (status, code) => {
+    expect(classifyHandoverFailure(new V2ApiError(status, { code, message: 'Reply unresolved', traceId: 'synthetic', retryable: true }), 'original-action'))
+      .toMatchObject({ kind: 'OUTCOME_UNKNOWN', actionId: 'original-action', canRetryWithSameDetails: false });
+  });
+
   it("authoritative server rejections are rejected, never queued as pending success", () => {
     const conflict = classifyHandoverFailure(
       new V2ApiError(409, {
@@ -106,8 +114,9 @@ describe("explicit online / unknown / pending / rejected state", () => {
       }),
       "action",
     );
-    expect(limited.kind).toBe("REJECTED");
-    expect(limited.canRetryWithSameDetails).toBe(true);
+    // The shared journal retains rate-limited commands: the UI must not mint a replacement.
+    expect(limited.kind).toBe("OUTCOME_UNKNOWN");
+    expect(limited.canRetryWithSameDetails).toBe(false);
     expect(limited.actionId).toBe("action");
   });
 
@@ -125,6 +134,12 @@ describe("explicit online / unknown / pending / rejected state", () => {
 });
 
 describe("custody receipt honesty", () => {
+  it('keeps a wrong-code reply in the correction form rather than terminal confirmed state', () => {
+    expect(handoverResultState({ legAttemptId: job.id, accepted: false, reason: 'Custody code rejected', attemptCount: 1, nextAttemptAllowed: true }, 'failed-action'))
+      .toMatchObject({ kind: 'REJECTED', actionId: 'failed-action', canRetryWithSameDetails: true });
+    expect(handoverResultState({ legAttemptId: job.id, accepted: false, attemptCount: 5, nextAttemptAllowed: false }, 'locked-action'))
+      .toMatchObject({ kind: 'REJECTED', canRetryWithSameDetails: false });
+  });
   it("a confirmed online receipt presents the issued custody event", () => {
     const copy = custodyReceiptCopy({
       legAttemptId: job.id,

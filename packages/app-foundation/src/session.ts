@@ -11,6 +11,7 @@ type CommandArgs = {
   'orders.adjustment.decide': { params: { orderId: string }; body: v2.AdjustmentDecision };
   'identity.address.create': { body: v2.AddressInput };
   'logistics.rider.handover': { params: { jobId: string }; body: Omit<v2.RiderHandover, 'jobId'> };
+  'logistics.rider.accept': { params: { jobId: string }; body: v2.VersionedCommand };
   'logistics.ops.assign': { body: v2.AssignmentInput };
   'billing.manual.confirm': { params: { obligationId: string }; body: v2.ManualPaymentConfirmation };
   'billing.refund.create': { body: v2.RefundRequest };
@@ -20,7 +21,7 @@ type CommandArgs = {
 };
 type CommandResults = {
   'orders.book': v2.Order; 'orders.quote': v2.Quote; 'orders.adjustment.decide': v2.Order; 'identity.address.create': v2.Address;
-  'logistics.rider.handover': v2.HandoverResult; 'logistics.ops.assign': v2.Assignment; 'billing.manual.confirm': v2.Receipt; 'billing.refund.create': v2.Refund;
+  'logistics.rider.accept': v2.Assignment; 'logistics.rider.handover': v2.HandoverResult; 'logistics.ops.assign': v2.Assignment; 'billing.manual.confirm': v2.Receipt; 'billing.refund.create': v2.Refund;
   'reviews.create': v2.Review;
   'support.incidents.create': v2.Incident;
   'support.incidents.messages': v2.IncidentMessage;
@@ -89,6 +90,7 @@ function sendRecord(client: V2Client, record: QueuedMutationRecord): Promise<unk
       return client.decideAdjustment(record.params.orderId, decision.adjustmentId, decision.adjustmentVersion, decision.decision, decision.expectedVersion, opts);
     }
     case 'identity.address.create': return client.createAddress(body, opts);
+    case 'logistics.rider.accept': return client.acceptJob(record.params.jobId, v2.versionedCommandSchema.parse(body).expectedVersion, opts);
     case 'logistics.rider.handover': return client.recordHandover(record.params.jobId, body, opts);
     case 'logistics.ops.assign': return client.assignDelivery(body, opts);
     case 'billing.manual.confirm': return client.confirmManualPayment(record.params.obligationId, body, opts);
