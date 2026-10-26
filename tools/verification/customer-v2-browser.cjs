@@ -137,4 +137,5 @@ async function run() {
   const ops = withOps ? require('./ops-facility-browser.cjs').opsFacilityJourney(close, withRider, withPickup) : null;
   try { await main(ops ? ops.proposeAdjustment : close.proposeAdjustment, ops?.finish, ops?.captureFailure, close.replyToSupport); } finally { await close(); }
 }
-run().catch(error=>{console.error(error);process.exit(1);});
+module.exports = { run };
+if (require.main === module) run().catch(error=>{console.error(error);process.exit(1);});

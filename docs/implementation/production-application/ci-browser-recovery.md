@@ -46,4 +46,14 @@ Add `LAUNDRY_VERIFY_PICKUP=true` to the verification invocation above to select 
 
 The extended receipt includes `pickupBrowserProven` and `pickupBagContinuity`, separate per-leg results, and four recordings (customer, ops, pickup-rider session, return-rider session). No physical transfer, native restart/permissions, live-provider verification or real staff MFA is established by this synthetic web journey.
 
+## Playwright migration in progress
+
+`playwright.product.config.ts` and `tools/verification/specs/product-fulfillment.spec.ts` reuse the existing task-only journey via an explicit `run` export. The spec additionally checks both actual rider receipts, bag continuity, no premature delivery, customer ledger/review/support invariants, and attaches the four distinct role recordings to the Playwright result. A focused Node regression verifies that importing the driver starts neither a database nor a browser.
+
+The first wrapper run (`b0cf2cf06`) failed before browser startup: Playwright transpiled compiled contract JS and rejected `export * as v2` with `Export namespace should be first transformed by @babel/plugin-transform-export-namespace-from`. The configuration now excludes only compiled API and contract output from transpilation, preserving the same Node-built artifacts used by standalone acceptance. `bd496561d` passed the corrected Playwright journey in 20.7 seconds, including all receipt assertions and four attached role recordings, followed by the import-boundary regression and whitespace checks. This was an uncommitted diagnostic pass, not clean-revision acceptance. No application change or Babel dependency was added.
+
+`ba2e2eb9a` also passed all 113 Node tooling tests and whitespace checks. The earlier 1,167-test application checkpoint is historical; application sources were not changed in this integration.
+
+This additive migration does **not** replace the existing default CI suite or satisfy its three smoke scenarios/full-frame recording gate. A fresh disposable database and explicitly configured app exports remain prerequisites. The production gate is not green merely because an additional product test exists.
+
 No production deployment, live ordering, real payment or provider activation is authorized by this work.
