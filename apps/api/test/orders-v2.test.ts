@@ -512,6 +512,30 @@ describe('B04 quality checks, evidence and access boundaries', () => {
     void customer;
   });
 
+  it('loads delivery summaries only for authorized page rows and hides another facility', async () => {
+    const { customer, order, operator } = await live();
+    const authenticate = (token: string) => identity.authenticate(token);
+    const logistics = new LogisticsService({ db: getPool(), authenticate, clock });
+    const attempt = await logistics.openLegAttempt(order.id, 'PICKUP', { scheduledWindow: order.pickupWindow });
+    const reads: string[][] = [];
+    const scoped = new OrdersService({ db: getPool(), authenticate, catalog, availability, clock,
+      loadDeliveryLegs: (ids, tx) => { reads.push([...ids]); return logistics.orderLegSummaries(ids, tx); },
+    });
+    const stranger = await signin('+919000070011');
+    const otherId = await provisionStaff('+919000070012', 'FACILITY');
+    await assignFacility(otherId, randomUUID());
+    const other = await signin('+919000070012');
+    await expect(scoped.getOrder(stranger.accessToken, order.id)).rejects.toMatchObject({ code: 'NOT_FOUND' });
+    expect((await scoped.listOrders(stranger.accessToken)).items).toEqual([]);
+    expect((await scoped.opsQueue(other.accessToken)).items).toEqual([]);
+    expect(reads).toEqual([]);
+    const expected = [{ leg: 'PICKUP', status: 'BOOKED', version: attempt.version }];
+    expect((await scoped.listOrders(customer.accessToken)).items[0].deliveryLegs).toEqual(expected);
+    expect((await scoped.opsQueue(operator.accessToken)).items[0].deliveryLegs).toEqual(expected);
+    expect(reads).toEqual([[order.id], [order.id]]);
+    expect((await scoped.getOrder(customer.accessToken, order.id)).status).toBe(order.status);
+  });
+
   it('refuses a reused key whose payload changed', async () => {
     const { serviceId, customer, addressId } = await seed();
     const quoteKey = key();
@@ -600,6 +624,7 @@ describe('transactional booking peer integration', () => {
     const billing = new BillingService({ db: getPool(), authenticate, clock });
     const logistics = new LogisticsService({ db: getPool(), authenticate, clock });
     const composed = new OrdersService({ db: getPool(), authenticate, catalog, availability, clock,
+      loadDeliveryLegs: (ids, tx) => logistics.orderLegSummaries(ids, tx),
       onBooked: async (booked, tx) => {
         await createObligationForOrder(tx, { orderId: booked.id, clock });
         await logistics.openLegAttempt(booked.id, 'PICKUP', { scheduledWindow: booked.pickupWindow }, tx);
@@ -624,6 +649,11 @@ describe('transactional booking peer integration', () => {
       const legs = (await getPool().query('SELECT * FROM logistics_leg_attempts WHERE order_id=$1', [first.id])).rows;
       expect(legs).toHaveLength(1);
       expect(legs[0]).toMatchObject({ leg: 'PICKUP', status: 'BOOKED' });
+      const expectedLegs = [{ leg: 'PICKUP', status: 'BOOKED', version: legs[0].version }];
+      expect(first.deliveryLegs).toEqual(expectedLegs);
+      expect(second).toEqual(first);
+      expect((await client.getOrder(first.id)).deliveryLegs).toEqual(expectedLegs);
+      expect((await client.listOrders()).items[0].deliveryLegs).toEqual(expectedLegs);
       const events = (await getPool().query('SELECT envelope FROM v2_outbox WHERE aggregate_id=$1', [first.id])).rows;
       expect(events).toHaveLength(1);
       expect(v2.domainEventSchema.parse(events[0].envelope)).toMatchObject({ eventType: 'order.confirmed.v2', aggregateId: first.id });
@@ -656,6 +686,7 @@ describe('transactional return-ready peer integration', () => {
     const authenticate = (token: string) => identity.authenticate(token);
     const logistics = new LogisticsService({ db: getPool(), authenticate, clock });
     const composed = new OrdersService({ db: getPool(), authenticate, catalog, availability, clock,
+      loadDeliveryLegs: (ids, tx) => logistics.orderLegSummaries(ids, tx),
       onBooked: async (booked, tx) => { await createObligationForOrder(tx, { orderId: booked.id, clock }); },
       onReady: async (ready, tx) => {
         const obligation = await reconcileObligationForReturn(tx, { orderId: ready.id, clock });
@@ -698,6 +729,10 @@ describe('transactional return-ready peer integration', () => {
     const legs = (await getPool().query("SELECT * FROM logistics_leg_attempts WHERE order_id=$1 AND leg='RETURN'", [ready.id])).rows;
     expect(legs).toHaveLength(1);
     expect(legs[0]).toMatchObject({ status: 'BOOKED', scheduled_window: ready.promisedReturnWindow });
+    const expectedLegs = [{ leg: 'RETURN', status: 'BOOKED', version: legs[0].version }];
+    expect(ready.deliveryLegs).toEqual(expectedLegs);
+    expect((await composed.getOrder(customer.accessToken, ready.id)).deliveryLegs).toEqual(expectedLegs);
+    expect((await composed.opsQueue(operator.accessToken)).items[0].deliveryLegs).toEqual(expectedLegs);
     const events = (await getPool().query("SELECT envelope FROM v2_outbox WHERE aggregate_id=$1 AND event_type='order.ready-for-return.v2'", [ready.id])).rows;
     expect(events).toHaveLength(1);
     expect(v2.domainEventSchema.parse(events[0].envelope)).toMatchObject({ eventType: 'order.ready-for-return.v2', aggregateVersion: ready.version,

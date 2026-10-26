@@ -140,6 +140,12 @@ export class BillingReadController {
 export class OpsBillingController {
   constructor(@Inject(BILLING) private readonly service: BillingService | null) {}
 
+  @Get('orders/:orderId/obligations')
+  obligations(@Param('orderId') orderId: string, @Query() raw: PageQueryRaw, @Headers('authorization') authorization: string | undefined, @Res({ passthrough: true }) response: Response) {
+    noStore(response);
+    return serviceOf(this.service).listOpsOrderObligations(bearer(authorization), orderId, pageQuery(raw));
+  }
+
   @Post('obligations/:obligationId/confirm-manual')
   @HttpCode(200)
   confirmManual(@Param('obligationId') obligationId: string, @Body() input: unknown, @Headers('authorization') authorization: string | undefined, @Headers('idempotency-key') key: string, @Res({ passthrough: true }) response: Response) {

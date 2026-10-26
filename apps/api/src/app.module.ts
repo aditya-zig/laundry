@@ -94,6 +94,7 @@ function ordersService(): OrdersService {
   return (orders ??= new OrdersService({ db: getPool(), authenticate: authenticate(), catalog: catalogService(), availability: availabilityService(),
     // Match /health/ready and the gateway: no origin-level bypass before release gates pass.
     newOrdersEnabled: false,
+    loadDeliveryLegs: (ids, transaction) => logisticsService().orderLegSummaries(ids, transaction),
     onBooked: async (order, transaction) => {
       await createObligationForOrder(transaction, { orderId: order.id });
       await logisticsService().openLegAttempt(order.id, 'PICKUP', { scheduledWindow: order.pickupWindow }, transaction);

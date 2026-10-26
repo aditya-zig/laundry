@@ -144,6 +144,12 @@ export class OpsLogisticsV2Controller {
     return this.service;
   }
 
+  @Get('orders/:orderId/legs')
+  legs(@Param('orderId') orderId: string, @Headers('authorization') authorization: string | undefined, @Res({ passthrough: true }) response: Response) {
+    noStore(response);
+    return this.logistics.getDispatchLegs(bearer(authorization), orderId);
+  }
+
   @Post('assignments')
   @HttpCode(200)
   assign(

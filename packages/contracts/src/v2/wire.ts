@@ -85,6 +85,7 @@ export const WIRE_SCHEMAS = {
   HandoverResult: logistics.handoverResultSchema,
   DeliveryException: commands.deliveryExceptionSchema,
   LegAttempt: logistics.legAttemptSchema,
+  DispatchLegList: z.array(logistics.legAttemptSchema).max(2),
   RiderLocationReport: commands.riderLocationReportSchema,
   Location: logistics.locationSchema,
   AssignmentInput: commands.assignmentInputSchema,

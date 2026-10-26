@@ -353,6 +353,9 @@ export function createV2Client(options: V2ClientOptions = {}) {
     listOrderObligations: (orderId: string, query?: Query) =>
       call("billing.obligations", v2.WIRE_SCHEMAS.ObligationList, { params: { orderId }, query }),
 
+    listOpsOrderObligations: (orderId: string, query?: Query) =>
+      call("billing.ops.obligations", v2.WIRE_SCHEMAS.ObligationList, { params: { orderId }, query }),
+
     listOrderPaymentAttempts: (orderId: string, query?: Query) =>
       call("billing.attempts", v2.WIRE_SCHEMAS.PaymentAttemptList, { params: { orderId }, query }),
 
@@ -521,6 +524,9 @@ export function createV2Client(options: V2ClientOptions = {}) {
 
     reconciliation: (period: string, opts?: V2MutatingOpts) =>
       call("billing.reconcile", v2.reconciliationSchema, { body: v2.reconciliationRequestSchema.parse({ period }), opts }),
+
+    getDispatchLegs: (orderId: string) =>
+      call("logistics.ops.legs", v2.WIRE_SCHEMAS.DispatchLegList, { params: { orderId } }),
 
     assignDelivery: (input: v2.AssignmentInput, opts?: V2MutatingOpts) =>
       call("logistics.ops.assign", v2.assignmentSchema, { body: v2.assignmentInputSchema.parse(input), opts }),

@@ -621,6 +621,23 @@ describe('B05 routes over HTTP', () => {
     expect(await count("SELECT count(*)::int AS n FROM billing_receipts WHERE confirmed_via='GATEWAY_CAPTURE' AND order_id=$1", [manual.orderId])).toBe(0);
   });
 
+  it('exposes a separate operator obligation read without widening customer routes', async () => {
+    const { orderId, obligation } = await seedBilling();
+    const url = `${base}/ops/billing/orders/${orderId}/obligations`;
+    const response = await fetch(url, { headers: { authorization: `Bearer ${operatorToken}` } });
+    expect(response.status).toBe(200);
+    expect(v2.pageSchema(v2.obligationSchema).parse(await response.json()).items).toEqual([obligation]);
+    expect(response.headers.get('cache-control')).toBe('no-store');
+    const denied = await fetch(url, { headers: { authorization: `Bearer ${customerToken}` } });
+    expect(denied.status).toBe(403);
+    expect(v2.errorEnvelopeSchema.parse(await denied.json()).code).toBe('FORBIDDEN');
+    expect((await fetch(url)).status).toBe(401);
+    const privateCustomerRoute = await fetch(`${base}/orders/${orderId}/billing/obligations`, { headers: { authorization: `Bearer ${operatorToken}` } });
+    expect(privateCustomerRoute.status).toBe(403);
+    expect((await fetch(`${base}/ops/billing/orders/${randomUUID()}/obligations`, { headers: { authorization: `Bearer ${operatorToken}` } })).status).toBe(404);
+    expect((await fetch(`${url}?limit=0`, { headers: { authorization: `Bearer ${operatorToken}` } })).status).toBe(400);
+  });
+
   it('separates roles, ownership and the signed provider route', async () => {
     const { orderId, obligation } = await seedBilling();
     const other = await seedBilling(1000, otherCustomerId);

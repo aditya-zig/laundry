@@ -100,7 +100,7 @@ export const v2WireFixtures = {
   RiderJobList: [job], RiderJob: job, VersionedCommand: { expectedVersion: 1 }, Assignment: assignment,
   RiderHandover: { jobId: job.id, legAttemptId: leg.id, expectedVersion: 1, actionId: id(55), method: "CODE", code: "123456", capturedAt: at, containerIds: [container.id], garmentCount: 17, condition: "GOOD" },
   HandoverResult: { legAttemptId: leg.id, accepted: true, custodyEventId: id(56), attemptCount: 1, nextAttemptAllowed: false },
-  DeliveryException: { ...reason, actionId: id(55), capturedAt: at, mediaIds: [] }, LegAttempt: leg,
+  DeliveryException: { ...reason, actionId: id(55), capturedAt: at, mediaIds: [] }, LegAttempt: leg, DispatchLegList: [leg],
   RiderLocationReport: { jobId: job.id, expectedVersion: 1, lat: 12.97, lng: 77.64, reportedAt: at }, Location: { orderId: order.id, lat: 12.97, lng: 77.64, reportedAt: at, source: "DEVICE", stale: false },
   AssignmentInput: { ...reason, legAttemptId: leg.id, riderId: assignment.riderId }, ReassignmentInput: { ...reason, riderId: id(57) }, LegCancellation: reason,
   LogisticsWebhook: { eventId: "synthetic-logistics-event", providerReference: "synthetic-job", status: "COMPLETED", occurredAt: at, proofReference: "synthetic-provider-proof" }, CustomerTracking: tracking,
