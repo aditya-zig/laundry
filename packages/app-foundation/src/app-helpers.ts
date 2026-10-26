@@ -1,5 +1,5 @@
 import { createV2Client, type Actor } from '@laundry/api-client';
-import { createMemoryPendingMutationStore, createMemorySecureTokenStore, type PendingMutationStore, type SecureTokenStore } from './ports.js';
+import { StorageError, createMemoryPendingMutationStore, createMemorySecureTokenStore, type PendingMutationStore, type SecureTokenStore } from './ports.js';
 import { createSessionFoundation, type SessionFoundation } from './session.js';
 export interface BrowserFoundationOptions {
   baseUrl: string;
@@ -32,10 +32,13 @@ export function createBrowserSessionFoundation(options: BrowserFoundationOptions
   });
 }
 export type PlatformSessionStores = Pick<BrowserFoundationOptions, 'refreshTokenStore' | 'pendingMutationStore' | 'generateKey'>;
-export function createAppSessionBinding(getBaseUrl: () => string) {
+export function createAppSessionBinding(getBaseUrl: () => string, requireProtectedStores = false) {
   let foundation: SessionFoundation | undefined, stores: PlatformSessionStores = {}, epoch = 0;
   const listeners = new Set<(actor: Actor | null) => void>();
   function getFoundation(): SessionFoundation {
+    if (requireProtectedStores && (!stores.refreshTokenStore || !stores.pendingMutationStore || !stores.generateKey)) {
+      throw new StorageError('Native protected stores and a secure UUID source must be ready before session access');
+    }
     return foundation ??= createBrowserSessionFoundation({ ...stores, baseUrl: getBaseUrl(), onIdentityChange(actor) {
       epoch++;
       for (const listener of [...listeners]) listener(actor);
