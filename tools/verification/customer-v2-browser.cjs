@@ -1,13 +1,13 @@
 // Owned automated test browser only. No signed-in cloud sessions or real providers.
 const {chromium, expect} = require('@playwright/test');
 const {readFile,writeFile,mkdir} = require('node:fs/promises');
-const {resolve} = require('node:path');
+const {resolve,relative} = require('node:path');
 const {execFileSync} = require('node:child_process');
 const {startFixture} = require('./customer-v2-fixture.cjs');
-async function main(proposeAdjustment) {
+async function main(proposeAdjustment, finishOps, captureOpsFailure) {
   const output=resolve('.data/browser-evidence/customer-v2'); await mkdir(output,{recursive:true});
   const browser=await chromium.launch({headless:true});
-  const context=await browser.newContext({viewport:{width:1280,height:900}});
+  const context=await browser.newContext({viewport:{width:1280,height:900},recordVideo:{dir:resolve(output,'videos'),size:{width:1280,height:900}}});
   const page=await context.newPage(); const mutations=[], decisions=[], errors=[];
   page.on('pageerror',error=>errors.push(error.message));
   page.on('request',request=>{
@@ -58,7 +58,7 @@ async function main(proposeAdjustment) {
     expect(mutations).toHaveLength(2); expect(mutations[0].key).toBeTruthy(); expect(mutations[0]).toEqual(mutations[1]);
     const evidence=await (await fetch('http://127.0.0.1:4499/__synthetic_evidence')).json();
     expect(evidence).toEqual({syntheticOnly:true,orders:1,obligations:1,legs:1,confirmed_events:1,accepted_decisions:0});
-    await proposeAdjustment();
+    await proposeAdjustment(browser);
     await page.getByRole('button',{name:'Refresh',exact:true}).click();
     await page.getByRole('button',{name:'Accept revised total INR 100.00',exact:true}).click();
     await expect(page.getByRole('button',{name:'Check original accept decision',exact:true})).toBeVisible();
@@ -76,10 +76,14 @@ async function main(proposeAdjustment) {
     expect(decisions).toHaveLength(2); expect(decisions[0].key).toBeTruthy(); expect(decisions[0]).toEqual(decisions[1]);
     const finalEvidence=await (await fetch('http://127.0.0.1:4499/__synthetic_evidence')).json();
     expect(finalEvidence).toEqual({...evidence,accepted_decisions:1});
+    const opsEvidence = finishOps ? await finishOps() : null;
+    const completedEvidence = finishOps ? await (await fetch('http://127.0.0.1:4499/__synthetic_evidence')).json() : finalEvidence;
+    expect(completedEvidence).toEqual({ ...finalEvidence, legs: finishOps ? 2 : 1 });
     expect(errors).toEqual([]);
-    await writeFile(resolve(output,'result.json'),JSON.stringify({status:'passed',sourceRevision:execFileSync('git',['rev-parse','HEAD'],{encoding:'utf8'}).trim(),sourceDirty:Boolean(execFileSync('git',['status','--porcelain'],{encoding:'utf8'}).trim()),syntheticOnly:true,commercialCalls:0,sameBookingKeyAndBody:true,sameAdjustmentKeyAndBody:true,...finalEvidence,browserErrors:errors},null,2));
+    await writeFile(resolve(output,'result.json'),JSON.stringify({status:'passed',sourceRevision:execFileSync('git',['rev-parse','HEAD'],{encoding:'utf8'}).trim(),sourceDirty:Boolean(execFileSync('git',['status','--porcelain'],{encoding:'utf8'}).trim()),syntheticOnly:true,commercialCalls:0,sameBookingKeyAndBody:true,sameAdjustmentKeyAndBody:true,scope:finishOps?'customer-and-ops':'customer',recordings:{customer:relative(output,await page.video().path()),ops:opsEvidence?.video},...completedEvidence,browserErrors:errors},null,2));
     console.log('PASS: actual customer UI + SDK + compiled HTTP services + disposable PostgreSQL. First committed reply replaced by 503/unknown; navigation/retry reused key/body; exactly one order/obligation/pickup/event. Explicit intake-adjustment acceptance also survives reply loss/navigation with one decision audit. Synthetic OTP/prices/capacity only.');
   } catch(error) {
+    await captureOpsFailure?.();
     console.error('Browser runtime errors:', errors);
     await page.screenshot({path:resolve(output,'failed.png'),fullPage:true}).catch(()=>{});
     await writeFile(resolve(output,'failed-body.txt'),await page.locator('body').innerText());
@@ -87,7 +91,9 @@ async function main(proposeAdjustment) {
   } finally { await context.close(); await browser.close(); }
 }
 async function run() {
-  const close = await startFixture();
-  try { await main(close.proposeAdjustment); } finally { await close(); }
+  const withOps = process.env.LAUNDRY_VERIFY_OPS_FACILITY === 'true';
+  const close = await startFixture({ withOps });
+  const ops = withOps ? require('./ops-facility-browser.cjs').opsFacilityJourney(close) : null;
+  try { await main(ops ? ops.proposeAdjustment : close.proposeAdjustment, ops?.finish, ops?.captureFailure); } finally { await close(); }
 }
 run().catch(error=>{console.error(error);process.exit(1);});

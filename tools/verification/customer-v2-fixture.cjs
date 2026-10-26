@@ -11,7 +11,7 @@ req('reflect-metadata');
 const { NestFactory } = req('@nestjs/core');
 const { Module } = req('@nestjs/common');
 const load = path => require(resolve(compiled, path));
-async function startFixture() {
+async function startFixture({ withOps = false } = {}) {
   if (process.env.LAUNDRY_SYNTHETIC_ACCEPTANCE !== 'true') throw Error('Explicit synthetic acceptance opt-in required');
   const url = new URL(process.env.DATABASE_URL || '');
   if (!['127.0.0.1','localhost'].includes(url.hostname) || !url.pathname.startsWith('/laundry_verify_') || process.env.NODE_ENV === 'production') throw Error('Disposable local verification database only');
@@ -27,13 +27,20 @@ async function startFixture() {
   const { CatalogService } = load('modules/catalog/src/index.js');
   const { AvailabilityService } = load('modules/availability/src/index.js');
   const { OrdersService } = load('modules/orders/src/index.js');
-  const { BillingService, createObligationForOrder } = load('modules/billing/src/index.js');
+  const { BillingService, createObligationForOrder, reconcileObligationForReturn } = load('modules/billing/src/index.js');
   const { LogisticsService } = load('modules/logistics/src/index.js');
   const catalog = new CatalogService({ db, authenticate, clock });
   const availability = new AvailabilityService({ db, authenticate, clock });
   const billing = new BillingService({ db, authenticate, clock });
   const logistics = new LogisticsService({ db, authenticate, clock });
-  const orders = new OrdersService({ db, authenticate, catalog, availability, clock, onBooked: async (order, tx) => { await createObligationForOrder(tx, { orderId: order.id, clock }); await logistics.openLegAttempt(order.id,'PICKUP',{ scheduledWindow: order.pickupWindow },tx); } });
+  const orders = new OrdersService({ db, authenticate, catalog, availability, clock,
+    onBooked: async (order, tx) => { await createObligationForOrder(tx, { orderId: order.id, clock }); await logistics.openLegAttempt(order.id,'PICKUP',{ scheduledWindow: order.pickupWindow },tx); },
+    onReady: async (order, tx) => {
+      const obligation = await reconcileObligationForReturn(tx, { orderId: order.id, clock });
+      await logistics.openLegAttempt(order.id, 'RETURN', { scheduledWindow: order.promisedReturnWindow }, tx);
+      return obligation;
+    },
+  });
   const now = new Date(), areaId = randomUUID(), facility = randomUUID(), serviceId = randomUUID();
   const hours = Array.from({ length: 7 }, (_, dayOfWeek) => ({ dayOfWeek, start:'09:00',end:'18:00' }));
   await db.query(`INSERT INTO availability_areas (id,name,timezone,polygon,hours,slot_minutes,pickup_lead_minutes,booking_horizon_days,version,active,created_at,updated_at) VALUES ($1,'Synthetic browser test area','Asia/Kolkata',$2,$3,60,0,14,1,true,$4,$4)`, [areaId, JSON.stringify([{lat:12.9,lng:77.5},{lat:13,lng:77.5},{lat:13,lng:77.7},{lat:12.9,lng:77.7}]), JSON.stringify(hours),now]);
@@ -51,17 +58,30 @@ async function startFixture() {
   const app = await NestFactory.create(Fixture,{logger:false,rawBody:true});
   load('apps/api/src/http-body.js').configureHttpBody(app);
   app.useGlobalFilters(new (load('apps/api/src/filters/http-exception.filter.js').EnvelopeFilter)());
-  app.enableCors({origin:'http://127.0.0.1:4219'});
+  app.enableCors({origin: withOps ? ['http://127.0.0.1:4219', 'http://127.0.0.1:4220'] : 'http://127.0.0.1:4219'});
   app.getHttpAdapter().get('/__synthetic_evidence', async (_request, response) => {
     const { rows } = await db.query(`SELECT (SELECT COUNT(*)::int FROM orders_v2_orders) AS orders, (SELECT COUNT(*)::int FROM billing_obligations) AS obligations, (SELECT COUNT(*)::int FROM logistics_leg_attempts) AS legs, (SELECT COUNT(*)::int FROM v2_outbox WHERE event_type='order.confirmed.v2') AS confirmed_events, (SELECT COUNT(*)::int FROM v2_audit WHERE action='ADJUSTMENT_ACCEPTED') AS accepted_decisions`);
     response.json({ syntheticOnly: true, ...rows[0] });
   });
-  let dropNextBooking = true, dropNextDecision = true;
+  app.getHttpAdapter().get('/__synthetic_ops_evidence', async (_request, response) => {
+    const { rows } = await db.query(`SELECT
+      (SELECT COUNT(*)::int FROM v2_audit WHERE action='ORDER_INTAKE_RECORDED') AS intakes,
+      (SELECT COUNT(*)::int FROM v2_audit WHERE action='QUALITY_CHECK_PASSED') AS qc_passes,
+      (SELECT COUNT(*)::int FROM v2_audit WHERE action='QUALITY_CHECK_FAILED') AS qc_failures,
+      (SELECT COUNT(*)::int FROM logistics_leg_attempts WHERE leg='RETURN') AS return_legs,
+      (SELECT COUNT(*)::int FROM v2_outbox WHERE event_type='order.ready-for-return.v2') AS ready_events,
+      (SELECT amount_due_minor::int FROM billing_obligations LIMIT 1) AS amount_due_minor`);
+    response.json({ syntheticOnly: true, ...rows[0] });
+  });
+  let dropNextBooking = true, dropNextDecision = true, dropNextIntake = withOps, dropNextQualityPass = withOps;
   app.use((request,response,next)=>{ const json=response.json.bind(response); response.json=body=>{
     const booking = request.path === '/v2/orders' && dropNextBooking;
     const decision = request.path.endsWith('/adjustments/decision') && dropNextDecision;
-    if(request.method==='POST' && body?.id && (booking || decision)) {
+    const intake = request.path.endsWith('/intake') && dropNextIntake;
+    const quality = request.path.endsWith('/quality-check') && body?.status === 'READY_FOR_RETURN' && dropNextQualityPass;
+    if(request.method==='POST' && body?.id && (booking || decision || intake || quality)) {
       if (booking) dropNextBooking = false; if (decision) dropNextDecision = false;
+      if (intake) dropNextIntake = false; if (quality) dropNextQualityPass = false;
       response.status(503); return json({code:'PROVIDER_OUTCOME_UNKNOWN',message:'Synthetic post-commit response loss',traceId:randomUUID(),retryable:true});
     } return json(body);
   }; next(); });
@@ -70,16 +90,32 @@ async function startFixture() {
   const preview = await createPreviewServer(resolve(root,'apps/customer/dist'));
   await new Promise(resolve=>preview.listen(4219,'127.0.0.1',resolve));
   console.log('TASK-ONLY synthetic browser fixture ready: http://127.0.0.1:4219; first booking reply intentionally replaced by post-commit 503/unknown. No commercial SMS or production ordering.');
-  async function shutdown() { await new Promise(resolve=>preview.close(resolve)); await app.close(); await closePool(); }
-  shutdown.proposeAdjustment = async () => {
-    // Synthetic owner provisioning/intake is fixture setup, not physical custody or staff-MFA acceptance.
-    const phone = '+919600000008';
-    await db.query('INSERT INTO identity_staff(id,phone,role,created_at) VALUES($1,$2,$3,$4)', [randomUUID(), phone, 'OPERATOR', clock()]);
-    const challenge = await identity.requestOtp({ phone }, randomUUID(), 'synthetic-fixture-staff');
-    const session = await identity.verifyOtp({ challengeId: challenge.challengeId, code: deliveries.get(challenge.challengeId).code }, randomUUID(), 'synthetic-fixture-staff');
+  const opsPreview = withOps ? await createPreviewServer(resolve(root,'apps/ops/dist')) : null;
+  if (opsPreview) await new Promise(resolve => opsPreview.listen(4220, '127.0.0.1', resolve));
+  async function shutdown() {
+    if (opsPreview) await new Promise(resolve => opsPreview.close(resolve));
+    await new Promise(resolve=>preview.close(resolve)); await app.close(); await closePool();
+  }
+  let staffSession;
+  shutdown.prepareOps = async () => {
+    // Synthetic provisioning/pickup setup is NOT physical custody or staff-MFA acceptance.
+    const phone = '+919600000008', consolePhone = '+919600000009';
+    if (!staffSession) {
+      await db.query('INSERT INTO identity_staff(id,phone,role,created_at) VALUES($1,$2,$3,$4)', [randomUUID(), phone, 'OPERATOR', clock()]);
+      // Pickup setup and the browser console use different synthetic staff.
+      // Reusing the setup phone would correctly hit the real 60-second OTP
+      // cooldown; never relax that guard or rewrite challenge timestamps.
+      if (withOps) await db.query('INSERT INTO identity_staff(id,phone,role,created_at) VALUES($1,$2,$3,$4)', [randomUUID(), consolePhone, 'OPERATOR', clock()]);
+      const challenge = await identity.requestOtp({ phone }, randomUUID(), 'synthetic-fixture-staff');
+      staffSession = await identity.verifyOtp({ challengeId: challenge.challengeId, code: deliveries.get(challenge.challengeId).code }, randomUUID(), 'synthetic-fixture-staff');
+    }
     const row = (await db.query('SELECT id FROM orders_v2_orders ORDER BY created_at DESC LIMIT 1')).rows[0];
-    const picked = await orders.markPickupPending(session.accessToken, row.id);
-    return orders.recordIntake(session.accessToken, row.id, { expectedVersion: picked.version, lines: [{ orderLineId: picked.lines[0].orderLineId, measuredWeightGrams: 2400, condition: 'GOOD' }], containers: [{ id: randomUUID(), sealed: true, condition: 'GOOD', garmentCount: 12 }], mediaIds: [] }, randomUUID());
+    const picked = await orders.markPickupPending(staffSession.accessToken, row.id);
+    return { phone: withOps ? consolePhone : phone, picked };
+  };
+  shutdown.proposeAdjustment = async () => {
+    const { picked } = await shutdown.prepareOps();
+    return orders.recordIntake(staffSession.accessToken, picked.id, { expectedVersion: picked.version, lines: [{ orderLineId: picked.lines[0].orderLineId, measuredWeightGrams: 2400, condition: 'GOOD' }], containers: [{ id: randomUUID(), sealed: true, condition: 'GOOD', garmentCount: 12 }], mediaIds: [] }, randomUUID());
   };
   return shutdown;
 }
