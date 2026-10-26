@@ -72,16 +72,19 @@ async function main(proposeAdjustment, finishOps, captureOpsFailure, replyToSupp
     await expect(page.getByText(/^Adjustment accepted/)).toBeVisible();
     await expect(page.getByRole('button',{name:'Check original accept decision',exact:true})).toHaveCount(0);
     await expect(page.getByText(/^State: ACCEPTED\./)).toBeVisible();
-    await expect(page.getByText('INR 100.00 · Payment due at return',{exact:true})).toBeVisible();
+    await expect(page.getByText('INR 100.00 · Pay-on-return model',{exact:true})).toBeVisible();
+    await require('./customer-billing-browser.cjs').customerBillingJourney(page, output, false);
     await page.screenshot({path:resolve(output,'adjustment-accepted-mobile.png'),fullPage:true});
     expect(decisions).toHaveLength(2); expect(decisions[0].key).toBeTruthy(); expect(decisions[0]).toEqual(decisions[1]);
     const finalEvidence=await (await fetch('http://127.0.0.1:4499/__synthetic_evidence')).json();
     expect(finalEvidence).toEqual({...evidence,accepted_decisions:1});
     const opsEvidence = finishOps ? await finishOps() : null;
-    let supportEvidence = {};
+    let supportEvidence = {}, billingEvidence = {};
     if (finishOps) {
       await page.getByRole('button',{name:'Refresh',exact:true}).click();
       await expect(page.getByText('DELIVERED',{exact:true})).toBeVisible();
+      await expect(page.getByText('INR 100.00 · Payment due at return',{exact:true})).toHaveCount(0);
+      billingEvidence = await require('./customer-billing-browser.cjs').customerBillingJourney(page, output, true);
       await expect(page.getByRole('button',{name:'Submit review',exact:true})).toBeDisabled();
       const consent = page.getByRole('checkbox',{name:'Allow publication after moderation',exact:true});
       await expect(consent).not.toBeChecked();
@@ -112,7 +115,7 @@ async function main(proposeAdjustment, finishOps, captureOpsFailure, replyToSupp
     const completedEvidence = finishOps ? await (await fetch('http://127.0.0.1:4499/__synthetic_evidence')).json() : finalEvidence;
     expect(completedEvidence).toEqual({ ...finalEvidence, legs: finishOps ? 2 : 1 });
     expect(errors).toEqual([]);
-    await writeFile(resolve(output,'result.json'),JSON.stringify({status:'passed',sourceRevision:execFileSync('git',['rev-parse','HEAD'],{encoding:'utf8'}).trim(),sourceDirty:Boolean(execFileSync('git',['status','--porcelain'],{encoding:'utf8'}).trim()),syntheticOnly:true,commercialCalls:0,sameBookingKeyAndBody:true,sameAdjustmentKeyAndBody:true,sameReviewKeyAndBody:finishOps?true:null,...supportEvidence,scope:finishOps?'customer-and-ops':'customer',recordings:{customer:relative(output,await page.video().path()),ops:opsEvidence?.video},...completedEvidence,browserErrors:errors},null,2));
+    await writeFile(resolve(output,'result.json'),JSON.stringify({status:'passed',sourceRevision:execFileSync('git',['rev-parse','HEAD'],{encoding:'utf8'}).trim(),sourceDirty:Boolean(execFileSync('git',['status','--porcelain'],{encoding:'utf8'}).trim()),syntheticOnly:true,commercialCalls:0,sameBookingKeyAndBody:true,sameAdjustmentKeyAndBody:true,sameReviewKeyAndBody:finishOps?true:null,...supportEvidence,...billingEvidence,scope:finishOps?'customer-and-ops':'customer',recordings:{customer:relative(output,await page.video().path()),ops:opsEvidence?.video},...completedEvidence,browserErrors:errors},null,2));
     if(finishOps) {
       console.log('PASS: owner review after recorded delivery, no default rating or publication consent, one private review after reply loss and navigation/retry, and no second-review form.');
       console.log('PASS: one customer support case and one customer message after committed reply loss/navigation/retry, exact keys/bodies, compiled-service synthetic staff reply visible, and no order status/version change. No staffed-console or live-notification claim.');

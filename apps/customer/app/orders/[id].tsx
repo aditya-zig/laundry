@@ -7,6 +7,8 @@ import { CustomerPrivateScreen } from "../../src/features/booking/CustomerPrivat
 import { AdjustmentDecisionCard } from "../../src/features/booking/AdjustmentDecisionCard";
 import { OrderReviewCard } from "../../src/features/booking/OrderReviewCard";
 import { OrderSupportCard } from "../../src/features/booking/OrderSupportCard";
+import { OrderBillingCard } from "../../src/features/booking/OrderBillingCard";
+import { paymentModelLabel } from "../../src/features/booking/order-billing";
 import { describeError } from "../../src/features/booking/presenters";
 import { Card, Loading, NoteCard, Page } from "../../src/features/booking/ui";
 import { formatINR } from "../../src/guards";
@@ -34,7 +36,7 @@ function OwnedDetail({ id }: { id: string }) {
   return <>
     <Card title={order.status.replaceAll("_", " ")}>
       <Text style={{ color: colors.ink, marginTop: 8 }}>Order {order.id}</Text>
-      <Text style={{ color: colors.ink, marginTop: 8 }}>{formatINR(order.totalMinor)} · {order.paymentModel === "DUE_AT_RETURN" ? "Payment due at return" : "Prepaid order"}</Text>
+      <Text style={{ color: colors.ink, marginTop: 8 }}>{formatINR(order.totalMinor)} · {paymentModelLabel(order.paymentModel)}</Text>
       <Text style={{ color: colors.inkMuted, marginTop: 8 }}>Scheduled pickup: {order.pickupWindow.start} — {order.pickupWindow.end}</Text>
       <Text style={{ color: colors.inkMuted, marginTop: 8 }}>Promised return: {order.promisedReturnWindow.start} — {order.promisedReturnWindow.end}</Text>
     </Card>
@@ -42,8 +44,9 @@ function OwnedDetail({ id }: { id: string }) {
     <Card title="Recorded history">
       {events.length === 0 ? <Text style={{ color: colors.inkMuted }}>No timeline events have been recorded.</Text> : events.map((event, index) => <Text key={`${event.at}:${event.status}:${index}`} style={{ color: colors.ink, marginTop: 12 }}>{event.label}{"\n"}{event.at}{event.reason ? `\n${event.reason}` : ""}</Text>)}
     </Card>
+    <OrderBillingCard key={`billing:${order.id}`} orderId={order.id} />
     <OrderReviewCard key={order.id} order={order} />
     <OrderSupportCard key={`support:${order.id}`} orderId={order.id} />
-    <NoteCard kind="note" title="Authoritative order record" body="A scheduled return is not a custody receipt or proof of payment. No rider location is simulated here. Rescheduling, cancellation and payment detail are not yet connected on this screen." actionLabel="Refresh" onAction={() => setRevision(value => value + 1)} />
+    <NoteCard kind="note" title="Authoritative order record" body="A scheduled return is not a custody receipt or proof of payment. No rider location is simulated here. Rescheduling and cancellation are not yet connected on this screen. Payment records are read-only and do not initiate collection or a refund." actionLabel="Refresh" onAction={() => setRevision(value => value + 1)} />
   </>;
 }

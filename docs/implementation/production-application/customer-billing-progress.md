@@ -1,0 +1,21 @@
+# Customer payment-record visibility — scoped local verification
+
+This continues unattended recovery on `work/facility-recovery-20261026`. Not a deployment, gateway integration, production approval or issue closure.
+
+## Defect and scope
+
+The customer order/list header mapped `DUE_AT_RETURN` directly to **“Payment due at return”**, including after an operator's receipt had settled the obligation and the order was delivered. A payment arrangement is not a current payment state. Synthetic PostgreSQL/browser regression `b6f610dc9` reproduced the defect against the previous bundle after actual recorded manual settlement: exact `INR 100.00 · Payment due at return` had **expected count 0, received 1**, while browser runtime errors were empty and the ops assignment/custody/manual-receipt flow had passed. This was an intentional diagnostic failure, not discarded evidence.
+
+The arrangement header now says “Pay-on-return model” or “Prepaid payment model”. An owned-order read-only card separately reads authorized v2 obligation, receipt and refund pages through `@laundry/api-client`/the app foundation:
+
+- Integer-paise due, recorded settlement and remaining amount per obligation; actual status/version, not a total inferred from delivery or a receipt count. Zero due and voiding are not claimed as money received.
+- Receipt provenance distinguishes manual cash/UPI confirmations from gateway capture. Original receipts remain visible independently of refunds.
+- Requested, processing and unknown refunds are not presented as returned funds.
+- Independent bounded pagination for all three record types, explicit loading/error handling and no aggregate balance claimed over a partial page. A missing continuation cursor or a non-advancing page is an error, not a claim that all records were loaded.
+- Failed reads never become “no receipts”, “zero due”, or payment success. This screen starts no payment, refund, cancellation or delivery mutation.
+
+## Verification underway
+
+Nine new unit cases cover model/state separation, partial/full/zero/void obligations, manual-versus-gateway provenance, refund uncertainty, cursor-preserving page merges and unusable/non-advancing pagination. Run `b7591bc12` passed all **126 customer tests**, workspace typechecks and the configured export, then failed the new browser expectation: it expected INR 100 outstanding before QC, but the actual obligation correctly retained INR 60. Inspection of `reconcileObligationForReturn` confirmed this is intentional: final reconciliation runs inside the passed-QC transaction and requires `READY_FOR_RETURN`. No billing state was changed to satisfy the incorrect assertion. The UI now explains that pre-QC figures are recorded, not a final bill; the corrected regression requires INR 60 before QC and a settled INR 100/manual receipt afterwards. Targeted rerun **`b032d9cd6` passed**: nine unit cases, configured export, and actual exported customer/ops/browser/PostgreSQL journey. The browser extension also injects a receipt-read 503 while preserving actual API headers: no false empty/zero state and successful read retry. Mobile/desktop settled-ledger and failed-read screenshots were inspected. The private browser receipt confirms `ownedBillingRecordsVisible=true`, `manualReceiptNotGatewayCapture=true`, `failedReadNotZeroBalance=true`, and zero browser errors. This first repaired receipt correctly records `sourceDirty=true`; it is not clean-revision acceptance. The earlier clean support checkpoint's receipt indexes are preserved under `.verification/checkpoints/e2413d932672475929ae147e77fa08743cba4bec/` (private, ignored). A committed-revision browser checkpoint remains required; another full backup/restore is not necessary for these read-only UI changes.
+
+No real gateway callback, refund, physical transfer, provider credential or commercial call is used. Cloud/deployment, native/device security/offline, live identity/MFA, real support staffing, approved rates/capacity and the partner's physical rehearsal remain gated separately.
