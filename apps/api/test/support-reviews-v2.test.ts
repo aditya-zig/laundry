@@ -400,6 +400,46 @@ describe('B08 routes through the real SDK over HTTP', () => {
   });
   afterEach(async () => { await app?.close(); });
 
+  it('pages support cases and messages over HTTP without crossing customer or role boundaries', async () => {
+    const orderId = await seedOrder();
+    let bearer = TOKEN_A;
+    const client = createV2Client({ baseUrl: base, getToken: () => bearer });
+    const first = await client.createIncident({ orderId, category: 'QUALITY', summary: 'First synthetic concern', mediaIds: [] });
+    now = new Date(now.getTime() + 1000);
+    const second = await client.createIncident({ orderId, category: 'BILLING', summary: 'Second synthetic concern', mediaIds: [] });
+    const foreign = await openIncident(await seedOrder(CUSTOMER_B), TOKEN_B);
+    const page = await client.listIncidents({ limit: 1 });
+    expect(page.items.map(value => value.id)).toEqual([second.id]);
+    expect(page.pageInfo.hasMore).toBe(true);
+    if (!page.pageInfo.nextCursor) throw new Error('A support cursor is required');
+    const next = await client.listIncidents({ cursor: page.pageInfo.nextCursor, limit: 1 });
+    expect(next.items.map(value => value.id)).toEqual([first.id]);
+    expect(next.pageInfo.hasMore).toBe(false);
+
+    const message = await client.postIncidentMessage(first.id, { body: 'Synthetic customer follow-up', mediaIds: [] });
+    bearer = TOKEN_SUPPORT;
+    const reply = await client.postIncidentMessage(first.id, { body: 'Synthetic support acknowledgement', mediaIds: [] });
+    expect(reply.authorRole).toBe('SUPPORT');
+    bearer = TOKEN_A;
+    const thread = await client.listIncidentMessages(first.id, { limit: 1 });
+    expect(thread.items.map(value => value.id)).toEqual([message.id]);
+    expect(thread.pageInfo.hasMore).toBe(true);
+    if (!thread.pageInfo.nextCursor) throw new Error('A message cursor is required');
+    const nextMessages = await client.listIncidentMessages(first.id, { cursor: thread.pageInfo.nextCursor, limit: 1 });
+    expect(nextMessages.items.map(value => value.id)).toEqual([reply.id]);
+    expect(nextMessages.pageInfo.hasMore).toBe(false);
+
+    bearer = TOKEN_B;
+    expect((await client.listIncidents()).items.map(value => value.id)).toEqual([foreign.id]);
+    await expect(client.listIncidentMessages(first.id)).rejects.toMatchObject({ status: 404, code: 'NOT_FOUND' });
+    await expect(client.postIncidentMessage(first.id, { body: 'Not my case', mediaIds: [] })).rejects.toMatchObject({ status: 404, code: 'NOT_FOUND' });
+    bearer = TOKEN_RIDER;
+    await expect(client.listIncidentMessages(first.id)).rejects.toMatchObject({ status: 403, code: 'FORBIDDEN' });
+    await expect(client.postIncidentMessage(first.id, { body: 'Rider cannot reply', mediaIds: [] })).rejects.toMatchObject({ status: 403, code: 'FORBIDDEN' });
+    bearer = TOKEN_A;
+    expect((await client.listIncidentMessages(first.id)).items.map(value => value.id)).toEqual([message.id, reply.id]);
+  });
+
   it('serves incidents, rewash, reviews, eligibility and the public feed with envelopes', async () => {
     const orderId = await seedOrder();
     let bearer: string | undefined = TOKEN_A;

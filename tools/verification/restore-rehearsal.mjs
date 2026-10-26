@@ -85,7 +85,11 @@ async function main() {
         (SELECT count(*)::int FROM billing_receipts WHERE confirmed_via = 'GATEWAY_CAPTURE') AS gateway_receipts,
         (SELECT count(*)::int FROM reviews_v2) AS recorded_reviews,
         (SELECT count(*)::int FROM reviews_v2 WHERE publish_consent) AS publication_consents,
-        (SELECT count(*)::int FROM reviews_v2 WHERE publication='PUBLISHED') AS public_reviews`));
+        (SELECT count(*)::int FROM reviews_v2 WHERE publication='PUBLISHED') AS public_reviews,
+        (SELECT count(*)::int FROM support_v2_incidents) AS support_cases,
+        (SELECT count(*)::int FROM support_v2_incident_messages) AS support_messages,
+        (SELECT count(*)::int FROM support_v2_incident_messages WHERE author_role='CUSTOMER') AS customer_messages,
+        (SELECT count(*)::int FROM support_v2_incident_messages WHERE author_role IN ('OPERATOR','SUPPORT')) AS staff_messages`));
       assert.equal(facts.orders, 1); assert.equal(facts.accepted_decisions, 1);
       assert.equal(facts.obligations, 1); assert.equal(facts.pickup_legs, 1);
       const withOps = process.env.LAUNDRY_VERIFY_OPS_FACILITY === 'true';
@@ -97,6 +101,10 @@ async function main() {
       assert.equal(facts.recorded_reviews, withOps ? 1 : 0);
       assert.equal(facts.publication_consents, 0, 'Private feedback must retain its original consent');
       assert.equal(facts.public_reviews, 0);
+      assert.equal(facts.support_cases, withOps ? 1 : 0);
+      assert.equal(facts.support_messages, withOps ? 2 : 0);
+      assert.equal(facts.customer_messages, withOps ? 1 : 0);
+      assert.equal(facts.staff_messages, withOps ? 1 : 0);
     }
     assert.equal((await b.query("SELECT count(*)::int AS n FROM pg_tables WHERE schemaname='public'")).rows[0].n, 0, 'Restore target must start empty');
     const sourceState = source.describe(), targetState = target.describe();
@@ -132,6 +140,13 @@ async function main() {
           FROM reviews_v2 LIMIT 1`, [randomUUID()]), error => error.code === '23505');
         assert.equal((await b.query('SELECT count(*)::int AS n FROM reviews_v2')).rows[0].n, 1, 'Recovery lost one-review-per-order uniqueness');
       }
+      if (facts.support_messages) {
+        await assert.rejects(b.query(`INSERT INTO support_v2_incident_messages
+          (id,incident_id,seq,author_role,author_id,body,media_ids,created_at)
+          SELECT $1::uuid,incident_id,seq,author_role,author_id,body,media_ids,created_at
+          FROM support_v2_incident_messages ORDER BY seq LIMIT 1`, [randomUUID()]), error => error.code === '23505');
+        assert.equal((await b.query('SELECT count(*)::int AS n FROM support_v2_incident_messages')).rows[0].n, 2, 'Recovery lost per-case message sequence uniqueness');
+      }
     }
     if (signalled) throw new Error('Restore verification interrupted');
     await mkdir('.verification', { recursive: true });
@@ -140,7 +155,7 @@ async function main() {
       runtime: { source: sourceState.runtime, target: targetState.runtime },
       scope: `Synthetic ${sourceJourney} application rows and encrypted identity backup/restore; fake external providers; not cloud restore, physical fulfillment or whole-product v2 acceptance`,
       archive: { sha256: hash(dump.stdout), sizeBytes: dump.stdout.length, privateLocalPath: archivePath }, facts, identity, restoredTables: before.tables.length,
-      fingerprints: before, duplicateReviewRejectedAfterRestore: sourceJourney === 'legacy' || Boolean(facts.recorded_reviews), duplicateOrderRejectedAfterRestore: sourceJourney === 'customer-v2', productionReady: false };
+      fingerprints: before, duplicateReviewRejectedAfterRestore: sourceJourney === 'legacy' || Boolean(facts.recorded_reviews), duplicateOrderRejectedAfterRestore: sourceJourney === 'customer-v2', duplicateSupportSequenceRejectedAfterRestore: Boolean(facts.support_messages), productionReady: false };
     await writeFile('.verification/restore-rehearsal.json', JSON.stringify(receipt, null, 2));
     console.log(`Recovery verified (${sourceJourney}, PostgreSQL ${serverVersion}): ${before.tables.length} tables, all sequences, selected application facts, uniqueness and encrypted identity recovery. Production readiness NOT claimed.`);
   } finally {

@@ -4,7 +4,7 @@ const {readFile,writeFile,mkdir} = require('node:fs/promises');
 const {resolve,relative} = require('node:path');
 const {execFileSync} = require('node:child_process');
 const {startFixture} = require('./customer-v2-fixture.cjs');
-async function main(proposeAdjustment, finishOps, captureOpsFailure) {
+async function main(proposeAdjustment, finishOps, captureOpsFailure, replyToSupport) {
   const output=resolve('.data/browser-evidence/customer-v2'); await mkdir(output,{recursive:true});
   const browser=await chromium.launch({headless:true});
   const context=await browser.newContext({viewport:{width:1280,height:900},recordVideo:{dir:resolve(output,'videos'),size:{width:1280,height:900}}});
@@ -78,6 +78,7 @@ async function main(proposeAdjustment, finishOps, captureOpsFailure) {
     const finalEvidence=await (await fetch('http://127.0.0.1:4499/__synthetic_evidence')).json();
     expect(finalEvidence).toEqual({...evidence,accepted_decisions:1});
     const opsEvidence = finishOps ? await finishOps() : null;
+    let supportEvidence = {};
     if (finishOps) {
       await page.getByRole('button',{name:'Refresh',exact:true}).click();
       await expect(page.getByText('DELIVERED',{exact:true})).toBeVisible();
@@ -106,12 +107,16 @@ async function main(proposeAdjustment, finishOps, captureOpsFailure) {
       await expect(page.getByText(/A review is already recorded for this order/)).toBeVisible();
       await expect(page.getByRole('button',{name:'Submit review',exact:true})).toHaveCount(0);
       await page.screenshot({path:resolve(output,'review-recorded-mobile.png'),fullPage:true});
+      supportEvidence = await require('./customer-support-browser.cjs').customerSupportJourney(page, output, replyToSupport);
     }
     const completedEvidence = finishOps ? await (await fetch('http://127.0.0.1:4499/__synthetic_evidence')).json() : finalEvidence;
     expect(completedEvidence).toEqual({ ...finalEvidence, legs: finishOps ? 2 : 1 });
     expect(errors).toEqual([]);
-    await writeFile(resolve(output,'result.json'),JSON.stringify({status:'passed',sourceRevision:execFileSync('git',['rev-parse','HEAD'],{encoding:'utf8'}).trim(),sourceDirty:Boolean(execFileSync('git',['status','--porcelain'],{encoding:'utf8'}).trim()),syntheticOnly:true,commercialCalls:0,sameBookingKeyAndBody:true,sameAdjustmentKeyAndBody:true,sameReviewKeyAndBody:finishOps?true:null,scope:finishOps?'customer-and-ops':'customer',recordings:{customer:relative(output,await page.video().path()),ops:opsEvidence?.video},...completedEvidence,browserErrors:errors},null,2));
-    if(finishOps) console.log('PASS: owner review after recorded delivery, no default rating or publication consent, one private review after reply loss and navigation/retry, and no second-review form.');
+    await writeFile(resolve(output,'result.json'),JSON.stringify({status:'passed',sourceRevision:execFileSync('git',['rev-parse','HEAD'],{encoding:'utf8'}).trim(),sourceDirty:Boolean(execFileSync('git',['status','--porcelain'],{encoding:'utf8'}).trim()),syntheticOnly:true,commercialCalls:0,sameBookingKeyAndBody:true,sameAdjustmentKeyAndBody:true,sameReviewKeyAndBody:finishOps?true:null,...supportEvidence,scope:finishOps?'customer-and-ops':'customer',recordings:{customer:relative(output,await page.video().path()),ops:opsEvidence?.video},...completedEvidence,browserErrors:errors},null,2));
+    if(finishOps) {
+      console.log('PASS: owner review after recorded delivery, no default rating or publication consent, one private review after reply loss and navigation/retry, and no second-review form.');
+      console.log('PASS: one customer support case and one customer message after committed reply loss/navigation/retry, exact keys/bodies, compiled-service synthetic staff reply visible, and no order status/version change. No staffed-console or live-notification claim.');
+    }
     console.log('PASS: actual customer UI + SDK + compiled HTTP services + disposable PostgreSQL. First committed reply replaced by 503/unknown; navigation/retry reused key/body; exactly one order/obligation/pickup/event. Explicit intake-adjustment acceptance also survives reply loss/navigation with one decision audit. Synthetic OTP/prices/capacity only.');
   } catch(error) {
     await captureOpsFailure?.();
@@ -125,6 +130,6 @@ async function run() {
   const withOps = process.env.LAUNDRY_VERIFY_OPS_FACILITY === 'true';
   const close = await startFixture({ withOps });
   const ops = withOps ? require('./ops-facility-browser.cjs').opsFacilityJourney(close) : null;
-  try { await main(ops ? ops.proposeAdjustment : close.proposeAdjustment, ops?.finish, ops?.captureFailure); } finally { await close(); }
+  try { await main(ops ? ops.proposeAdjustment : close.proposeAdjustment, ops?.finish, ops?.captureFailure, close.replyToSupport); } finally { await close(); }
 }
 run().catch(error=>{console.error(error);process.exit(1);});

@@ -6,6 +6,7 @@ import { apiV2 } from "../../src/api-v2";
 import { CustomerPrivateScreen } from "../../src/features/booking/CustomerPrivateScreen";
 import { AdjustmentDecisionCard } from "../../src/features/booking/AdjustmentDecisionCard";
 import { OrderReviewCard } from "../../src/features/booking/OrderReviewCard";
+import { OrderSupportCard } from "../../src/features/booking/OrderSupportCard";
 import { describeError } from "../../src/features/booking/presenters";
 import { Card, Loading, NoteCard, Page } from "../../src/features/booking/ui";
 import { formatINR } from "../../src/guards";
@@ -42,6 +43,7 @@ function OwnedDetail({ id }: { id: string }) {
       {events.length === 0 ? <Text style={{ color: colors.inkMuted }}>No timeline events have been recorded.</Text> : events.map((event, index) => <Text key={`${event.at}:${event.status}:${index}`} style={{ color: colors.ink, marginTop: 12 }}>{event.label}{"\n"}{event.at}{event.reason ? `\n${event.reason}` : ""}</Text>)}
     </Card>
     <OrderReviewCard key={order.id} order={order} />
+    <OrderSupportCard key={`support:${order.id}`} orderId={order.id} />
     <NoteCard kind="note" title="Authoritative order record" body="A scheduled return is not a custody receipt or proof of payment. No rider location is simulated here. Rescheduling, cancellation and payment detail are not yet connected on this screen." actionLabel="Refresh" onAction={() => setRevision(value => value + 1)} />
   </>;
 }

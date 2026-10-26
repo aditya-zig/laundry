@@ -31,6 +31,8 @@ async function startFixture({ withOps = false } = {}) {
   const { LogisticsService } = load('modules/logistics/src/index.js');
   const { ReviewsService } = load('modules/reviews/src/index.js');
   const reviews = new ReviewsService({ db, authenticate, clock });
+  const { SupportService } = load('modules/support/src/index.js');
+  const support = new SupportService({ db, authenticate, clock });
   const catalog = new CatalogService({ db, authenticate, clock });
   const availability = new AvailabilityService({ db, authenticate, clock });
   const { completeReturnWhenSettled } = load('modules/orders/src/completion.js');
@@ -63,7 +65,7 @@ async function startFixture({ withOps = false } = {}) {
   const { OrdersModule } = load('apps/api/src/features/orders/orders.module.js');
   const { ProductModule } = load('apps/api/src/features/product.module.js');
   class Fixture {}
-  Module({imports:[IdentityModule.register(()=>identity),CatalogModule.register(()=>catalog),AvailabilityModule.register(()=>availability),OrdersModule.register(()=>orders),ProductModule.register({billing:()=>billing,logistics:()=>logistics,reviews:()=>reviews})]})(Fixture);
+  Module({imports:[IdentityModule.register(()=>identity),CatalogModule.register(()=>catalog),AvailabilityModule.register(()=>availability),OrdersModule.register(()=>orders),ProductModule.register({billing:()=>billing,logistics:()=>logistics,reviews:()=>reviews,support:()=>support})]})(Fixture);
   const app = await NestFactory.create(Fixture,{logger:false,rawBody:true});
   load('apps/api/src/http-body.js').configureHttpBody(app);
   app.useGlobalFilters(new (load('apps/api/src/filters/http-exception.filter.js').EnvelopeFilter)());
@@ -99,8 +101,21 @@ async function startFixture({ withOps = false } = {}) {
       (SELECT COUNT(*)::int FROM reviews_v2 WHERE publication='PUBLISHED') AS public_reviews`);
     response.json({ syntheticOnly: true, ...rows[0] });
   });
+  app.getHttpAdapter().get('/__synthetic_support_evidence', async (_request, response) => {
+    const { rows } = await db.query(`SELECT
+      (SELECT COUNT(*)::int FROM support_v2_incidents) AS incidents,
+      (SELECT COUNT(*)::int FROM support_v2_incident_messages) AS messages,
+      (SELECT COUNT(*)::int FROM support_v2_incident_messages WHERE author_role='CUSTOMER') AS customer_messages,
+      (SELECT COUNT(*)::int FROM support_v2_incident_messages WHERE author_role IN ('OPERATOR','SUPPORT')) AS staff_messages,
+      (SELECT COUNT(*)::int FROM v2_audit WHERE action='INCIDENT_OPENED') AS opened_audits,
+      (SELECT COUNT(*)::int FROM v2_audit WHERE action='INCIDENT_MESSAGE_ADDED') AS message_audits,
+      (SELECT version FROM orders_v2_orders LIMIT 1) AS order_version,
+      (SELECT status FROM orders_v2_orders LIMIT 1) AS order_status`);
+    response.json({ syntheticOnly: true, ...rows[0] });
+  });
   let dropNextBooking = true, dropNextDecision = true, dropNextIntake = withOps, dropNextQualityPass = withOps,
-    dropNextAssignment = withOps, dropNextReceipt = withOps, dropNextReview = withOps;
+    dropNextAssignment = withOps, dropNextReceipt = withOps, dropNextReview = withOps,
+    dropNextIncident = withOps, dropNextMessage = withOps;
   app.use((request,response,next)=>{ const json=response.json.bind(response); response.json=body=>{
     const booking = request.path === '/v2/orders' && dropNextBooking;
     const decision = request.path.endsWith('/adjustments/decision') && dropNextDecision;
@@ -109,10 +124,13 @@ async function startFixture({ withOps = false } = {}) {
     const assignment = request.path === '/v2/ops/logistics/assignments' && dropNextAssignment;
     const receipt = request.path.endsWith('/confirm-manual') && dropNextReceipt;
     const review = request.path.endsWith('/reviews') && dropNextReview;
-    if(request.method==='POST' && body?.id && (booking || decision || intake || quality || assignment || receipt || review)) {
+    const incident = /^\/v2\/orders\/[^/]+\/incidents$/.test(request.path) && dropNextIncident;
+    const message = request.path.startsWith('/v2/incidents/') && request.path.endsWith('/messages') && dropNextMessage;
+    if(request.method==='POST' && body?.id && (booking || decision || intake || quality || assignment || receipt || review || incident || message)) {
       if (booking) dropNextBooking = false; if (decision) dropNextDecision = false;
       if (intake) dropNextIntake = false; if (quality) dropNextQualityPass = false;
       if (assignment) dropNextAssignment = false; if (receipt) dropNextReceipt = false; if (review) dropNextReview = false;
+      if (incident) dropNextIncident = false; if (message) dropNextMessage = false;
       response.status(503); return json({code:'PROVIDER_OUTCOME_UNKNOWN',message:'Synthetic post-commit response loss',traceId:randomUUID(),retryable:true});
     } return json(body);
   }; next(); });
@@ -143,6 +161,15 @@ async function startFixture({ withOps = false } = {}) {
     const row = (await db.query('SELECT id FROM orders_v2_orders ORDER BY created_at DESC LIMIT 1')).rows[0];
     const picked = await orders.markPickupPending(staffSession.accessToken, row.id);
     return { phone: withOps ? consolePhone : phone, picked };
+  };
+  shutdown.replyToSupport = async () => {
+    // Real compiled staff authorization, synthetic setup identity. This is not
+    // acceptance of a staffed support console or a live notification channel.
+    if (!withOps || !staffSession) throw Error('Prepare synthetic staff before replying');
+    const row = (await db.query('SELECT id FROM support_v2_incidents ORDER BY created_at DESC,id DESC LIMIT 1')).rows[0];
+    if (!row) throw Error('The customer must open the case in the actual UI first');
+    return support.appendMessage(staffSession.accessToken, row.id,
+      { body: 'Synthetic operator acknowledgement; no refund or rewash promised.', mediaIds: [] }, randomUUID());
   };
   shutdown.proposeAdjustment = async () => {
     const { picked } = await shutdown.prepareOps();

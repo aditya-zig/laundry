@@ -67,6 +67,29 @@ describe('F00 restore, revocation and secure persistence', () => {
   });
 });
 describe('F00 refresh and stable command identities', () => {
+  it.each(['incident', 'message'] as const)('retains the exact support %s and actor-bound key after a committed reply is lost', async kind => {
+    const h = new Harness(), f = await h.signedIn();
+    const descriptor = kind === 'incident'
+      ? { routeId: 'support.incidents.create' as const, body: v2.incidentInputSchema.parse(fixtures.IncidentInput) }
+      : { routeId: 'support.incidents.messages' as const, params: { incidentId: fixtures.Incident.id }, body: v2.incidentMessageInputSchema.parse(fixtures.IncidentMessageInput) };
+    const path = kind === 'incident' ? `/orders/${fixtures.IncidentInput.orderId}/incidents` : `/incidents/${fixtures.Incident.id}/messages`;
+    h.handle = req => req.path.endsWith(path) ? response({ code: 'PROVIDER_UNAVAILABLE', message: 'Reply lost after commit', traceId: 'synthetic', retryable: true }, 503) : h.defaultHandle(req);
+    await expect(f.enqueueMutation(descriptor)).rejects.toMatchObject({ status: 503 });
+    const [pending] = await f.listQueuedMutations();
+    expect(JSON.parse(pending.bodyJson!)).toEqual(descriptor.body);
+    const reopened = h.build(); await reopened.initialize();
+    const altered = kind === 'incident'
+      ? { routeId: 'support.incidents.create' as const, body: { ...fixtures.IncidentInput, summary: 'Changed concern' } }
+      : { routeId: 'support.incidents.messages' as const, params: { incidentId: fixtures.Incident.id }, body: { ...fixtures.IncidentMessageInput, body: 'Changed message' } };
+    await expect(reopened.enqueueMutation({ ...altered, retainedKey: pending.idempotencyKey })).rejects.toBeInstanceOf(StorageError);
+    h.handle = req => req.path.endsWith(path) ? response(kind === 'incident' ? fixtures.Incident : fixtures.IncidentMessage) : h.defaultHandle(req);
+    await reopened.enqueueMutation({ ...descriptor, retainedKey: pending.idempotencyKey });
+    const calls = h.calls.filter(req => req.path.endsWith(path));
+    expect(calls).toHaveLength(2);
+    expect(calls[0].body).toEqual(calls[1].body);
+    expect(calls[0].headers.get('idempotency-key')).toBe(calls[1].headers.get('idempotency-key'));
+    expect(await reopened.listQueuedMutations()).toEqual([]);
+  });
   it('retains an explicit post-delivery review and its publication consent after reply loss', async () => {
     const h = new Harness(), f = await h.signedIn();
     const body = v2.reviewInputSchema.parse({ ...fixtures.ReviewInput, overall: 4, comment: 'Synthetic private feedback', mediaIds: [], publishConsent: false });

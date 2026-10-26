@@ -392,14 +392,14 @@ export function createV2Client(options: V2ClientOptions = {}) {
     getDownloadUrl: (mediaId: string, opts?: V2MutatingOpts) =>
       call("media.download", mediaDownload, { params: { mediaId }, opts }),
 
-    listIncidents: () =>
-      call("support.incidents.list", incidentList),
+    listIncidents: (query?: Query) =>
+      call("support.incidents.list", incidentList, { query }),
 
     createIncident: (input: v2.IncidentInput, opts?: V2MutatingOpts) =>
       call("support.incidents.create", incident, { params: { orderId: v2.idSchema.parse(input.orderId) }, body: v2.incidentInputSchema.parse(input), opts }),
 
-    listIncidentMessages: (incidentId: string) =>
-      call("support.incidents.messages.list", v2.pageSchema(v2.incidentMessageSchema), { params: { incidentId } }),
+    listIncidentMessages: (incidentId: string, query?: Query) =>
+      call("support.incidents.messages.list", v2.pageSchema(v2.incidentMessageSchema), { params: { incidentId }, query }),
 
     postIncidentMessage: (
       incidentId: string,
