@@ -2,22 +2,24 @@ import { spawn, spawnSync, execFileSync } from 'node:child_process';
 import { mkdir, open, readFile, rm, writeFile } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
 import { resolve } from 'node:path';
-import { requireTestDatabase } from './evidence.mjs';
+import { requireTestDatabase, validateManifest, REQUIRED_PRODUCT_SCENARIOS } from './evidence.mjs';
 import { recordingSampleIsUsable } from './viewports.mjs';
 import { checkpointSamples } from './recording-checkpoint.mjs';
 
 async function main() {
+  const directory = resolve('.verification/hq');
+  await mkdir(directory, { recursive: true });
+  await rm(resolve(directory, 'manifest.json'), { force: true });
   requireTestDatabase(process.env.DATABASE_URL);
+  const scope = process.env.VERIFY_WEB_SCOPE ?? 'legacy';
+  if (!['legacy', 'product'].includes(scope)) throw new Error('Unknown recording evidence scope');
   if (!process.env.DISPLAY || !/^[^:]*:\d+(?:\.\d+)?$/.test(process.env.DISPLAY)) throw new Error('An isolated Xvfb display is required; do not record a user desktop');
   if (process.env.LAUNDRY_ISOLATED_RECORDING !== 'true') throw new Error('Run pnpm verify:recording to create an owned virtual display');
   const revision = execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim();
   if (execFileSync('git', ['status', '--porcelain'], { encoding: 'utf8' }).trim()) throw new Error('Original video evidence requires a clean source revision');
-  const directory = resolve('.verification/hq');
-  await mkdir(directory, { recursive: true });
   const output = resolve(directory, 'browser-original-1080p30.mp4');
   const checkpointsPath = resolve(directory, 'checkpoints.jsonl');
   await rm(checkpointsPath, { force: true });
-  await rm(resolve(directory, 'manifest.json'), { force: true });
   const log = await open(resolve(directory, 'recorder.log'), 'w');
   let recorder, journey, interrupted = false;
   const stop = () => { interrupted = true; try { if (journey?.pid) process.kill(-journey.pid, 'SIGTERM'); } catch {} recorder?.stdin.end('q\n'); };
@@ -42,6 +44,10 @@ async function main() {
     recorder.stdin.end('q\n');
     const capture = await recorder.result;
     if (interrupted || result.code !== 0 || capture.code !== 0) throw new Error('Recorded browser journey or capture failed; diagnostic originals retained');
+    const browserEvidenceFile = scope === 'product' ? 'product-manifest.json' : 'manifest.json';
+    const browserEvidence = await readFile(resolve('.verification', browserEvidenceFile));
+    await validateManifest(JSON.parse(browserEvidence), { root: resolve('.verification'), headSha: revision, scope,
+      ...(scope === 'product' ? { requiredScenarios: REQUIRED_PRODUCT_SCENARIOS } : {}) });
     const probe = spawnSync('ffprobe', ['-v', 'error', '-select_streams', 'v:0', '-show_entries', 'stream=width,height,r_frame_rate,codec_name', '-show_entries', 'format=duration,size', '-of', 'json', output], { encoding: 'utf8' });
     if (probe.error || probe.status !== 0) throw new Error('Could not inspect original recording metadata');
     const metadata = JSON.parse(probe.stdout), stream = metadata.streams[0];
@@ -63,7 +69,10 @@ async function main() {
     }
     if (!samples.every(recordingSampleIsUsable)) throw new Error('A required journey checkpoint is blank or mostly unused canvas; no original evidence receipt issued');
     await writeFile(resolve(directory, 'manifest.json'), JSON.stringify({ testedSha: revision, checkedAt: new Date().toISOString(), dirty: false,
-      scope: 'Original virtual-desktop recording of legacy demo web acceptance; not production-v2, native or physical fulfillment evidence',
+      scope: scope === 'product'
+        ? 'Original virtual-desktop recording of synthetic current-product web acceptance; not native, physical fulfillment, live providers or production readiness'
+        : 'Original virtual-desktop recording of legacy demo web acceptance; not production-v2, native or physical fulfillment evidence',
+      browserEvidenceKind: scope, browserEvidenceFile, browserEvidenceSha256: createHash('sha256').update(browserEvidence).digest('hex'),
       file: 'browser-original-1080p30.mp4', sha256: createHash('sha256').update(bytes).digest('hex'), sizeBytes: bytes.length,
       metadata, samples, productionReady: false }, null, 2));
     console.log('Original 1080p/30fps H.264 browser recording verified; sampled frames require visual inspection.');

@@ -2,6 +2,8 @@
 const { expect } = require('@playwright/test');
 const { writeFile } = require('node:fs/promises');
 const { resolve, relative } = require('node:path');
+const { reviewViewport } = require('./viewports.mjs');
+const { recordingCheckpoint } = require('./recording-checkpoint.mjs');
 async function riderCustodyJourney(browser, fixture, output, leg = 'RETURN') {
   if (!browser || !['PICKUP', 'RETURN'].includes(leg)) throw Error('Owned verification browser and known leg required');
   const proof = await fixture.syntheticRiderProof(leg);
@@ -10,7 +12,8 @@ async function riderCustodyJourney(browser, fixture, output, leg = 'RETURN') {
   const statusBefore = leg === 'PICKUP' ? 'CONFIRMED' : 'READY_FOR_RETURN';
   const statusAfter = leg === 'PICKUP' ? 'PICKUP_PENDING' : 'RETURNING';
   expect(await fixture.syntheticRiderEvidence(leg)).toEqual({ accepted_audits: acceptedBefore, code_attempts: 0, custody_handovers: 0, order_status: statusBefore });
-  const context = await browser.newContext({ viewport: { width: 390, height: 844 }, recordVideo: { dir: resolve(output, 'videos'), size: { width: 390, height: 844 } } });
+  const viewport = reviewViewport({ width: 390, height: 844 });
+  const context = await browser.newContext({ viewport, recordVideo: { dir: resolve(output, 'videos'), size: viewport } });
   const page = await context.newPage(), accepts = [], handovers = [], errors = [];
   page.on('pageerror', error => errors.push(error.message));
   page.on('request', request => {
@@ -38,9 +41,9 @@ async function riderCustodyJourney(browser, fixture, output, leg = 'RETURN') {
     if (leg === 'PICKUP') {
       expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
       await page.screenshot({ path: resolve(output, 'rider-pickup-form-mobile.png'), fullPage: true });
-      await page.setViewportSize({ width: 1280, height: 900 });
+      await page.setViewportSize(reviewViewport({ width: 1280, height: 900 }));
       await page.screenshot({ path: resolve(output, 'rider-pickup-form-desktop.png'), fullPage: true });
-      await page.setViewportSize({ width: 390, height: 844 });
+      await page.setViewportSize(reviewViewport({ width: 390, height: 844 }));
     }
     await expect(page.getByRole('button', { name: 'Record custody handover', exact: true })).toBeDisabled();
     await page.getByRole('button', { name: 'Confirm rider assignment', exact: true }).click();
@@ -66,8 +69,9 @@ async function riderCustodyJourney(browser, fixture, output, leg = 'RETURN') {
     expect(errors).toEqual([]);
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
     await page.screenshot({ path: resolve(output, `${prefix}-custody-mobile.png`), fullPage: true });
-    await page.setViewportSize({ width: 1280, height: 900 });
+    await page.setViewportSize(reviewViewport({ width: 1280, height: 900 }));
     await page.screenshot({ path: resolve(output, `${prefix}-custody-desktop.png`), fullPage: true });
+    if (leg === 'RETURN') await recordingCheckpoint(page, 'return-proof');
     const result = { status: 'passed', syntheticOnly: true, actualRiderBrowser: true, sameAcceptanceKeyAndBody: true, sameHandoverKeyAndBody: true,
       wrongCodeRejected: true, assignmentRequiredBeforeProof: true, noPrematureDelivery: true, riderLeg: leg, pickupBrowserProven: leg === 'PICKUP', physicalCustodyProven: false, nativeDeviceProven: false, ...facts, browserErrors: errors,
       video: relative(output, await page.video().path()) };

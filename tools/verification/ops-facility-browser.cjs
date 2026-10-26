@@ -4,6 +4,8 @@
 const { expect } = require('@playwright/test');
 const { readFile, writeFile } = require('node:fs/promises');
 const { resolve, relative } = require('node:path');
+const { reviewViewport } = require('./viewports.mjs');
+const { recordingCheckpoint } = require('./recording-checkpoint.mjs');
 
 function opsFacilityJourney(fixture, withRider = false, withPickup = false) {
   let context, page, pickupEvidence;
@@ -32,7 +34,8 @@ function opsFacilityJourney(fixture, withRider = false, withPickup = false) {
     captureFailure,
     async proposeAdjustment(browser) {
       const { phone } = await fixture.prepareOps();
-      context = await browser.newContext({ viewport: { width: 1280, height: 1000 }, recordVideo: { dir: resolve(output, 'videos'), size: { width: 1280, height: 1000 } } });
+      const viewport = reviewViewport({ width: 1280, height: 1000 });
+      context = await browser.newContext({ viewport, recordVideo: { dir: resolve(output, 'videos'), size: viewport } });
       page = await context.newPage();
       page.on('pageerror', error => errors.push(error.message));
       page.on('request', request => {
@@ -64,6 +67,7 @@ function opsFacilityJourney(fixture, withRider = false, withPickup = false) {
         await expect(assign).toHaveCount(0);
         sameRetry(assignmentCalls);
         pickupEvidence = await require('./rider-custody-browser.cjs').riderCustodyJourney(browser, fixture, output, 'PICKUP');
+        await page.bringToFront();
         await detail().getByRole('button', { name: 'Refresh', exact: true }).first().click();
       }
       const form = page.getByTestId('ops-intake-form');
@@ -80,10 +84,10 @@ function opsFacilityJourney(fixture, withRider = false, withPickup = false) {
       await bag.getByLabel('Physically sealed', { exact: true }).check();
       await form.getByLabel('I checked the physical facts and bag labels.', { exact: true }).check();
       await page.screenshot({ path: resolve(output, 'ops-intake-desktop.png'), fullPage: true });
-      await page.setViewportSize({ width: 390, height: 844 });
+      await page.setViewportSize(reviewViewport({ width: 390, height: 844 }));
       expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
       await page.screenshot({ path: resolve(output, 'ops-intake-mobile.png'), fullPage: true });
-      await page.setViewportSize({ width: 1280, height: 1000 });
+      await page.setViewportSize(reviewViewport({ width: 1280, height: 1000 }));
       await form.getByRole('button', { name: 'Submit measured intake', exact: true }).click();
       await retryUnknown();
       sameRetry(intakeCalls);
@@ -93,6 +97,7 @@ function opsFacilityJourney(fixture, withRider = false, withPickup = false) {
     },
     async finish() {
       try {
+        await page.bringToFront();
         await detail().getByRole('button', { name: 'Refresh', exact: true }).first().click();
         await detail().getByRole('button', { name: 'Start care', exact: true }).click();
         await detail().getByRole('button', { name: 'Send to quality check', exact: true }).click();
@@ -113,7 +118,7 @@ function opsFacilityJourney(fixture, withRider = false, withPickup = false) {
         expect(facts).toEqual({ syntheticOnly: true, intakes: 1, qc_passes: 1, qc_failures: 1, return_legs: 1, ready_events: 1, amount_due_minor: 10000 });
         expect(errors).toEqual([]);
         await page.screenshot({ path: resolve(output, 'ops-quality-desktop.png'), fullPage: true });
-        await page.setViewportSize({ width: 390, height: 844 });
+        await page.setViewportSize(reviewViewport({ width: 390, height: 844 }));
         await page.screenshot({ path: resolve(output, 'ops-quality-mobile.png'), fullPage: true });
         const rider = await fixture.prepareReturnRider();
         const assignForm = page.getByRole('form', { name: 'Assign return rider', exact: true });
@@ -128,9 +133,11 @@ function opsFacilityJourney(fixture, withRider = false, withPickup = false) {
         await expect(assignForm).toHaveCount(0);
         sameRetry(assignmentCalls.slice(withPickup ? 2 : 0));
         expect(assignmentCalls).toHaveLength(withPickup ? 4 : 2);
+        await recordingCheckpoint(page, 'return-dispatch');
         const riderEvidence = withRider
           ? await require('./rider-custody-browser.cjs').riderCustodyJourney(context.browser(), fixture, output)
           : (await fixture.acceptSyntheticReturnCustody(), null);
+        await page.bringToFront();
         await detail().getByRole('button', { name: 'Refresh', exact: true }).first().click();
         const payment = page.getByRole('form', { name: 'Record payment at return', exact: true });
         await payment.getByLabel('Received by', { exact: true }).selectOption('UPI');
@@ -139,7 +146,7 @@ function opsFacilityJourney(fixture, withRider = false, withPickup = false) {
         await payment.getByRole('checkbox').check();
         await page.screenshot({ path: resolve(output, 'ops-payment-mobile.png'), fullPage: true });
         expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
-        await page.setViewportSize({ width: 1280, height: 1000 });
+        await page.setViewportSize(reviewViewport({ width: 1280, height: 1000 }));
         await page.screenshot({ path: resolve(output, 'ops-payment-desktop.png'), fullPage: true });
         await payment.getByRole('button', { name: 'Record received payment', exact: true }).click();
         await expect(page.getByRole('button', { name: 'Retry retained command', exact: true })).toBeVisible();

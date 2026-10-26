@@ -1,6 +1,7 @@
 // Owned synthetic browser only. Read records; never create a customer payment or refund.
 const {expect}=require('@playwright/test');
 const {resolve}=require('node:path');
+const {reviewViewport}=require('./viewports.mjs');
 async function customerBillingJourney(page, output, settled) {
   await expect(page.getByText('Recorded payments',{exact:true})).toBeVisible();
   await expect(page.getByText('INR 100.00 · Pay-on-return model',{exact:true})).toBeVisible();
@@ -36,10 +37,10 @@ async function customerBillingJourney(page, output, settled) {
   await page.screenshot({path:resolve(output,`payment-records-${settled?'settled':'open'}-mobile.png`),fullPage:true});
   expect(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth)).toBe(true);
   if(settled) {
-    await page.setViewportSize({width:1280,height:900});
+    await page.setViewportSize(reviewViewport({width:1280,height:900}));
     await page.screenshot({path:resolve(output,'payment-records-settled-desktop.png'),fullPage:true});
     expect(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth)).toBe(true);
-    await page.setViewportSize({width:390,height:844});
+    await page.setViewportSize(reviewViewport({width:390,height:844}));
   }
   return {ownedBillingRecordsVisible:true,manualReceiptNotGatewayCapture:settled,failedReadNotZeroBalance:settled};
 }

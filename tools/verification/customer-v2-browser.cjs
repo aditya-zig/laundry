@@ -4,10 +4,13 @@ const {readFile,writeFile,mkdir} = require('node:fs/promises');
 const {resolve,relative} = require('node:path');
 const {execFileSync} = require('node:child_process');
 const {startFixture} = require('./customer-v2-fixture.cjs');
+const {browserLaunchOptions,reviewViewport} = require('./viewports.mjs');
+const {recordingCheckpoint} = require('./recording-checkpoint.mjs');
 async function main(proposeAdjustment, finishOps, captureOpsFailure, replyToSupport) {
   const output=resolve('.data/browser-evidence/customer-v2'); await mkdir(output,{recursive:true});
-  const browser=await chromium.launch({headless:true});
-  const context=await browser.newContext({viewport:{width:1280,height:900},recordVideo:{dir:resolve(output,'videos'),size:{width:1280,height:900}}});
+  const browser=await chromium.launch(browserLaunchOptions());
+  const viewport=reviewViewport({width:1280,height:900});
+  const context=await browser.newContext({viewport,recordVideo:{dir:resolve(output,'videos'),size:viewport}});
   const page=await context.newPage(); const mutations=[], decisions=[], reviews=[], errors=[];
   page.on('pageerror',error=>errors.push(error.message));
   page.on('request',request=>{
@@ -22,7 +25,7 @@ async function main(proposeAdjustment, finishOps, captureOpsFailure, replyToSupp
     await expect(page.getByLabel(/^Synthetic wash and fold\..*Open details$/)).toBeVisible();
     await expect(page.getByText('Indicative demo rate — not approved launch pricing')).toBeVisible();
     await page.screenshot({path:resolve(output,'catalog-desktop.png'),fullPage:true});
-    await page.setViewportSize({width:390,height:844});
+    await page.setViewportSize(reviewViewport({width:390,height:844}));
     await page.getByLabel(/^Synthetic wash and fold\..*Open details$/).click();
     await expect(page).toHaveURL(url => /^\/services\/[0-9a-f-]+$/.test(url.pathname));
     await page.reload({waitUntil:'networkidle'});
@@ -71,11 +74,13 @@ async function main(proposeAdjustment, finishOps, captureOpsFailure, replyToSupp
     await page.screenshot({path:resolve(output,'confirmed-mobile.png'),fullPage:true});
     await page.getByRole('button',{name:'View order',exact:true}).click();
     await expect(page.getByText('Recorded history',{exact:true})).toBeVisible();
+    await recordingCheckpoint(page,'booking');
     await page.screenshot({path:resolve(output,'owned-order-mobile.png'),fullPage:true});
     expect(mutations).toHaveLength(2); expect(mutations[0].key).toBeTruthy(); expect(mutations[0]).toEqual(mutations[1]);
     const evidence=await (await fetch('http://127.0.0.1:4499/__synthetic_evidence')).json();
     expect(evidence).toEqual({syntheticOnly:true,orders:1,obligations:1,legs:1,confirmed_events:1,accepted_decisions:0});
     await proposeAdjustment(browser);
+    await page.bringToFront();
     await page.getByRole('button',{name:'Refresh',exact:true}).click();
     await page.getByRole('button',{name:'Accept revised total INR 100.00',exact:true}).click();
     await expect(page.getByRole('button',{name:'Check original accept decision',exact:true})).toBeVisible();
@@ -97,8 +102,10 @@ async function main(proposeAdjustment, finishOps, captureOpsFailure, replyToSupp
     const opsEvidence = finishOps ? await finishOps() : null;
     let supportEvidence = {}, billingEvidence = {};
     if (finishOps) {
+      await page.bringToFront();
       await page.getByRole('button',{name:'Refresh',exact:true}).click();
       await expect(page.getByText('DELIVERED',{exact:true})).toBeVisible();
+      await recordingCheckpoint(page,'delivered');
       await expect(page.getByText('INR 100.00 · Payment due at return',{exact:true})).toHaveCount(0);
       billingEvidence = await require('./customer-billing-browser.cjs').customerBillingJourney(page, output, true);
       await expect(page.getByRole('button',{name:'Submit review',exact:true})).toBeDisabled();
@@ -107,10 +114,10 @@ async function main(proposeAdjustment, finishOps, captureOpsFailure, replyToSupp
       await page.getByRole('radio',{name:'Rate 4 out of 5',exact:true}).click();
       await page.getByLabel('Review feedback',{exact:true}).fill('Synthetic private feedback after recorded delivery.');
       await page.screenshot({path:resolve(output,'review-mobile.png'),fullPage:true});
-      await page.setViewportSize({width:1280,height:900});
+      await page.setViewportSize(reviewViewport({width:1280,height:900}));
       await page.screenshot({path:resolve(output,'review-desktop.png'),fullPage:true});
       expect(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth)).toBe(true);
-      await page.setViewportSize({width:390,height:844});
+      await page.setViewportSize(reviewViewport({width:390,height:844}));
       await page.getByRole('button',{name:'Submit review',exact:true}).click();
       await expect(page.getByRole('button',{name:'Check original review',exact:true})).toBeVisible();
       await page.goBack();

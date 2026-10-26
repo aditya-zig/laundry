@@ -2,6 +2,7 @@
 // Staff acknowledgement comes from synthetic fixture setup, NOT a staffed console.
 const { expect } = require('@playwright/test');
 const { resolve } = require('node:path');
+const { reviewViewport } = require('./viewports.mjs');
 async function customerSupportJourney(page, output, replyToSupport) {
   const cases = [], messages = [];
   const capture = request => {
@@ -22,10 +23,10 @@ async function customerSupportJourney(page, output, replyToSupport) {
     await page.getByRole('radio', { name: 'Care quality', exact: true }).click();
     await page.getByLabel('Support case summary', { exact: true }).fill(summary);
     await page.getByLabel('Support case details', { exact: true }).fill('Synthetic cuff inspection request; no refund authorised.');
-    await page.setViewportSize({ width: 1280, height: 900 });
+    await page.setViewportSize(reviewViewport({ width: 1280, height: 900 }));
     await page.getByText('Support for this order', { exact: true }).locator('..').screenshot({ path: resolve(output, 'support-case-desktop.png') });
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
-    await page.setViewportSize({ width: 390, height: 844 });
+    await page.setViewportSize(reviewViewport({ width: 390, height: 844 }));
     await page.getByRole('button', { name: 'Open support case', exact: true }).click();
     await expect(page.getByRole('button', { name: 'Check original support case', exact: true })).toBeVisible();
     await expect(page.getByLabel('Support case summary', { exact: true })).toHaveCount(0);
@@ -57,10 +58,10 @@ async function customerSupportJourney(page, output, replyToSupport) {
     await expect(page.getByText(/^OPERATOR ·/)).toBeVisible();
     await page.getByText('Support conversation', { exact: true }).locator('..').screenshot({ path: resolve(output, 'support-thread-mobile.png') });
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
-    await page.setViewportSize({ width: 1280, height: 900 });
+    await page.setViewportSize(reviewViewport({ width: 1280, height: 900 }));
     await page.getByText('Support conversation', { exact: true }).locator('..').screenshot({ path: resolve(output, 'support-thread-desktop.png') });
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
-    await page.setViewportSize({ width: 390, height: 844 });
+    await page.setViewportSize(reviewViewport({ width: 390, height: 844 }));
     expect(await evidence()).toEqual({ ...before, incidents: 1, messages: 2, customer_messages: 1, staff_messages: 1, opened_audits: 1, message_audits: 2 });
     expect({ emptyCasesDuringUnknown, emptyMessagesDuringUnknown }).toEqual({ emptyCasesDuringUnknown: 0, emptyMessagesDuringUnknown: 0 });
     return { noFalseEmptyStateDuringUnknown: true, sameSupportCaseKeyAndBody: true, sameSupportMessageKeyAndBody: true, supportOrderUnchanged: true, syntheticStaffReplyOnly: true };
