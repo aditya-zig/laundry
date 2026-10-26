@@ -75,7 +75,7 @@ const billingSummary: v2.BillingSummary = { orderId: order.id, obligationStatus:
  * by walking a permissive schema. Adding a wire name requires a new example. */
 export const v2WireFixtures = {
   OtpRequest: { phone: "+919000000000" }, OtpChallenge: { challengeId: id(51), expiresAt: expiry },
-  OtpVerify: { challengeId: id(51), code: "123456" }, SessionRefresh: { refreshToken: "synthetic-refresh-not-a-credential" },
+  OtpVerify: { challengeId: id(51), code: "123456" }, AuthSessionExchange: {}, SessionRefresh: { refreshToken: "synthetic-refresh-not-a-credential" },
   Session: { sessionId: id(52), accessToken: "synthetic-access-not-a-credential", refreshToken: "synthetic-refresh-not-a-credential", expiresAt: expiry, actor },
   LogoutResult: { revoked: true }, SessionRevocation: { sessionId: id(52), revoked: true }, Actor: actor,
   StaffInvitation: { phone: "+919000000001", role: "FACILITY", facilityIds: [id(30)], reason: "Synthetic staff invitation" },

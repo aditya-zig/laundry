@@ -224,6 +224,127 @@
         }
       }
     },
+    "/v2/identity/session/exchange": {
+      "post": {
+        "operationId": "identity.session.exchange",
+        "summary": "Exchange a verified-phone Better Auth session for a customer app session",
+        "tags": [
+          "B01"
+        ],
+        "security": [],
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            },
+            "description": "Persist with original intent. Same actor/key/payload replays; changed intent conflicts."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Contract-valid result. The runtime validates cross-field invariants and normalizes instants to UTC.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Session"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "INVALID_INPUT. ",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "UNAUTHENTICATED. ",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "FORBIDDEN. ",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "IDEMPOTENCY_CONFLICT. ",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Transport body limit exceeded (INVALID_INPUT); no command was executed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "RATE_LIMITED. ",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "PROVIDER_UNAVAILABLE. PROVIDER_OUTCOME_UNKNOWN. ",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        },
+        "x-laundry-roles": [
+          "PUBLIC"
+        ],
+        "x-laundry-idempotency": "REQUIRED",
+        "x-laundry-owner": "B01",
+        "x-laundry-backend-acceptance": "NOT_VERIFIED",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AuthSessionExchange"
+              }
+            }
+          }
+        }
+      }
+    },
     "/v2/identity/session/refresh": {
       "post": {
         "operationId": "identity.session.refresh",
@@ -10244,6 +10365,12 @@
           "challengeId",
           "code"
         ],
+        "additionalProperties": false,
+        "x-laundry-runtime-validation": true
+      },
+      "AuthSessionExchange": {
+        "type": "object",
+        "properties": {},
         "additionalProperties": false,
         "x-laundry-runtime-validation": true
       },

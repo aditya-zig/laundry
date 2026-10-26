@@ -128,7 +128,17 @@ export class IdentityService {
   private async revokeUnboundFamily(tx: Pool | PoolClient, familyId: string) {
     await tx.query("UPDATE identity_session_families SET revoked_at=COALESCE(revoked_at,$2),revoke_reason=COALESCE(revoke_reason,'STAFF_UNBOUND') WHERE id=$1 AND revoked_at IS NULL", [familyId, this.clock()]);
   }
+  private async externalSessionValid(tx: Pool | PoolClient, familyId: string): Promise<boolean> {
+    const invalid = await tx.query(`SELECT e.family_id FROM identity_external_sessions e
+      JOIN identity_session_families f ON f.id=e.family_id JOIN identity_profiles p ON p.id=f.profile_id
+      LEFT JOIN laundry_auth_session s ON s.id=e.auth_session_id AND s."userId"=e.auth_user_id
+      LEFT JOIN laundry_auth_user u ON u.id=e.auth_user_id
+      WHERE e.family_id=$1 AND (s.id IS NULL OR s."expiresAt"<=$2 OR u.id IS NULL OR
+        u."phoneNumberVerified" IS DISTINCT FROM true OR u."phoneNumber" IS DISTINCT FROM p.phone)`, [familyId, this.clock()]);
+    return invalid.rowCount === 0;
+  }
   private async actor(tx: Pool | PoolClient, profileId: string, familyId?: string): Promise<v2.Actor> {
+    if (familyId && !await this.externalSessionValid(tx, familyId)) throw invalidSession();
     // A family is bound to the provisioned staff identity, role and MFA
     // version at issue time. The binding is rechecked on every authenticate,
     // refresh and cached credential replay: deactivation, a role change or an
@@ -186,7 +196,7 @@ export class IdentityService {
         if (previous.session_id) {
           const row = (await tx.query<SessionRecord>(`SELECT s.*,f.profile_id,f.issuer_mode,f.revoked_at,f.absolute_expires_at,p.active FROM identity_sessions s
             JOIN identity_session_families f ON f.id=s.family_id JOIN identity_profiles p ON p.id=f.profile_id WHERE s.id=$1 FOR UPDATE OF f FOR SHARE OF p`, [previous.session_id])).rows[0];
-          if (!this.current(row)) throw invalidSession();
+          if (!this.current(row) || !await this.externalSessionValid(tx, row.family_id)) throw invalidSession();
           const binding = await this.staffBindingState(tx, row.family_id);
           if (binding && !binding.valid) {
             // Return a persisted denial, not a thrown transaction rollback:
@@ -321,6 +331,32 @@ export class IdentityService {
       return { ok: true, value: session, sessionId: session.sessionId };
     });
   }
+  /** Called only with server-verified Better Auth proof, never a request body.
+   * Preserve the v2 app session contract and existing phone-owned resources.
+   * Staff still use the enrolled-MFA path; social login cannot grant a role. */
+  async exchangeVerifiedAuth(proof: { phone: string; userId: string; sessionId: string }, key: string, peer: string): Promise<v2.Session> {
+    v2.phoneSchema.parse(proof.phone); v2.idSchema.parse(proof.userId); v2.idSchema.parse(proof.sessionId);
+    return this.command(`auth-exchange:${proof.sessionId}`, key, proof, async tx => {
+      if (!await this.rate(tx, `exchange-peer:${this.hash('peer', peer)}`, 100)) return denied('RATE_LIMITED', 'Too many sign-in requests');
+      const verified = await tx.query(`SELECT s.id FROM laundry_auth_session s JOIN laundry_auth_user u ON u.id=s."userId"
+        WHERE s.id=$1 AND u.id=$2 AND s."expiresAt">$3 AND u."phoneNumber"=$4 AND u."phoneNumberVerified"=true
+        FOR SHARE OF s,u`, [proof.sessionId, proof.userId, this.clock(), proof.phone]);
+      if (!verified.rowCount) return denied('UNAUTHENTICATED', 'Verify your phone to continue');
+      if ((await tx.query('SELECT id FROM identity_staff WHERE phone=$1 AND active=true', [proof.phone])).rowCount) {
+        return denied('FORBIDDEN', 'Use the enrolled staff MFA sign-in');
+      }
+      const profile = (await tx.query(`INSERT INTO identity_profiles (id,phone,created_at) VALUES ($1,$2,$3)
+        ON CONFLICT (phone) DO UPDATE SET phone=EXCLUDED.phone RETURNING id,active`, [randomUUID(), proof.phone, this.clock()])).rows[0];
+      if (!profile.active) return denied('UNAUTHENTICATED', 'Sign in is unavailable');
+      const family = randomUUID(), now = this.clock();
+      await tx.query('INSERT INTO identity_session_families (id,profile_id,issuer_mode,created_at,absolute_expires_at) VALUES ($1,$2,$3,$4,$5)',
+        [family, profile.id, this.options.provider.mode, now, new Date(now.getTime() + FAMILY_MS)]);
+      await tx.query('INSERT INTO identity_external_sessions (family_id,auth_session_id,auth_user_id) VALUES ($1,$2,$3)', [family, proof.sessionId, proof.userId]);
+      const session = await this.issueSession(tx, profile.id, family);
+      await this.audit(tx, 'AUTH_SESSION_EXCHANGED', profile.id, session.sessionId);
+      return { ok: true, value: session, sessionId: session.sessionId };
+    });
+  }
   async refresh(input: v2.SessionRefresh, key: string, peer: string): Promise<v2.Session> {
     const parsed = v2.sessionRefreshSchema.parse(input);
     if (!validToken(parsed.refreshToken)) throw invalidSession();
@@ -357,6 +393,7 @@ export class IdentityService {
     if (!row || row.issuer_mode !== this.options.provider.mode) throw invalidSession();
     return this.command(`logout:${row.id}`, key, {}, async tx => {
       await tx.query("UPDATE identity_session_families SET revoked_at=COALESCE(revoked_at,$2),revoke_reason=COALESCE(revoke_reason,'LOGOUT') WHERE id=$1", [row.family_id, this.clock()]);
+      await tx.query('DELETE FROM laundry_auth_session WHERE id IN (SELECT auth_session_id FROM identity_external_sessions WHERE family_id=$1)', [row.family_id]);
       await this.audit(tx, 'LOGOUT', row.profile_id, row.family_id);
       return success({ revoked: true });
     });
@@ -369,6 +406,7 @@ export class IdentityService {
         WHERE s.id=$1 AND f.profile_id=$2`, [sessionId, current.actor.id])).rows[0];
       if (!row) return denied('NOT_FOUND', 'Session not found');
       await tx.query("UPDATE identity_session_families SET revoked_at=COALESCE(revoked_at,$2),revoke_reason=COALESCE(revoke_reason,'OWNER_REVOKED') WHERE id=$1", [row.id, this.clock()]);
+      await tx.query('DELETE FROM laundry_auth_session WHERE id IN (SELECT auth_session_id FROM identity_external_sessions WHERE family_id=$1)', [row.id]);
       await this.audit(tx, 'SESSION_REVOKED', current.actor.id, sessionId);
       return success({ sessionId, revoked: true });
     }, async tx => { await this.lock(tx, `revoke-owner:${current.actor.id}`); return this.authenticated(tx, token, true); });

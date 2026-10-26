@@ -14,7 +14,7 @@ beforeAll(async () => {
   await getPool().query(`CREATE ROLE ${role} LOGIN PASSWORD '${password}' NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS`);
   await getPool().query(`GRANT CONNECT ON DATABASE "${url.pathname.slice(1)}" TO ${role}`);
   await getPool().query(`GRANT USAGE ON SCHEMA public TO ${role}`);
-  const tables = (await getPool().query("SELECT tablename FROM pg_tables WHERE schemaname='public' AND tablename LIKE 'identity\\_%' ESCAPE '\\'")).rows;
+  const tables = (await getPool().query("SELECT tablename FROM pg_tables WHERE schemaname='public' AND (tablename LIKE 'identity\\_%' ESCAPE '\\' OR tablename LIKE 'laundry\\_auth\\_%' ESCAPE '\\')")).rows;
   for (const table of tables) {
     const privileges = ['identity_staff', 'identity_staff_facilities'].includes(table.tablename) ? 'SELECT' : 'SELECT,INSERT,UPDATE,DELETE';
     await getPool().query(`GRANT ${privileges} ON TABLE public."${table.tablename}" TO ${role}`);

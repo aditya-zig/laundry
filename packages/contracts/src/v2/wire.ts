@@ -19,6 +19,7 @@ export const WIRE_SCHEMAS = {
   OtpRequest: identity.otpRequestSchema,
   OtpChallenge: identity.otpChallengeSchema,
   OtpVerify: identity.otpVerifySchema,
+  AuthSessionExchange: identity.authSessionExchangeSchema,
   SessionRefresh: identity.sessionRefreshSchema,
   Session: identity.sessionSchema,
   LogoutResult: identity.logoutResultSchema,

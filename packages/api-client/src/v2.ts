@@ -222,6 +222,10 @@ export function createV2Client(options: V2ClientOptions = {}) {
     verifyOtp: (challengeId: string, code: string, opts?: V2MutatingOpts & { mfaCode?: string }) =>
       call("identity.otp.verify", v2.sessionSchema, { body: v2.otpVerifySchema.parse({ challengeId, code, ...(opts?.mfaCode === undefined ? {} : { mfaCode: opts.mfaCode }) }), opts }),
 
+    // Construct this client with getToken returning the Better Auth bearer
+    // token for exchange; use the returned access token for business calls.
+    exchangeAuthSession: (opts?: V2MutatingOpts) =>
+      call("identity.session.exchange", v2.sessionSchema, { body: {}, opts }),
     refreshSession: (refreshToken: string, opts?: V2MutatingOpts) =>
       call("identity.session.refresh", v2.sessionSchema, { body: v2.sessionRefreshSchema.parse({ refreshToken }), opts }),
 

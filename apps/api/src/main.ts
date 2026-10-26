@@ -3,7 +3,9 @@ import { NestFactory } from "@nestjs/core";
 import { NestExpressApplication } from "@nestjs/platform-express";
 import { join, dirname } from "node:path";
 import { existsSync } from "node:fs";
-import { AppModule } from "./app.module";
+import { AppModule, betterAuthService } from "./app.module";
+import { toNodeHandler } from 'better-auth/node';
+import type { NextFunction, Request, Response } from 'express';
 import { EnvelopeFilter } from "./filters/http-exception.filter";
 import { getPool, initializeDb } from "../../../modules/shared/src/db";
 import { identityFromEnvironment } from "../../../modules/identity/src";
@@ -35,7 +37,8 @@ export async function createApplication(): Promise<NestExpressApplication> {
   if (process.env.NODE_ENV === 'production') identityFromEnvironment(getPool());
   if (process.env.NODE_ENV === 'production' || process.env.LAUNDRY_DATABASE_MODE === 'runtime') await verifyRuntimeDatabase(getPool());
   else await initializeDb();
-  const app = await NestFactory.create<NestExpressApplication>(AppModule, { rawBody: true });
+  const auth = betterAuthService();
+  const app = await NestFactory.create<NestExpressApplication>(AppModule, { rawBody: true, bodyParser: false });
   app.enableShutdownHooks(["SIGINT", "SIGTERM"]);
   app.enableCors({
     origin: resolveCorsOrigins(),
@@ -43,6 +46,17 @@ export async function createApplication(): Promise<NestExpressApplication> {
     methods: ["GET", "POST", "PATCH", "PUT", "DELETE", "OPTIONS"],
   });
   app.useGlobalFilters(new EnvelopeFilter());
+  // Better Auth must see the original request stream, including Apple's
+  // form-post callback, before Express consumes JSON/form bodies.
+  if (auth) {
+    const handler = toNodeHandler(auth);
+    app.use((request: Request, response: Response, next: NextFunction) => {
+      const path = request.url.split('?')[0];
+      if (path !== '/v2/auth/identity' && !path.startsWith('/v2/auth/identity/')) return next();
+      response.setHeader('Cache-Control', 'no-store');
+      return handler(request, response);
+    });
+  }
   configureHttpBody(app);
   // Serve only the Freebuff service asset folder, nothing else. Resolve from
   // the module directory so pnpm --filter launches work; cwd differs there.

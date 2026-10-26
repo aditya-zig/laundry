@@ -7,6 +7,7 @@ import {
   otpChallengeSchema,
   otpRequestSchema,
   sessionSchema,
+  authSessionExchangeSchema,
 } from "../src/v2/identity.js";
 import { reviewInputSchema } from "../src/v2/reviews.js";
 
@@ -26,6 +27,13 @@ describe("v2 identity boundary", () => {
     expect(otpChallengeSchema.safeParse({
       challengeId: id, expiresAt, demoCode: "123456",
     }).success).toBe(false);
+  });
+
+  it('accepts only an empty framework exchange body, never caller-claimed identity', () => {
+    expect(authSessionExchangeSchema.safeParse({}).success).toBe(true);
+    for (const body of [{ phone: '+919000000000' }, { userId: id }, { phoneNumberVerified: true }, { role: 'ADMIN' }, { token: 'claimed-proof' }]) {
+      expect(authSessionExchangeSchema.safeParse(body).success).toBe(false);
+    }
   });
 
   it("requires an international phone number and rejects client-selected roles", () => {

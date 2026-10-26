@@ -31,6 +31,9 @@ export const sessionSchema = z.object({
 }).strict();
 export type Session = z.infer<typeof sessionSchema>;
 
+// The verified framework session comes from headers/cookies, never this body.
+export const authSessionExchangeSchema = z.object({}).strict();
+export type AuthSessionExchange = z.infer<typeof authSessionExchangeSchema>;
 export const sessionRefreshSchema = z.object({ refreshToken: z.string().min(1) }).strict();
 export type SessionRefresh = z.infer<typeof sessionRefreshSchema>;
 export const logoutResultSchema = z.object({ revoked: z.literal(true) }).strict();
