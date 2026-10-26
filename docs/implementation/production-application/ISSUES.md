@@ -1,10 +1,18 @@
 # Published GitHub implementation queue
 
+## Current execution — 26 October 2026
+
+Canonical integration is `main`. Use the [3-day production / 5- and 10-day parity plan](3-5-10-day-recovery-plan.md), current GitHub issue amendments and [Day-1 checkpoint](day-1-execution-20261026.md). Existing implementation must be verified, not reset to the original blocked table. The deadline does not declare contracts frozen or release evidence complete. Founder/facility prerequisites are [#45](https://github.com/aditya-zig/laundry/issues/45).
+
+## Historical initial queue
+
+The snapshot below preserves the initial wave prerequisites and issue IDs. Its state column is not a current status report; no worker is automatically dispatched.
+
 [Coordinating epic #5](https://github.com/aditya-zig/laundry/issues/5) · 23 child tasks · no PRs.
 
 Only P00 and R01 were initially ready. Labels express dispatch eligibility, not launched workers. Read CLOUD-AGENTS.md for pinned prerequisites, leases and evidence gates.
 
-Integration baseline: `cloud/P00-source-consolidation` at `f0efdc0`.
+Initial integration baseline: `cloud/P00-source-consolidation` at `f0efdc0` (now a retained snapshot tag, not the development branch).
 
 Contract target: `laundry-wire-v2.0.0`. The earlier freeze claim is withdrawn. C01 remains blocked on complete schema/SDK coverage, fixtures, OpenAPI and integration infrastructure. See `../contracts/RETRY-SAFETY.md`. Feature dispatch remains blocked.
 

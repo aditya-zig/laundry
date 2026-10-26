@@ -436,23 +436,37 @@ describe('B10 durable dispatch', () => {
     const customer = await signin(customerPhone);
     const { order } = await bookOnce(customer);
     // Booking itself must publish the event atomically, not a test-only helper.
-    const published = (await getPool().query('SELECT envelope FROM v2_outbox WHERE aggregate_id=$1', [order.id])).rows;
+    const published = (await getPool().query<{ envelope: unknown; due_at: Date; dispatched_at: Date | null }>(
+      'SELECT envelope, due_at, dispatched_at FROM v2_outbox WHERE aggregate_id=$1', [order.id])).rows;
     expect(published).toHaveLength(1);
     expect(v2.domainEventSchema.parse(published[0].envelope)).toMatchObject({ eventType: 'order.confirmed.v2', aggregateId: order.id });
+    expect(published[0].dispatched_at).toBeNull();
+    // Publication uses PostgreSQL's clock; the booking fixture uses a fixed
+    // business date. Advance past the real due time without rewriting the
+    // outbox or depending on today's date. PostgreSQL retains microseconds
+    // that JavaScript Dates truncate, so equality can still be too early.
+    advance(Math.max(0, published[0].due_at.getTime() + 1 - now.getTime()));
 
     let outage = true;
+    let notificationAttempts = 0;
     const jobs = makeJobs([{
       consumer: 'notifications', eventType: 'order.confirmed.v2', description: 'Simulated notification outage',
-      handler: async () => { if (outage) throw new Error('notification provider unavailable'); },
+      handler: async () => {
+        notificationAttempts += 1;
+        if (outage) throw new Error('notification provider unavailable');
+      },
     }]);
 
-    expect((await jobs.dispatchBatch()).failed).toBe(1);
+    expect(await jobs.dispatchBatch()).toEqual({ claimed: 1, completed: 0, failed: 1, deadLettered: 0 });
+    expect(notificationAttempts).toBe(1);
+    expect(await count('SELECT COUNT(*) AS n FROM v2_inbox WHERE consumer=$1', ['notifications'])).toBe(0);
     const before = (await getPool().query('SELECT status, version, total_minor FROM orders_v2_orders WHERE id=$1', [order.id])).rows[0];
     expect(before).toMatchObject({ status: 'CONFIRMED', version: 1, total_minor: '6000' });
 
     outage = false;
     advance(60_000);
-    expect((await jobs.dispatchBatch()).completed).toBe(1);
+    expect(await jobs.dispatchBatch()).toEqual({ claimed: 1, completed: 1, failed: 0, deadLettered: 0 });
+    expect(notificationAttempts).toBe(2);
     const after = (await getPool().query('SELECT status, version, total_minor FROM orders_v2_orders WHERE id=$1', [order.id])).rows[0];
     expect(after).toEqual(before);
     expect(await count('SELECT COUNT(*) AS n FROM v2_inbox WHERE consumer=$1', ['notifications'])).toBe(1);

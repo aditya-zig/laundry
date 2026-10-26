@@ -132,7 +132,7 @@ Unavailable provider tests are `BLOCKED_PROVIDER`, not passing production checks
 
 ## 9. Parallel execution and integration
 
-The coordinator establishes an explicit published integration branch and immutable wave baselines. Do not use `build/laundry` for ordinary integration while its push workflow deploys. The plan branch is documentation only. Worker delivery is `cloud/<task-id>-<short-name>` plus a verified SHA and handoff; no PR. Only the coordinator combines delivered branches and advances the integration baseline using normal git operations.
+As of 26 October 2026, `main` is the canonical integration branch and GitHub default; the current schedule is the [3-day production / 5- and 10-day parity plan](3-5-10-day-recovery-plan.md). `build/laundry` and the old plan/integration branches are retained snapshot tags, not active development branches. A main push runs checks and does not authorize production activation. The coordinator publishes immutable verified wave SHAs. Worker delivery is `cloud/<task-id>-<short-name>` plus a verified SHA and handoff; no new PR is required by this dispatch protocol. Existing PRs with unique work remain for review. Only the coordinator combines delivered branches and advances the integration baseline using normal git operations.
 
 The task manifest distinguishes **start blockers** from **integration dependencies**. A task may build against frozen contracts and local fake ports while its runtime peers are in progress. Such a task can report `IMPLEMENTED`, not `INTEGRATED` or production-ready. Final end-to-end acceptance requires the actual peer implementations on the tested integration SHA.
 
