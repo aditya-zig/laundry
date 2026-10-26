@@ -56,13 +56,13 @@ export function nextStaffCareAction(order: v2.Order, role: v2.Actor["role"]): St
     case "READY_FOR_RETURN":
       return {
         label: "Dispatch return",
-        blockedReason: "Return dispatch is a logistics tool, not wired in this slice.",
+        blockedReason: role === "FACILITY" ? "An operator must assign the return rider." : "Use the dispatch panel below to assign a provisioned rider.",
       };
     case "RETURNING":
       return {
         label: "Complete return",
         blockedReason:
-          "Return custody acceptance and payment settlement gate the final handover; custody tools are not wired in this slice.",
+          "Accepted rider return custody and resolved payment gate delivery. Operators can record an actually received payment below; this care action cannot deliver an order.",
       };
     case "CONFIRMED":
       return { label: "Await pickup", blockedReason: "Intake requires the pickup workflow to start first." };
