@@ -24,6 +24,7 @@ import {
 import { FacilityRecordForm } from "../features/FacilityRecordForm";
 import { DispatchSettlementPanel } from "../features/DispatchSettlementPanel";
 import { CatalogReadinessPanel } from "../features/CatalogReadinessPanel";
+import { SupportConsole } from "../features/SupportConsole";
 import { useSyncedState } from "../features/useSyncedState";
 import type { PresentableError } from "../features/errors";
 import {
@@ -100,7 +101,7 @@ export function ProductOperationsApp(props: ProductOperationsAppProps = {}) {
   const actor = signInState?.phase === "signedIn" ? signInState.actor : null;
 
   useEffect(() => {
-    if (!workspace || !actor) return;
+    if (!workspace || !actor || actor.role === "SUPPORT") return;
     void workspace.queue.refresh();
   }, [workspace, actor]);
 
@@ -149,6 +150,7 @@ export function ProductOperationsApp(props: ProductOperationsAppProps = {}) {
       attempt={attemptState ?? { phase: "idle" }}
       toolsPending={settlementBusy}
       catalogTools={["OPERATOR", "ADMIN"].includes(currentActor.role) ? <CatalogReadinessPanel foundation={workspace.foundation} /> : null}
+      supportTools={["OPERATOR", "SUPPORT", "ADMIN"].includes(currentActor.role) ? <SupportConsole key={`${currentActor.id}:${currentActor.role}:${JSON.stringify(currentActor.scope)}`} foundation={workspace.foundation} actorId={currentActor.id} /> : null}
       onOpenOrder={(orderId) => {
         const attempt = workspace.care.getState();
         if (settlementBusy || attempt.phase === "sending" || attempt.phase === "unknown") return;
@@ -418,6 +420,7 @@ export interface OperationsWorkspaceViewProps {
   detailTools?: (order: v2.Order, blocked: boolean) => ReactNode;
   toolsPending?: boolean;
   catalogTools?: ReactNode;
+  supportTools?: ReactNode;
 }
 
 function FreshnessLine(props: {
@@ -455,7 +458,7 @@ export function OperationsWorkspaceView(props: OperationsWorkspaceViewProps) {
           <span className="ops-mark" aria-hidden="true">L</span>
           <div>
             <span className="ops-brand-name">Laundry Ops</span>
-            <span className="ops-mini ops-muted">Facility queue and order detail</span>
+            <span className="ops-mini ops-muted">{actor.role === "SUPPORT" ? "Customer support workspace" : "Facility queue and order detail"}</span>
           </div>
         </div>
         <div className="ops-header-actions" data-testid="ops-identity">
@@ -470,6 +473,7 @@ export function OperationsWorkspaceView(props: OperationsWorkspaceViewProps) {
 
       <main className="ops-sheets">
         {props.catalogTools && <div style={{ gridColumn: "1 / -1", minWidth: 0 }}>{props.catalogTools}</div>}
+        {actor.role !== "SUPPORT" && <>
         <section className="ops-sheet" aria-label="Order queue">
           <div className="ops-sheet-head">
             <h2 className="ops-h2">Order queue</h2>
@@ -622,6 +626,8 @@ export function OperationsWorkspaceView(props: OperationsWorkspaceViewProps) {
             {props.detailTools?.(detail.order, detail.stale || detail.refreshError !== undefined || attempt.phase === "sending" || attempt.phase === "unknown")}
           </>}
         </section>
+        </>}
+        {props.supportTools && <div style={{ gridColumn: "1 / -1", minWidth: 0 }}>{props.supportTools}</div>}
       </main>
     </div>
   );

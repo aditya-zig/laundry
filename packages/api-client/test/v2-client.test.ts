@@ -136,14 +136,15 @@ describe("v2 client headers", () => {
 });
 
 describe('support read pagination', () => {
-  it.each(['incidents', 'messages'] as const)('preserves the opaque cursor and limit for %s without a mutation key', async kind => {
+  it.each(['incidents', 'ops-incidents', 'messages'] as const)('preserves the opaque cursor and limit for %s without a mutation key', async kind => {
     const calls: Call[] = [];
     const client = createV2Client({ baseUrl: 'https://api.test/v2', fetchImpl: stub(calls, () => json({ items: [], pageInfo: { hasMore: false } })) });
     const cursor = 'opaque+/=cursor';
     if (kind === 'incidents') await client.listIncidents({ cursor, limit: 25 });
+    else if (kind === 'ops-incidents') await client.listOpsIncidents({ cursor, limit: 25 });
     else await client.listIncidentMessages(id, { cursor, limit: 25 });
     const url = new URL(calls[0].url);
-    expect(url.pathname).toBe(kind === 'incidents' ? '/v2/incidents' : `/v2/incidents/${id}/messages`);
+    expect(url.pathname).toBe(kind === 'incidents' ? '/v2/incidents' : kind === 'ops-incidents' ? '/v2/ops/incidents' : `/v2/incidents/${id}/messages`);
     expect(url.searchParams.get('cursor')).toBe(cursor);
     expect(url.searchParams.get('limit')).toBe('25');
     expect(calls[0].init.method).toBe('GET');

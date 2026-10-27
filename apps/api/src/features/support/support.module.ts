@@ -120,6 +120,12 @@ export class IncidentsController {
 export class OpsIncidentsController {
   constructor(@Inject(SUPPORT) private readonly service: SupportService | null) {}
 
+  @Get()
+  list(@Query() raw: PageQueryRaw, @Headers('authorization') authorization: string | undefined, @Res({ passthrough: true }) response: Response) {
+    noStore(response);
+    return serviceOf(this.service).listOpsIncidents(bearer(authorization), pageQuery(raw));
+  }
+
   @Post(':incidentId/resolve')
   @HttpCode(200)
   resolve(@Param('incidentId') incidentId: string, @Body() input: unknown, @Headers('authorization') authorization: string | undefined, @Headers('idempotency-key') key: string, @Res({ passthrough: true }) response: Response) {

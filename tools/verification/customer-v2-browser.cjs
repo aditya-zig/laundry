@@ -6,7 +6,7 @@ const {execFileSync} = require('node:child_process');
 const {startFixture} = require('./customer-v2-fixture.cjs');
 const {browserLaunchOptions,reviewViewport} = require('./viewports.mjs');
 const {recordingCheckpoint} = require('./recording-checkpoint.mjs');
-async function main(proposeAdjustment, finishOps, captureOpsFailure, replyToSupport) {
+async function main(proposeAdjustment, finishOps, captureOpsFailure, replyToSupport, closeOps) {
   const output=resolve('.data/browser-evidence/customer-v2'); await mkdir(output,{recursive:true});
   const browser=await chromium.launch(browserLaunchOptions());
   const viewport=reviewViewport({width:1280,height:900});
@@ -157,7 +157,9 @@ async function main(proposeAdjustment, finishOps, captureOpsFailure, replyToSupp
     await writeFile(resolve(output,'result.json'),JSON.stringify({status:'passed',sourceRevision:execFileSync('git',['rev-parse','HEAD'],{encoding:'utf8'}).trim(),sourceDirty:Boolean(execFileSync('git',['status','--porcelain'],{encoding:'utf8'}).trim()),syntheticOnly:true,commercialCalls:0,customerDeepLinkReloadProven:true,customerBagQuantityEditsProven:true,customerPieceQuantityEditsProven:true,opsCatalogReadOnlyProven:opsEvidence?.opsCatalogReadOnlyProven===true,opsCatalogFailedReadsNotEmptyOrZero:opsEvidence?.opsCatalogFailedReadsNotEmptyOrZero===true,sameBookingKeyAndBody:true,sameAdjustmentKeyAndBody:true,sameReviewKeyAndBody:finishOps?true:null,...supportEvidence,...billingEvidence,scope:opsEvidence?.rider?'customer-ops-rider':finishOps?'customer-and-ops':'customer',riderBrowser:opsEvidence?.rider??null,pickupRiderBrowser:opsEvidence?.pickup??null,pickupBrowserProven:opsEvidence?.pickup?.pickupBrowserProven===true,pickupBagContinuity:opsEvidence?.pickupBagContinuity===true,recordings:{customer:relative(output,await page.video().path()),ops:opsEvidence?.video,rider:opsEvidence?.rider?.video,pickupRider:opsEvidence?.pickup?.video},...completedEvidence,browserErrors:errors},null,2));
     if(finishOps) {
       console.log('PASS: owner review after recorded delivery, no default rating or publication consent, one private review after reply loss and navigation/retry, and no second-review form.');
-      console.log('PASS: one customer support case and one customer message after committed reply loss/navigation/retry, exact keys/bodies, compiled-service synthetic staff reply visible, and no order status/version change. No staffed-console or live-notification claim.');
+      console.log(supportEvidence.staffConsoleBrowserProven
+        ? 'PASS: customer case/message and actual operator console reply, each with committed reply-loss retry and exact keys/bodies; failed reads are not empty results. No order status/version change, live notification or staffed-SLA claim.'
+        : 'PASS: customer case/message with synthetic service staff reply; no staffed-console or live-notification claim.');
     }
     console.log('PASS: actual customer UI + SDK + compiled HTTP services + disposable PostgreSQL. First committed reply replaced by 503/unknown; navigation/retry reused key/body; exactly one order/obligation/pickup/event. Explicit intake-adjustment acceptance also survives reply loss/navigation with one decision audit. Synthetic OTP/prices/capacity only.');
   } catch(error) {
@@ -166,7 +168,7 @@ async function main(proposeAdjustment, finishOps, captureOpsFailure, replyToSupp
     await page.screenshot({path:resolve(output,'failed.png'),fullPage:true}).catch(()=>{});
     await writeFile(resolve(output,'failed-body.txt'),await page.locator('body').innerText());
     throw error;
-  } finally { await context.close(); await browser.close(); }
+  } finally { try { await closeOps?.(); } finally { try { await context.close(); } finally { await browser.close(); } } }
 }
 async function run() {
   const withOps = process.env.LAUNDRY_VERIFY_OPS_FACILITY === 'true';
@@ -174,7 +176,7 @@ async function run() {
   const withPickup = process.env.LAUNDRY_VERIFY_PICKUP === 'true';
   const close = await startFixture({ withOps, withRider, withPickup });
   const ops = withOps ? require('./ops-facility-browser.cjs').opsFacilityJourney(close, withRider, withPickup) : null;
-  try { await main(ops ? ops.proposeAdjustment : close.proposeAdjustment, ops?.finish, ops?.captureFailure, close.replyToSupport); } finally { await close(); }
+  try { await main(ops ? ops.proposeAdjustment : close.proposeAdjustment, ops?.finish, ops?.captureFailure, ops ? ops.replyToSupport : close.replyToSupport, ops?.close); } finally { await close(); }
 }
 module.exports = { run };
 if (require.main === module) run().catch(error=>{console.error(error);process.exit(1);});

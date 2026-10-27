@@ -1,5 +1,6 @@
 // Task-only customer UI acceptance, using the already-owned browser context.
-// Staff acknowledgement comes from synthetic fixture setup, NOT a staffed console.
+// The caller supplies either the actual owned ops UI or an explicitly synthetic
+// service fallback; the result records which path was actually exercised.
 const { expect } = require('@playwright/test');
 const { resolve } = require('node:path');
 const { reviewViewport } = require('./viewports.mjs');
@@ -52,7 +53,8 @@ async function customerSupportJourney(page, output, replyToSupport) {
     await expect(page.getByText('Message recorded', { exact: true })).toBeVisible();
     expect(messages).toHaveLength(2); expect(messages[0].key).toBeTruthy(); expect(messages[0]).toEqual(messages[1]);
     expect(JSON.parse(messages[0].body)).toEqual({ body: text, mediaIds: [] });
-    await replyToSupport();
+    const staffEvidence = await replyToSupport();
+    await page.bringToFront();
     await page.getByRole('button', { name: 'Refresh case messages', exact: true }).click();
     await expect(page.getByText('Synthetic operator acknowledgement; no refund or rewash promised.', { exact: true })).toBeVisible();
     await expect(page.getByText(/^OPERATOR ·/)).toBeVisible();
@@ -64,7 +66,7 @@ async function customerSupportJourney(page, output, replyToSupport) {
     await page.setViewportSize(reviewViewport({ width: 390, height: 844 }));
     expect(await evidence()).toEqual({ ...before, incidents: 1, messages: 2, customer_messages: 1, staff_messages: 1, opened_audits: 1, message_audits: 2 });
     expect({ emptyCasesDuringUnknown, emptyMessagesDuringUnknown }).toEqual({ emptyCasesDuringUnknown: 0, emptyMessagesDuringUnknown: 0 });
-    return { noFalseEmptyStateDuringUnknown: true, sameSupportCaseKeyAndBody: true, sameSupportMessageKeyAndBody: true, supportOrderUnchanged: true, syntheticStaffReplyOnly: true };
+    return { noFalseEmptyStateDuringUnknown: true, sameSupportCaseKeyAndBody: true, sameSupportMessageKeyAndBody: true, supportOrderUnchanged: true, syntheticStaffReplyOnly: staffEvidence?.staffConsoleBrowserProven !== true, ...staffEvidence };
   } finally { page.off('request', capture); }
 }
 module.exports = { customerSupportJourney };

@@ -21,6 +21,7 @@ import {
 import { formatWindow, formatInrMinor, shortId } from "../features/format";
 import { parseFacilityRecord, type FacilityDraft } from "../features/FacilityRecordForm";
 import { OperationsWorkspaceView, SignInView } from "./ProductOperationsApp";
+import { SupportConsole } from "../features/SupportConsole";
 
 type RecordedCall = {
   method: string;
@@ -261,6 +262,20 @@ describe("facility intake and quality commands", () => {
     expect(h.calls[0].headers["Idempotency-Key"]).toBe("qc-key-1");
     expect(h.calls[1].headers["Idempotency-Key"]).toBe("qc-key-2");
     expect(h.calls[1].body).toMatchObject({ expectedVersion: 4 });
+  });
+
+  it("gives support staff their text console without a forbidden facility queue or fulfillment controls", () => {
+    const foundation = newFoundation(harness());
+    const actor: v2.Actor = { ...operatorActor, role: "SUPPORT" };
+    const markup = renderToStaticMarkup(createElement(OperationsWorkspaceView, {
+      actor, queue: { kind: "idle" }, detail: { kind: "idle" }, attempt: { phase: "idle" },
+      supportTools: createElement(SupportConsole, { foundation, actorId: actor.id }),
+    }));
+    expect(markup).toContain('Customer support workspace');
+    expect(markup).toContain('aria-label="Staff support console"');
+    expect(markup).toContain('Load support cases');
+    expect(markup).not.toContain('aria-label="Order queue"');
+    expect(markup).not.toContain('Start care');
   });
 
   it("shows a physical measurement form only to permitted staff at pickup intake", () => {

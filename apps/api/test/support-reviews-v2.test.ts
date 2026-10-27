@@ -28,6 +28,8 @@ const TOKEN_B = 'B'.repeat(43);
 const TOKEN_OPERATOR = 'C'.repeat(43);
 const TOKEN_SUPPORT = 'D'.repeat(43);
 const TOKEN_RIDER = 'E'.repeat(43);
+const TOKEN_FACILITY = 'F'.repeat(43);
+const TOKEN_ADMIN = 'G'.repeat(43);
 const key = () => randomUUID();
 
 const actor = (id: string, role: v2.ActorRole): v2.Actor => ({ id, role, facilityIds: [], scope: { facilityIds: [] } });
@@ -37,6 +39,8 @@ const ACTORS: Record<string, v2.Actor> = {
   [TOKEN_OPERATOR]: actor(OPERATOR_ID, 'OPERATOR'),
   [TOKEN_SUPPORT]: actor(SUPPORT_ID, 'SUPPORT'),
   [TOKEN_RIDER]: actor(RIDER_ID, 'RIDER'),
+  [TOKEN_FACILITY]: actor('88888888-8888-4888-8888-888888888888', 'FACILITY'),
+  [TOKEN_ADMIN]: actor('99999999-9999-4999-8999-999999999999', 'ADMIN'),
 };
 
 const authenticate = async (token: string) => {
@@ -399,6 +403,55 @@ describe('B08 routes through the real SDK over HTTP', () => {
     base = (await app.getUrl()) + '/v2';
   });
   afterEach(async () => { await app?.close(); });
+
+  it('pages the staff incident queue across customers without widening customer/rider/facility access', async () => {
+    const orderA = await seedOrder();
+    const orderB = await seedOrder(CUSTOMER_B);
+    const first = await openIncident(orderA);
+    now = new Date(now.getTime() + 1000);
+    const second = await openIncident(orderB, TOKEN_B);
+    now = new Date(now.getTime() + 1000);
+    const third = await openIncident(orderA);
+    const get = (token: string | undefined, query = '') => fetch(base + '/ops/incidents' + query, {
+      headers: token ? { authorization: `Bearer ${token}` } : {},
+    });
+    const response = await get(TOKEN_SUPPORT, '?limit=2');
+    expect(response.status).toBe(200);
+    expect(response.headers.get('cache-control')).toBe('no-store');
+    const page = v2.pageSchema(v2.incidentSchema).parse(await response.json());
+    expect(page.items.map(value => value.id)).toEqual([third.id, second.id]);
+    expect(page.pageInfo.hasMore).toBe(true);
+    if (!page.pageInfo.nextCursor) throw new Error('Staff queue continuation is required');
+    const nextResponse = await get(TOKEN_OPERATOR, '?limit=2&cursor=' + encodeURIComponent(page.pageInfo.nextCursor));
+    expect(nextResponse.status).toBe(200);
+    const next = v2.pageSchema(v2.incidentSchema).parse(await nextResponse.json());
+    expect(next.items.map(value => value.id)).toEqual([first.id]);
+    expect(next.pageInfo.hasMore).toBe(false);
+    expect((await get(TOKEN_ADMIN)).status).toBe(200);
+    for (const token of [TOKEN_A, TOKEN_B, TOKEN_RIDER, TOKEN_FACILITY]) {
+      const denied = await get(token);
+      expect(denied.status).toBe(403);
+      expect(v2.errorEnvelopeSchema.parse(await denied.json()).code).toBe('FORBIDDEN');
+      expect(denied.headers.get('cache-control')).toBe('no-store');
+    }
+    expect((await get(undefined)).status).toBe(401);
+    const owned = createV2Client({ baseUrl: base, getToken: () => TOKEN_A });
+    expect((await owned.listIncidents()).items.map(value => value.id)).toEqual([third.id, first.id]);
+    const orders = (await getPool().query('SELECT status,version FROM orders_v2_orders ORDER BY id')).rows;
+    expect(orders).toEqual([{ status: 'DELIVERED', version: 3 }, { status: 'DELIVERED', version: 3 }]);
+    const index = (await getPool().query("SELECT indexdef FROM pg_indexes WHERE schemaname='public' AND tablename='support_v2_incidents' AND indexname='support_v2_incident_staff_queue'")).rows[0];
+    expect(index?.indexdef).toContain('(created_at DESC, id DESC)');
+  });
+
+  it('rejects invalid staff queue limits and forged cursor ids with typed validation errors', async () => {
+    const forgedCursor = Buffer.from(now.toISOString() + '|not-a-uuid').toString('base64url');
+    for (const query of ['?limit=0', '?cursor=broken', '?cursor=' + forgedCursor]) {
+      const response = await fetch(base + '/ops/incidents' + query, { headers: { authorization: `Bearer ${TOKEN_SUPPORT}` } });
+      expect(response.status).toBe(400);
+      expect(v2.errorEnvelopeSchema.parse(await response.json()).code).toBe('INVALID_INPUT');
+      expect(response.headers.get('cache-control')).toBe('no-store');
+    }
+  });
 
   it('pages support cases and messages over HTTP without crossing customer or role boundaries', async () => {
     const orderId = await seedOrder();

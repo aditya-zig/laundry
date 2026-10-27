@@ -103,7 +103,7 @@ function decodeCursor(cursor: string | undefined): { at: Date; id: string } | un
   if (split === -1) throw new SupportFault('INVALID_INPUT', 'Cursor is not valid');
   const at = new Date(raw.slice(0, split));
   if (Number.isNaN(at.getTime())) throw new SupportFault('INVALID_INPUT', 'Cursor is not valid');
-  return { at, id: raw.slice(split + 1) };
+  return { at, id: id(raw.slice(split + 1), 'Cursor id') };
 }
 
 function seqCursor(value: number | undefined): string | undefined {
@@ -185,8 +185,8 @@ export class SupportService {
     }, 'Stored rewash request is not valid');
   }
 
-  /** A customer sees only their own incident; staff see every incident they are
-   * routed to. A customer asking for someone else's incident gets NOT_FOUND so
+  /** A customer sees only their own incident; authorized support staff can read
+   * the support queue. A customer asking for someone else's incident gets NOT_FOUND so
    * the route does not confirm that the incident exists. */
   private async visibleIncident(actor: v2.Actor, incidentId: string, client: Pool | PoolClient = this.options.db): Promise<IncidentRow> {
     const row = (await client.query<IncidentRow>('SELECT * FROM support_v2_incidents WHERE id=$1', [id(incidentId, 'incidentId')])).rows[0];
@@ -242,13 +242,23 @@ export class SupportService {
 
   async listIncidents(token: string, query: { cursor?: string; limit?: number } = {}): Promise<v2.Page<v2.Incident>> {
     const customer = await this.actorOf(token, CUSTOMERS);
+    return this.incidentPage(query, customer.id);
+  }
+
+  async listOpsIncidents(token: string, query: { cursor?: string; limit?: number } = {}): Promise<v2.Page<v2.Incident>> {
+    await this.actorOf(token, STAFF);
+    return this.incidentPage(query);
+  }
+
+  private async incidentPage(query: { cursor?: string; limit?: number }, customerId?: string): Promise<v2.Page<v2.Incident>> {
     const page = parse(v2.pageQuerySchema, query, 'Page query');
     const cursor = decodeCursor(page.cursor);
-    const args: unknown[] = [customer.id];
-    let where = 'customer_id=$1';
+    const args: unknown[] = customerId === undefined ? [] : [customerId];
+    let where = customerId === undefined ? 'TRUE' : 'customer_id=$1';
     if (cursor) {
+      const offset = args.length;
       args.push(cursor.at, cursor.id);
-      where += ` AND (created_at, id) < ($2::timestamptz, $3::uuid)`;
+      where += ` AND (created_at, id) < ($${offset + 1}::timestamptz, $${offset + 2}::uuid)`;
     }
     args.push(page.limit + 1);
     const rows = await this.rows<IncidentRow>(

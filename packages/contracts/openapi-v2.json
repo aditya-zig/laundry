@@ -8035,6 +8035,122 @@
         "x-laundry-backend-acceptance": "NOT_VERIFIED"
       }
     },
+    "/v2/ops/incidents": {
+      "get": {
+        "operationId": "support.ops.incidents.list",
+        "summary": "List support incidents for authorized staff",
+        "tags": [
+          "B08"
+        ],
+        "security": [
+          {
+            "bearerSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 50
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Contract-valid result. The runtime validates cross-field invariants and normalizes instants to UTC.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IncidentPage"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "INVALID_INPUT. ",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "UNAUTHENTICATED. ",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "FORBIDDEN. ",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "NOT_FOUND. ",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "RATE_LIMITED. ",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "PROVIDER_UNAVAILABLE. PROVIDER_OUTCOME_UNKNOWN. ",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        },
+        "x-laundry-roles": [
+          "OPERATOR",
+          "SUPPORT",
+          "ADMIN"
+        ],
+        "x-laundry-idempotency": "NOT_APPLICABLE",
+        "x-laundry-owner": "B08",
+        "x-laundry-backend-acceptance": "NOT_VERIFIED"
+      }
+    },
     "/v2/incidents/{incidentId}/messages": {
       "post": {
         "operationId": "support.incidents.messages",

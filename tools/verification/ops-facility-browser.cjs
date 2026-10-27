@@ -168,8 +168,12 @@ function opsFacilityJourney(fixture, withRider = false, withPickup = false) {
       } catch (error) {
         await captureFailure();
         throw error;
-      } finally { if (context) await context.close(); }
+      }
     },
+    async replyToSupport() {
+      return require('./ops-support-browser.cjs').opsSupportJourney(page, output);
+    },
+    async close() { if (context) await context.close(); },
   };
 }
 module.exports = { opsFacilityJourney };

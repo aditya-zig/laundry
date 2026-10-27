@@ -395,6 +395,9 @@ export function createV2Client(options: V2ClientOptions = {}) {
     listIncidents: (query?: Query) =>
       call("support.incidents.list", incidentList, { query }),
 
+    listOpsIncidents: (query?: Query) =>
+      call("support.ops.incidents.list", incidentList, { query }),
+
     createIncident: (input: v2.IncidentInput, opts?: V2MutatingOpts) =>
       call("support.incidents.create", incident, { params: { orderId: v2.idSchema.parse(input.orderId) }, body: v2.incidentInputSchema.parse(input), opts }),
 

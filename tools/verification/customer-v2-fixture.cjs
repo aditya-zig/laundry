@@ -122,8 +122,8 @@ async function startFixture({ withOps = false, withRider = false, withPickup = f
   });
   let dropNextBooking = true, dropNextDecision = true, dropNextIntake = withOps, dropNextQualityPass = withOps,
     dropNextReceipt = withOps, dropNextReview = withOps,
-    dropNextIncident = withOps, dropNextMessage = withOps;
-  const lostAssignments = new Set(), lostAcceptances = new Set(), lostHandovers = new Set();
+    dropNextIncident = withOps;
+  const lostAssignments = new Set(), lostAcceptances = new Set(), lostHandovers = new Set(), lostMessageActors = new Set();
   app.use((request,response,next)=>{ const json=response.json.bind(response); response.json=body=>{
     const booking = request.path === '/v2/orders' && dropNextBooking;
     const decision = request.path.endsWith('/adjustments/decision') && dropNextDecision;
@@ -133,14 +133,14 @@ async function startFixture({ withOps = false, withRider = false, withPickup = f
     const receipt = request.path.endsWith('/confirm-manual') && dropNextReceipt;
     const review = request.path.endsWith('/reviews') && dropNextReview;
     const incident = /^\/v2\/orders\/[^/]+\/incidents$/.test(request.path) && dropNextIncident;
-    const message = request.path.startsWith('/v2/incidents/') && request.path.endsWith('/messages') && dropNextMessage;
+    const message = request.path.startsWith('/v2/incidents/') && request.path.endsWith('/messages') && withOps && !lostMessageActors.has(body?.authorId);
     const riderAcceptance = request.path.startsWith('/v2/rider/jobs/') && request.path.endsWith('/accept') && withRider && !lostAcceptances.has(body?.id);
     const riderHandover = request.path === '/v2/rider/handovers' && body?.accepted === true && withRider && !lostHandovers.has(body?.custodyEventId);
     if(request.method==='POST' && (body?.id || riderHandover) && (booking || decision || intake || quality || assignment || receipt || review || incident || message || riderAcceptance || riderHandover)) {
       if (booking) dropNextBooking = false; if (decision) dropNextDecision = false;
       if (intake) dropNextIntake = false; if (quality) dropNextQualityPass = false;
       if (assignment) lostAssignments.add(body.id); if (receipt) dropNextReceipt = false; if (review) dropNextReview = false;
-      if (incident) dropNextIncident = false; if (message) dropNextMessage = false;
+      if (incident) dropNextIncident = false; if (message) lostMessageActors.add(body.authorId);
       if (riderAcceptance) lostAcceptances.add(body.id); if (riderHandover) lostHandovers.add(body.custodyEventId);
       response.status(503); return json({code:'PROVIDER_OUTCOME_UNKNOWN',message:'Synthetic post-commit response loss',traceId:randomUUID(),retryable:true});
     } return json(body);
