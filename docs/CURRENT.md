@@ -9,7 +9,6 @@ Canonical branch: `work/facility-recovery-20261026` (pushed to `origin`)
 - Refresh this file as part of every checkpoint commit; a stale pointer is a process fault, not a missing file.
 - Verification runs only in the canonical worktree while `git status --porcelain` is empty. Do not edit tracked sources while receipts are being recorded.
 - After any work session, `pnpm agents:local-status` must be checked; unpushed commits have no backup.
-- A dated status snapshot, not the state of record: `docs/reports/first-mate-report-20261109.html`.
 
 Latest verified evidence (update on each checkpoint):
 
