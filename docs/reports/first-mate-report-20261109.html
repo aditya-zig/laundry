@@ -1,401 +1,467 @@
 <!DOCTYPE html>
-<!-- Status snapshot, rev 2, assembled 2026-11-09 from receipts at e41049b9.
-     Copy trimmed to ~380 words on request. State of record remains the
-     checkpoint docs under docs/implementation/production-application/. -->
+<!-- Point-in-time status snapshot, assembled 2026-11-09 from receipts at e41049b9.
+     The state of record remains the checkpoint docs under docs/implementation/production-application/. -->
 <html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>First Mate's Report, Nov 9 2026</title>
+<title>First Mate's Report, Nov 9 2026, Laundry production readiness</title>
 <style>
   :root{
-    --ink:#070f1d; --panel:rgba(255,255,255,.05); --line:rgba(222,186,118,.3); --line2:rgba(255,255,255,.09);
-    --body:#b0bfda; --bright:#f5f2e8; --mute:#7e8caa;
-    --good:#5fc99e; --warn:#e6b455; --bad:#e2705d;
+    --ink:#0a1524; --panel:rgba(255,255,255,.045); --panel2:rgba(255,255,255,.08);
+    --line:rgba(212,178,106,.28); --line2:rgba(255,255,255,.10);
+    --gold:#d8b36a; --gold2:#f0d9a8; --paper:#eef0ea; --body:#b6c2d4; --bright:#f2f4ff;
+    --good:#63c39a; --warn:#e0b34e; --bad:#e0705f; --mute:#7f8fa8;
   }
   *{box-sizing:border-box; margin:0; padding:0}
   html{scroll-behavior:smooth}
   body{
     background:
-      radial-gradient(1100px 700px at 85% -15%, rgba(64,90,160,.30), transparent 55%),
-      radial-gradient(900px 500px at -10% 40%, rgba(120,80,28,.22), transparent 55%),
-      linear-gradient(180deg,#070f1d 0%, #0b1830 60%, #050b16 100%);
-    color:var(--body); font:16px/1.6 Inter,"Segoe UI",system-ui,Arial,sans-serif;
-    padding:0 20px; -webkit-font-smoothing:antialiased;
+      radial-gradient(1200px 600px at 80% -10%, rgba(63,84,140,.25), transparent 60%),
+      radial-gradient(900px 500px at -10% 30%, rgba(88,60,30,.18), transparent 60%),
+      linear-gradient(180deg,#0a1524 0%, #0b1930 55%, #091321 100%);
+    color:var(--body); font:16px/1.65 "Inter", "Segoe UI", system-ui, Arial, sans-serif;
+    -webkit-font-smoothing:antialiased; padding:0 20px;
   }
-  .grain{position:fixed; inset:0; pointer-events:none; z-index:5; opacity:.05;
-    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)'/%3E%3C/svg%3E");}
-  .sheet{max-width:1100px; margin:0 auto; padding-bottom:70px; position:relative; z-index:6}
-  .serif{font-family:"Iowan Old Style","Palatino Linotype","Book Antiqua",Palatino,Georgia,serif}
-  .gold{background:linear-gradient(100deg,#8f6a2e 0%, #e9cb86 28%, #fdf6e0 50%, #dcb45f 68%, #8f6a2e 100%); -webkit-background-clip:text; background-clip:text; color:transparent}
-  .kicker{font-size:11px; letter-spacing:.34em; text-transform:uppercase; color:#cfa655; font-weight:700}
-  .chip{display:inline-block; border:1px solid rgba(222,186,118,.4); border-radius:999px; padding:5px 15px; background:rgba(222,186,118,.06); font:12px ui-monospace,Menlo,monospace; color:#cdd6e6}
+  .sheet{max-width:1120px; margin:0 auto; padding-bottom:80px}
+  .display{font-family:"Iowan Old Style","Palatino Linotype","Book Antiqua",Palatino,Georgia,serif; color:var(--bright)}
+  .kicker{font-size:11px; letter-spacing:.28em; text-transform:uppercase; color:var(--gold); font-weight:600}
+  .chip{display:inline-flex; align-items:center; gap:8px; border:1px solid rgba(216,179,106,.4); border-radius:999px; padding:5px 14px; background:rgba(216,179,106,.07); backdrop-filter:blur(6px)}
 
-  header.cover{padding:88px 8px 48px; position:relative}
-  header.cover .rose{position:absolute; right:-50px; top:-70px; opacity:.16; pointer-events:none}
-  h1{font-size:clamp(58px,9vw,110px); line-height:.98; font-weight:500; letter-spacing:-.015em; margin:16px 0 14px}
-  h1 em{font-style:italic}
-  .cover-sub{font-size:20px; color:#a7b6d0; max-width:560px}
-  .cover-chips{display:flex; gap:10px; flex-wrap:wrap; margin-top:28px}
+  header.cover{position:relative; padding:84px 8px 56px; text-align:left; overflow:hidden}
+  header.cover .rose{position:absolute; right:-40px; top:-60px; opacity:.13; pointer-events:none}
+  h1.cover-title{font-size:clamp(44px,7vw,84px); line-height:1.04; letter-spacing:-.01em; margin:18px 0 10px; font-weight:500}
+  h1.cover-title em{font-style:italic; color:var(--gold2)}
+  .cover-sub{max-width:640px; font-size:19px; color:#a9b6c9; margin-top:6px}
+  .cover-chips{display:flex; gap:10px; flex-wrap:wrap; margin-top:26px; font-size:12.5px; color:#c9d3e2; font-family:ui-monospace,"SF Mono",Menlo,Consolas,monospace}
 
-  nav.toc{display:flex; gap:26px; flex-wrap:wrap; padding:16px 4px; border-top:1px solid var(--line2); border-bottom:1px solid var(--line2); margin-top:36px}
-  nav.toc a{color:#93a5c0; text-decoration:none; font:600 11px Inter; letter-spacing:.24em; text-transform:uppercase}
-  nav.toc a:hover{color:#f0d9a8}
+  nav.toc{display:flex; gap:22px; flex-wrap:wrap; padding:18px 8px; border-top:1px solid var(--line2); border-bottom:1px solid var(--line2); font-size:13px; letter-spacing:.06em}
+  nav.toc a{color:#9fb0c7; text-decoration:none; text-transform:uppercase; font-weight:600; font-size:11.5px; letter-spacing:.2em}
+  nav.toc a:hover{color:var(--gold2)}
 
-  .verdict{display:grid; grid-template-columns:1fr 1fr; border:1px solid var(--line); border-radius:20px; overflow:hidden; margin:36px 0 30px;
-    background:linear-gradient(100deg, rgba(226,112,93,.16), rgba(226,112,93,.03) 52%, rgba(95,201,158,.13)); box-shadow:0 30px 90px rgba(0,0,0,.5)}
-  .verdict>div{padding:36px 34px}
+  .verdict{display:grid; grid-template-columns:1.15fr .85fr; gap:0; border:1px solid var(--line); border-radius:18px; overflow:hidden; margin:34px 0; background:linear-gradient(100deg, rgba(224,112,95,.14), rgba(224,112,95,.03) 55%, rgba(99,195,154,.12)); box-shadow:0 30px 80px rgba(0,0,0,.35)}
+  .verdict>div{padding:34px 36px}
   .verdict .no{border-right:1px solid var(--line2)}
-  .stamp{display:inline-block; transform:rotate(-3deg); border:2px solid currentColor; border-radius:8px; padding:4px 16px; font-weight:800; letter-spacing:.26em; font-size:13px;
-    box-shadow:0 0 0 3px rgba(0,0,0,.18), inset 0 0 14px rgba(0,0,0,.25)}
-  .stamp.bad{color:#f09080}
-  .stamp.go{color:#7fdcae}
-  .verdict .big{font-size:clamp(26px,2.8vw,38px); color:var(--bright); margin:16px 0 8px; line-height:1.15; font-weight:500}
-  .verdict p{font-size:14px; color:#93a5bd}
-  .verdict .quiet{color:#93a5bd; margin-top:10px}
+  .verdict .big{font-size:clamp(30px,3.4vw,44px); line-height:1.1; color:var(--bright); font-weight:500}
+  .verdict .why{font-size:13px; color:#9db0c8; margin-top:10px}
+  .stamp{display:inline-block; transform:rotate(-4deg); border:2px solid rgba(224,112,95,.65); color:#ef907f; padding:3px 14px; border-radius:6px; font-weight:800; letter-spacing:.22em; font-size:13px; margin-bottom:14px}
+  .stamp.go{border-color:rgba(99,195,154,.65); color:#7fd6ae}
 
-  .stats{display:grid; grid-template-columns:repeat(4,1fr); gap:14px}
-  .stat{border:1px solid var(--line2); background:var(--panel); border-radius:18px; padding:20px; position:relative}
-  .stat::after{content:""; position:absolute; inset:5px; border:1px solid rgba(222,186,118,.14); border-radius:13px; pointer-events:none}
-  .stat .label{font-size:10px; letter-spacing:.24em; text-transform:uppercase; color:var(--mute); font-weight:700}
-  .ringrow{display:flex; align-items:center; gap:13px; margin-top:14px}
-  .ringrow svg{transform:rotate(-90deg)}
-  .pctwrap{position:relative; width:64px; height:64px; flex:none}
-  .pctwrap .pct{position:absolute; inset:0; display:grid; place-items:center; font:700 12px ui-monospace,Menlo,monospace; color:var(--bright)}
-  .stat h3{font-size:20px; color:var(--bright); font-weight:600; line-height:1.15}
-  .stat p{font-size:11.5px; color:#8494b0; margin-top:3px}
+  .stats{display:grid; grid-template-columns:repeat(4,1fr); gap:14px; margin:26px 0 8px}
+  .stat{border:1px solid var(--line2); background:var(--panel); border-radius:16px; padding:20px 18px; text-align:left}
+  .stat .label{font-size:10.5px; letter-spacing:.2em; text-transform:uppercase; color:var(--mute); font-weight:700}
+  .ringrow{display:flex; align-items:center; gap:14px; margin-top:12px}
+  .ringwrap{position:relative; width:56px; height:56px; flex:none}
+  .ringwrap svg{transform:rotate(-90deg)}
+  .ringwrap .pct{position:absolute; inset:0; display:grid; place-items:center; font-size:12px; font-weight:700; color:var(--bright)}
+  .stat h3{font-size:22px; color:var(--bright); font-weight:600; line-height:1.2}
+  .stat p{font-size:12px; color:#8fa0b8; margin-top:3px}
 
-  .answer{border-left:2px solid #cfa655; padding:6px 0 6px 24px; margin:40px 2px 8px}
-  .answer div{display:flex; gap:14px; align-items:baseline; padding:5px 0; font-size:16.5px; color:#cfdaea}
-  .answer b{flex:none; width:74px; font:700 11px Inter; letter-spacing:.22em; text-transform:uppercase; color:#cfa655}
+  .answer{border-left:2px solid var(--gold); padding:4px 0 4px 22px; margin:40px 4px; font-size:17.5px; line-height:1.75; color:#cdd7e6}
+  .answer strong{color:var(--bright); font-weight:600}
 
-  section{padding:52px 4px 6px}
-  .secline{display:flex; align-items:baseline; gap:16px}
-  .secline .n{font:400 13px ui-monospace,Menlo,monospace; color:#cfa655; letter-spacing:.2em}
-  .secline h2{font-size:clamp(24px,3vw,34px); font-weight:500}
+  section{padding:54px 8px 10px}
+  .secline{display:flex; align-items:baseline; gap:18px; margin-bottom:6px}
+  .secline h2{font-size:clamp(26px,3vw,36px); font-weight:500}
   .secline .rule{flex:1; height:1px; background:linear-gradient(90deg, var(--line), transparent)}
-  .lede{margin-top:6px; color:#9db0ca; max-width:640px; font-size:15px}
+  .secline .n{font-size:12px; color:var(--mute); font-family:ui-monospace,Menlo,monospace}
+  .lede{max-width:760px; color:#a3b2c9; margin-top:8px}
 
-  table.ledger{width:100%; border-collapse:collapse; margin-top:20px; font-size:14px}
-  table.ledger th{text-align:left; font:700 10px Inter; letter-spacing:.22em; text-transform:uppercase; color:#cfa655; padding:10px 12px; border-bottom:1px solid var(--line)}
-  table.ledger td{padding:12px; border-bottom:1px solid var(--line2); vertical-align:top; color:#b9c6d8}
-  table.ledger td:first-child{color:var(--bright); font-weight:600; white-space:nowrap}
-  table.ledger tr:hover td{background:rgba(222,186,118,.045)}
-  .mono{font-family:ui-monospace,Menlo,monospace; font-size:12px; color:#9badc4}
-  .mono b{color:#ecdb9f; font-weight:600}
+  table.ledger{width:100%; border-collapse:collapse; margin-top:22px; font-size:14px}
+  table.ledger th{text-align:left; font-size:10.5px; letter-spacing:.18em; text-transform:uppercase; color:var(--gold); padding:10px 14px; border-bottom:1px solid var(--line)}
+  table.ledger td{padding:13px 14px; border-bottom:1px solid var(--line2); vertical-align:top; color:#bcc9da}
+  table.ledger tr:hover td{background:rgba(255,255,255,.025)}
+  table.ledger .what{color:var(--bright); font-weight:600}
+  .mono{font-family:ui-monospace,"SF Mono",Menlo,Consolas,monospace; font-size:12px; color:#9fb0c7}
+  .mono b{color:var(--gold2); font-weight:600}
+  .tag{display:inline-block; padding:2px 9px; border-radius:999px; font-size:10.5px; font-weight:700; letter-spacing:.08em; text-transform:uppercase}
+  .tag.ok{background:rgba(99,195,154,.14); color:#7fd6ae; border:1px solid rgba(99,195,154,.35)}
+  .tag.hum{background:rgba(224,179,78,.13); color:#ecca82; border:1px solid rgba(224,179,78,.35)}
+  .tag.eng{background:rgba(120,160,255,.12); color:#a9c2ff; border:1px solid rgba(120,160,255,.3)}
+  .tag.block{background:rgba(224,112,95,.13); color:#ef9a8b; border:1px solid rgba(224,112,95,.35)}
 
-  .bars{margin-top:22px; display:grid; gap:8px; max-width:640px}
-  .bar{display:grid; grid-template-columns:150px 1fr 56px; align-items:center; gap:14px; font-size:13px}
-  .bar .track{height:9px; border-radius:99px; background:rgba(255,255,255,.06); overflow:hidden}
-  .bar .fill{height:100%; border-radius:99px; background:linear-gradient(90deg,#2f5d8f,#6fb3a4); box-shadow:0 0 10px rgba(95,201,158,.35)}
-  .bar .num{font-family:ui-monospace,Menlo,monospace; text-align:right; color:#9badc4}
+  .bars{margin-top:20px; display:grid; gap:9px}
+  .bar{display:grid; grid-template-columns:190px 1fr 64px; align-items:center; gap:14px; font-size:13.5px}
+  .bar .name{color:#c4cfdf}
+  .bar .track{height:10px; border-radius:99px; background:rgba(255,255,255,.06); overflow:hidden; border:1px solid rgba(255,255,255,.06)}
+  .bar .fill{height:100%; border-radius:99px; background:linear-gradient(90deg, #2f5d8f, #6fb3a4); box-shadow:0 0 12px rgba(99,195,154,.35)}
+  .bar .num{text-align:right; font-family:ui-monospace,Menlo,monospace; color:#9fb0c7}
 
-  .cards{display:grid; grid-template-columns:repeat(auto-fill,minmax(310px,1fr)); gap:13px; margin-top:22px}
-  .card{border:1px solid var(--line2); border-radius:16px; padding:18px 20px; background:linear-gradient(180deg,var(--panel),rgba(255,255,255,.015)); transition:transform .16s, box-shadow .16s, border-color .16s; position:relative}
-  .card::after{content:""; position:absolute; inset:4px; border:1px solid rgba(222,186,118,.1); border-radius:12px; pointer-events:none}
-  .card:hover{transform:translateY(-2px); border-color:var(--line); box-shadow:0 18px 50px rgba(222,186,118,.07)}
-  .card .head{display:flex; justify-content:space-between; align-items:center; font:600 12px ui-monospace,Menlo,monospace; color:#ecdb9f}
-  .card h4{font-size:16px; color:var(--bright); font-weight:600; margin:7px 0 5px}
-  .card p{font-size:13px; color:#93a4bd}
-  .tag{display:inline-block; padding:2px 10px; border-radius:999px; font:700 10px Inter; letter-spacing:.1em; text-transform:uppercase; border:1px solid}
-  .tag.ok{color:#7fdcae; border-color:rgba(95,201,158,.4); background:rgba(95,201,158,.1)}
-  .tag.hum{color:#ecca82; border-color:rgba(224,179,78,.4); background:rgba(224,179,78,.09)}
-  .tag.eng{color:#a9c2ff; border-color:rgba(120,160,255,.3); background:rgba(120,160,255,.08)}
-  .tag.bad{color:#ef9a8b; border-color:rgba(226,112,93,.4); background:rgba(226,112,93,.09)}
+  .cards{display:grid; grid-template-columns:repeat(auto-fill,minmax(320px,1fr)); gap:14px; margin-top:24px}
+  .card{border:1px solid var(--line2); background:linear-gradient(180deg,var(--panel),rgba(255,255,255,.02)); border-radius:16px; padding:20px 22px; transition:transform .18s ease, border-color .18s ease}
+  .card:hover{transform:translateY(-2px); border-color:var(--line)}
+  .card .head{display:flex; align-items:center; justify-content:space-between; gap:10px}
+  .card .num{font-family:ui-monospace,Menlo,monospace; font-size:12px; color:var(--gold2); letter-spacing:.06em}
+  .card h4{font-size:15.5px; color:var(--bright); font-weight:600; margin:8px 0 6px; line-height:1.35}
+  .card p{font-size:13px; color:#9aabc2}
+  .card .foot{margin-top:12px; display:flex; gap:8px; flex-wrap:wrap}
 
-  .gatebox{margin-top:24px; border:1px dashed rgba(224,179,78,.45); border-radius:16px; padding:22px 24px; background:rgba(224,179,78,.05)}
-  .gatebox h3{font-size:14px; color:#ecca82; letter-spacing:.06em; margin-bottom:12px}
-  .gates{display:grid; grid-template-columns:repeat(auto-fill,minmax(220px,1fr)); gap:9px}
-  .gate{display:flex; gap:10px; font-size:13px; color:#c3cfdf}
-  .box{flex:none; width:16px; height:16px; border:1.5px solid rgba(224,179,78,.55); border-radius:4px; margin-top:2px}
-  .gate small{color:#8296b0; font-size:11px}
+  .gatebox{margin-top:26px; border:1px dashed rgba(224,179,78,.4); border-radius:16px; padding:24px 26px; background:rgba(224,179,78,.05)}
+  .gatebox h3{font-size:16px; color:var(--gold2); letter-spacing:.02em; margin-bottom:12px}
+  .gates{display:grid; grid-template-columns:repeat(auto-fill,minmax(230px,1fr)); gap:10px}
+  .gate{display:flex; gap:10px; align-items:flex-start; font-size:13px; color:#c3cfdf}
+  .box{flex:none; width:17px; height:17px; border:1.5px solid rgba(224,179,78,.55); border-radius:4px; margin-top:2px; position:relative}
+  .box::after{content:""; position:absolute; inset:3px; background:rgba(224,179,78,.12); border-radius:2px}
+  .gate small{display:block; color:#8296b0; font-size:11.5px}
 
-  .tickets{display:grid; grid-template-columns:1fr 1fr; gap:18px; margin-top:26px}
-  .ticket{border-radius:20px; padding:28px 28px 24px; position:relative; overflow:hidden;
-    background:linear-gradient(160deg, rgba(255,255,255,.07), rgba(255,255,255,.02)); border:1px solid var(--line2)}
-  .ticket.best{border-color:rgba(95,201,158,.4); box-shadow:0 24px 70px rgba(95,201,158,.08)}
-  .ticket .class{font:700 10.5px Inter; letter-spacing:.3em; text-transform:uppercase; color:var(--mute)}
-  .ticket .eta{font-size:clamp(52px,6vw,84px); line-height:1; margin:12px 0 2px; font-weight:500}
-  .ticket .days{font:600 11px Inter; letter-spacing:.2em; text-transform:uppercase; color:#93a4bd}
-  .ticket .rows{margin-top:18px; border-top:1px dashed rgba(255,255,255,.18); padding-top:14px; display:grid; gap:9px}
-  .ticket .row{display:flex; gap:14px; font-size:14px; color:#c8d4e5; align-items:baseline}
-  .ticket .row b{flex:none; width:96px; font:600 12px ui-monospace,Menlo,monospace; color:#ecdb9f}
-  .ticket .punch{position:absolute; width:26px; height:26px; border-radius:50%; background:#0a1423; border:1px solid var(--line2)}
-  .ticket .punch.t{top:-14px; right:70px}
-  .ticket .punch.b{bottom:-14px; right:70px}
-  .code{position:absolute; right:18px; bottom:16px; font:600 10px ui-monospace,Menlo,monospace; letter-spacing:.3em; color:#7e8caa}
-  .floorticket{margin-top:18px; border:1px solid rgba(226,112,93,.4); background:rgba(226,112,93,.07); border-radius:16px; padding:20px 24px; color:#ecc4b9; font-size:14.5px}
-  .floorticket b{color:#ffd2c6}
-  .footnote{font-size:12px; color:#7e8caa; margin-top:12px}
+  .scenarios{display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-top:26px}
+  .scen{border:1px solid var(--line2); border-radius:18px; padding:24px; background:linear-gradient(180deg,rgba(255,255,255,.05),rgba(255,255,255,.015))}
+  .scen.best{border-color:rgba(99,195,154,.35)}
+  .scen h4{font-size:20px; color:var(--bright); font-weight:600}
+  .scen .eta{font-family:"Iowan Old Style",Palatino,Georgia,serif; font-size:44px; color:var(--gold2); margin:8px 0 2px; line-height:1}
+  .scen .sub{font-size:12px; letter-spacing:.14em; text-transform:uppercase; color:var(--mute); font-weight:700}
+  .scen ol{margin:16px 0 0 18px; color:#b7c4d6; font-size:14px}
+  .scen li{margin:9px 0}
+  .scen li b{color:var(--bright); font-weight:600}
+  .floor{margin-top:18px; border:1px solid rgba(224,112,95,.35); background:rgba(224,112,95,.06); border-radius:14px; padding:18px 22px; font-size:14px; color:#e3b3a9}
+  .floor b{color:#ffcbc0}
+  .footnote{font-size:12px; color:#8093ad; margin-top:14px; max-width:820px}
 
-  .riskgrid{display:grid; grid-template-columns:repeat(auto-fill,minmax(320px,1fr)); gap:12px; margin-top:20px}
-  .risk{border-left:3px solid var(--bad); background:rgba(226,112,93,.05); border-radius:10px; padding:12px 16px; font-size:13.5px; color:#c9d2e0}
+  .riskgrid{display:grid; grid-template-columns:repeat(auto-fill,minmax(330px,1fr)); gap:14px; margin-top:22px}
+  .risk{border-left:3px solid var(--bad); background:rgba(224,112,95,.05); border-radius:10px; padding:14px 18px; font-size:13.5px; color:#c9d2e0}
+  .risk b{color:#f4b8ab}
   .risk.warn{border-left-color:var(--warn); background:rgba(224,179,78,.05)}
 
-  .timeline{margin-top:26px; border:1px solid var(--line2); border-radius:18px; background:var(--panel); padding:24px 12px 10px}
+  .timeline{margin-top:30px; border:1px solid var(--line2); border-radius:18px; background:var(--panel); padding:26px 18px 12px}
+  .timeline svg{width:100%; height:auto; display:block}
 
-  .divider{display:flex; align-items:center; gap:12px; margin:44px 0 0}
-  .divider .r{flex:1; height:1px; background:linear-gradient(90deg,transparent,var(--line),transparent)}
-  .divider svg{opacity:.75}
+  footer{margin-top:70px; padding:30px 8px 10px; border-top:1px solid var(--line2); font-size:12.5px; color:#7f8fa8}
+  footer .mono{font-size:11.5px}
+  .divider{display:flex; align-items:center; gap:14px; margin:46px 0 0}
+  .divider .r{flex:1; height:1px; background:linear-gradient(90deg, transparent, var(--line), transparent)}
+  .divider svg{opacity:.7}
 
-  footer{margin-top:64px; padding-top:26px; border-top:1px solid var(--line2); color:#7e8caa; font-size:12.5px}
-  footer .mono{font-size:11px}
-
-  .reveal{opacity:0; transform:translateY(12px); transition:opacity .6s ease, transform .6s ease}
+  .reveal{opacity:0; transform:translateY(14px); transition:opacity .7s ease, transform .7s ease}
   .reveal.in{opacity:1; transform:none}
-  @media (max-width:900px){ .stats{grid-template-columns:1fr 1fr} .verdict,.tickets{grid-template-columns:1fr} .verdict .no{border-right:0; border-bottom:1px solid var(--line2)} }
-  @media print{ .grain{display:none} .reveal{opacity:1} section{page-break-inside:avoid} }
+  @media (max-width:900px){ .stats{grid-template-columns:1fr 1fr} .verdict{grid-template-columns:1fr} .verdict .no{border-right:0; border-bottom:1px solid var(--line2)} .scenarios{grid-template-columns:1fr} .bar{grid-template-columns:120px 1fr 52px; font-size:12px} }
+  @media print{ body{background:#0a1524} .reveal{opacity:1; transform:none} header.cover{padding-top:40px} section{page-break-inside:avoid} }
 </style>
 </head>
 <body>
-<div class="grain"></div>
 <div class="sheet">
 
   <header class="cover">
-    <span class="kicker reveal">Ship log, Nov 9 2026</span>
-    <h1 class="serif reveal">First Mate's<br><em class="gold">Report</em></h1>
-    <p class="cover-sub reveal">All engineering is proven. Every approval is unsigned.</p>
+    <span class="kicker reveal">Ship log 2026-11-09 08:56 UTC</span>
+    <h1 class="display cover-title reveal">First Mate's<br><em>Report</em></h1>
+    <p class="cover-sub reveal">Laundry production readiness, read as of this morning. Today I ran the last three missing receipts, filed them, and closed two old tickets. The workroom is in decent order. What keeps the boat anchored is not code: three target dates have passed, the founder's approval sheet is blank, and production stays shut until those signatures exist.</p>
     <div class="cover-chips reveal">
-      <span class="chip">receipts e41049b9</span>
-      <span class="chip">tree clean</span>
-      <span class="chip">docs/reports/</span>
+      <span class="chip">branch work/facility-recovery-20261026</span>
+      <span class="chip">documents tip a79168ab</span>
+      <span class="chip">receipts pinned e41049b9</span>
+      <span class="chip">worktree clean</span>
     </div>
-    <svg class="rose" width="360" height="360" viewBox="0 0 200 200" fill="none">
-      <circle cx="100" cy="100" r="95" stroke="#8f6a2e" stroke-width="1"/>
-      <circle cx="100" cy="100" r="72" stroke="#8f6a2e" stroke-width=".5" stroke-dasharray="2 5"/>
-      <path d="M100 6 L110 90 L194 100 L110 110 L100 194 L90 110 L6 100 L90 90 Z" stroke="#e9cb86" stroke-width="1" fill="rgba(233,203,134,.07)"/>
-      <path d="M100 30 L106 94 L164 100 L106 106 L100 170 L94 106 L36 100 L94 94 Z" stroke="#8f6a2e" stroke-width=".6"/>
-      <circle cx="100" cy="100" r="5" fill="#e9cb86"/>
+    <svg class="rose" width="340" height="340" viewBox="0 0 200 200" fill="none">
+      <circle cx="100" cy="100" r="95" stroke="#d8b36a" stroke-width="1"/>
+      <circle cx="100" cy="100" r="78" stroke="#d8b36a" stroke-width=".5" stroke-dasharray="2 4"/>
+      <path d="M100 12 L108 92 L188 100 L108 108 L100 188 L92 108 L12 100 L92 92 Z" stroke="#d8b36a" stroke-width="1" fill="rgba(216,179,106,.08)"/>
+      <path d="M100 40 L106 94 L160 100 L106 106 L100 160 L94 106 L40 100 L94 94 Z" stroke="#d8b36a" stroke-width=".6"/>
+      <circle cx="100" cy="100" r="5" fill="#d8b36a"/>
     </svg>
   </header>
 
+  <nav class="toc reveal">
+    <a href="#sitrep">Situation</a>
+    <a href="#timeline">Chart</a>
+    <a href="#done">Done</a>
+    <a href="#next">Next</a>
+    <a href="#left">Left</a>
+    <a href="#eta">Days to production</a>
+    <a href="#risks">Risks</a>
+  </nav>
+
   <div class="verdict reveal">
     <div class="no">
-      <div class="stamp bad">NO-GO TODAY</div>
-      <div class="big serif">Proven. Unsigned.</div>
-      <p>Day 3, 5 and 10 all passed. Launch stays shut until the ink exists.</p>
+      <div class="stamp">NO-GO TODAY</div>
+      <div class="big">The house is built and proven, the paperwork is not signed.</div>
+      <div class="why">Targets Day 3 (Oct 28), Day 5 (Oct 30) and Day 10 (Nov 4) all passed without a recorded move, so the plan's own rule holds: a No-Go until re-planned. Every engineering receipt is synthetic. No live ordering exists anywhere.</div>
     </div>
     <div>
       <div class="stamp go">GO REACHABLE</div>
-      <div class="big serif gold">Nov 21, best case.</div>
-      <p>Founder ink this week. Trail for two meets December.</p>
-      <p class="quiet">Modeled, not approved. The plan's own rule: dates move, gates do not.</p>
+      <div class="big">Best case Nov 21,<br>likely December.</div>
+      <div class="why">If the founder signs this week, launch is about nine working days out. If approvals trail, the realistic window slides to early December. Modeled here, not approved anywhere.</div>
     </div>
   </div>
 
   <div class="stats reveal">
-    <div class="stat"><div class="label">Receipts today</div>
-      <div class="ringrow"><div class="pctwrap"><svg width="64" height="64" viewBox="0 0 64 64"><circle cx="32" cy="32" r="27" stroke="rgba(255,255,255,.08)" stroke-width="5.5" fill="none"/><circle data-ring="4" data-total="4" cx="32" cy="32" r="27" stroke="#5fc99e" stroke-width="5.5" fill="none" stroke-linecap="round"/></svg><div class="pct">4/4</div></div>
-      <div><h3>Complete</h3><p>journey, restore, film</p></div></div></div>
-    <div class="stat"><div class="label">Suites green</div>
-      <div class="ringrow"><div class="pctwrap"><svg width="64" height="64" viewBox="0 0 64 64"><circle cx="32" cy="32" r="27" stroke="rgba(255,255,255,.08)" stroke-width="5.5" fill="none"/><circle data-ring="9" data-total="9" cx="32" cy="32" r="27" stroke="#6fb3a4" stroke-width="5.5" fill="none" stroke-linecap="round"/></svg><div class="pct">9/9</div></div>
-      <div><h3>1,204 tests</h3><p>exit 0, plus 124 tooling</p></div></div></div>
-    <div class="stat"><div class="label">Founder gates</div>
-      <div class="ringrow"><div class="pctwrap"><svg width="64" height="64" viewBox="0 0 64 64"><circle cx="32" cy="32" r="27" stroke="rgba(255,255,255,.08)" stroke-width="5.5" fill="none"/><circle data-ring="0" data-total="8" cx="32" cy="32" r="27" stroke="#e6b455" stroke-width="5.5" fill="none" stroke-linecap="round"/></svg><div class="pct">0/8</div></div>
-      <div><h3>Awaiting ink</h3><p>rates, policies, identity</p></div></div></div>
-    <div class="stat"><div class="label">Parity verified</div>
-      <div class="ringrow"><div class="pctwrap"><svg width="64" height="64" viewBox="0 0 64 64"><circle cx="32" cy="32" r="27" stroke="rgba(255,255,255,.08)" stroke-width="5.5" fill="none"/><circle data-ring="0" data-total="8" cx="32" cy="32" r="27" stroke="#e2705d" stroke-width="5.5" fill="none" stroke-linecap="round"/></svg><div class="pct">0/8</div></div>
-      <div><h3>None yet</h3><p>issues 37 to 44 open</p></div></div></div>
+    <div class="stat">
+      <div class="label">Receipts run today</div>
+      <div class="ringrow">
+        <div class="ringwrap"><svg width="56" height="56" viewBox="0 0 56 56"><circle cx="28" cy="28" r="24" stroke="rgba(255,255,255,.09)" stroke-width="5" fill="none"/><circle data-ring="4" data-total="4" cx="28" cy="28" r="24" stroke="#63c39a" stroke-width="5" fill="none" stroke-linecap="round"/></svg><div class="pct">4/4</div></div>
+        <div><h3>Complete</h3><p>journey, restore, recording, filing</p></div>
+      </div>
+    </div>
+    <div class="stat">
+      <div class="label">Test suites green</div>
+      <div class="ringrow">
+        <div class="ringwrap"><svg width="56" height="56" viewBox="0 0 56 56"><circle cx="28" cy="28" r="24" stroke="rgba(255,255,255,.09)" stroke-width="5" fill="none"/><circle data-ring="9" data-total="9" cx="28" cy="28" r="24" stroke="#6fb3a4" stroke-width="5" fill="none" stroke-linecap="round"/></svg><div class="pct">9/9</div></div>
+        <div><h3>1,204 tests</h3><p>plus 124 tooling cases, exit 0</p></div>
+      </div>
+    </div>
+    <div class="stat">
+      <div class="label">Founder gates signed</div>
+      <div class="ringrow">
+        <div class="ringwrap"><svg width="56" height="56" viewBox="0 0 56 56"><circle cx="28" cy="28" r="24" stroke="rgba(255,255,255,.09)" stroke-width="5" fill="none"/><circle data-ring="0" data-total="8" cx="28" cy="28" r="24" stroke="#e0b34e" stroke-width="5" fill="none" stroke-linecap="round"/></svg><div class="pct">0/8</div></div>
+        <div><h3>All waiting</h3><p>rates, policies, identity, credentials, spend</p></div>
+      </div>
+    </div>
+    <div class="stat">
+      <div class="label">Parity issues verified</div>
+      <div class="ringrow">
+        <div class="ringwrap"><svg width="56" height="56" viewBox="0 0 56 56"><circle cx="28" cy="28" r="24" stroke="rgba(255,255,255,.09)" stroke-width="5" fill="none"/><circle data-ring="0" data-total="8" cx="28" cy="28" r="24" stroke="#e0705f" stroke-width="5" fill="none" stroke-linecap="round"/></svg><div class="pct">0/8</div></div>
+        <div><h3>None yet</h3><p>issues 37 to 44, all still open</p></div>
+      </div>
+    </div>
   </div>
 
   <div class="answer reveal">
-    <div><b>Done</b><span>the app, proven four ways, receipts pinned to e41049b9.</span></div>
-    <div><b>Next</b><span>issues 37 to 40, on owned config. No approvals needed.</span></div>
-    <div><b>Left</b><span>issues 41 to 44, all waiting on founder ink.</span></div>
-    <div><b>Launch</b><span>nine working days at best, December at worst.</span></div>
+    <strong>What's done:</strong> the working product exists and got its clean receipts this morning. Four roles walked the real app on camera, the database restore drill passed with 91 tables intact, and the 1080p film came out readable frame by frame.<br>
+    <strong>What's next:</strong> a short engineering queue, issues 37 to 40 first, on owned config that needs nobody's permission.<br>
+    <strong>What's left after that:</strong> issues 41 to 44, all hard-gated on the founder's partner approvals, plus a file whose eight checkboxes are still empty.<br>
+    <strong>How long:</strong> nothing says Nov 10. The floor is signatures, credentials and a physical rehearsal. Best case, nine working days. Realistically, a December dock.
   </div>
 
-  <div class="divider reveal"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#cfa655" stroke-width="1.4"><path d="M12 3v13M6 16c0 3 2.7 4.5 6 4.5s6-1.5 6-4.5M5 9h14"/><circle cx="12" cy="4" r="1.6"/></svg><div class="r"></div></div>
+  <div class="divider reveal"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#d8b36a" stroke-width="1.4"><path d="M12 3v13M6 16c0 3 2.7 4.5 6 4.5s6-1.5 6-4.5M5 9h14"/><circle cx="12" cy="4" r="1.6"/></svg><div class="r"></div></div>
 
   <section id="sitrep">
-    <div class="secline"><span class="n">01</span><h2 class="serif">The situation</h2><div class="rule"></div></div>
-    <p class="lede">Recovery began Oct 26 on a machine that had lost its Docker daemon. The branch sat twelve days unpushed before anyone looked. It is rebuilt now, receipted now, filed now.</p>
+    <div class="secline"><span class="n">01</span><h2 class="display">The situation</h2><div class="rule"></div></div>
+    <p class="lede">Recovery started Oct 26 on a machine that had lost its Docker daemon and sat twelve days unpushed before being discovered. Since then the branch has been rebuilt, verified, and this morning finally documented with digest-pinned receipts. Local ledger, point by point.</p>
     <div class="timeline reveal">
-      <svg viewBox="0 0 1040 160" role="img" aria-label="timeline">
-        <defs><linearGradient id="tl" x1="0" x2="1"><stop offset="0" stop-color="#7794c2"/><stop offset=".72" stop-color="#e9cb86"/><stop offset="1" stop-color="#5fc99e"/></linearGradient></defs>
-        <line x1="30" y1="80" x2="760" y2="80" stroke="url(#tl)" stroke-width="2"/>
-        <line x1="760" y1="80" x2="1010" y2="80" stroke="#8a97ad" stroke-width="1.6" stroke-dasharray="5 6" opacity=".85"/>
+      <svg viewBox="0 0 1040 170" role="img" aria-label="timeline from Oct 20 to a future launch">
+        <defs>
+          <linearGradient id="tl" x1="0" x2="1"><stop offset="0" stop-color="#7794c2"/><stop offset=".72" stop-color="#d8b36a"/><stop offset="1" stop-color="#63c39a"/></linearGradient>
+        </defs>
+        <line x1="30" y1="88" x2="760" y2="88" stroke="url(#tl)" stroke-width="2"/>
+        <line x1="760" y1="88" x2="1010" y2="88" stroke="#8a97ad" stroke-width="1.6" stroke-dasharray="5 6" opacity=".8"/>
         <g font-family="ui-monospace,Menlo,monospace" font-size="10.5" fill="#c9d3e2">
-          <circle cx="40" cy="80" r="4.5" fill="#7794c2"/>
-          <text x="40" y="62" text-anchor="middle" fill="#a9b6c9">OCT 20</text>
-          <text x="40" y="104" text-anchor="middle" fill="#8494b0">agent workflow</text>
-          <circle cx="180" cy="80" r="4.5" fill="#7794c2"/>
-          <text x="180" y="62" text-anchor="middle" fill="#a9b6c9">OCT 26</text>
-          <text x="180" y="104" text-anchor="middle" fill="#8494b0">day 1, recovery plan</text>
-          <circle cx="340" cy="80" r="4.5" fill="#6fb3a4"/>
-          <text x="340" y="62" text-anchor="middle" fill="#a9b6c9">OCT 27</text>
-          <text x="340" y="104" text-anchor="middle" fill="#8494b0">support, native</text>
-          <circle cx="480" cy="80" r="4" fill="none" stroke="#e2705d" stroke-width="1.6"/>
-          <text x="480" y="62" text-anchor="middle" fill="#f09080">DAY 5 MISSED</text>
-          <circle cx="610" cy="80" r="4" fill="none" stroke="#e2705d" stroke-width="1.6"/>
-          <text x="610" y="62" text-anchor="middle" fill="#f09080">DAY 10 MISSED</text>
-          <circle cx="760" cy="80" r="6" fill="#e9cb86"/>
-          <circle cx="760" cy="80" r="11" fill="none" stroke="#e9cb86" stroke-width="1" opacity=".7"/>
-          <text x="760" y="62" text-anchor="middle" fill="#fdf6e0" font-weight="bold">TODAY</text>
-          <text x="760" y="104" text-anchor="middle" fill="#c2ad74">receipts filed</text>
-          <circle cx="880" cy="80" r="4" fill="none" stroke="#8a97ad" stroke-width="1.4" stroke-dasharray="2 3"/>
-          <text x="880" y="62" text-anchor="middle" fill="#a9b6c9">FOUNDER INK</text>
-          <circle cx="1000" cy="80" r="4" fill="none" stroke="#5fc99e" stroke-width="1.6"/>
-          <text x="1000" y="62" text-anchor="middle" fill="#7fdcae">GO</text>
-          <text x="1000" y="104" text-anchor="middle" fill="#8494b0">rehearsal</text>
+          <circle cx="40" cy="88" r="4.5" fill="#7794c2"/>
+          <text x="40" y="70" text-anchor="middle" fill="#a9b6c9">OCT 20</text>
+          <text x="40" y="112" text-anchor="middle" fill="#8fa0b8">agent workflow spec</text>
+          <circle cx="180" cy="88" r="4.5" fill="#7794c2"/>
+          <text x="180" y="70" text-anchor="middle" fill="#a9b6c9">OCT 26</text>
+          <text x="180" y="112" text-anchor="middle" fill="#8fa0b8">day 1: main branching, 3-5-10 plan</text>
+          <circle cx="340" cy="88" r="4.5" fill="#6fb3a4"/>
+          <text x="340" y="70" text-anchor="middle" fill="#a9b6c9">OCT 27</text>
+          <text x="340" y="134" text-anchor="middle" fill="#8fa0b8">support console + native slices land</text>
+          <circle cx="480" cy="88" r="4" fill="none" stroke="#e0705f" stroke-width="1.6"/>
+          <text x="480" y="70" text-anchor="middle" fill="#ef9a8b">DAY 5 MISSED</text>
+          <text x="480" y="112" text-anchor="middle" fill="#8fa0b8">oct 30</text>
+          <circle cx="610" cy="88" r="4" fill="none" stroke="#e0705f" stroke-width="1.6"/>
+          <text x="610" y="70" text-anchor="middle" fill="#ef9a8b">DAY 10 MISSED</text>
+          <text x="610" y="112" text-anchor="middle" fill="#8fa0b8">nov 4</text>
+          <circle cx="760" cy="88" r="6" fill="#d8b36a"/>
+          <circle cx="760" cy="88" r="11" fill="none" stroke="#d8b36a" stroke-width="1" opacity=".7"/>
+          <text x="760" y="70" text-anchor="middle" fill="#f0d9a8" font-weight="bold">NOV 9 TODAY</text>
+          <text x="760" y="134" text-anchor="middle" fill="#c2ad74">3 receipts filed, issues closed</text>
+          <circle cx="880" cy="88" r="4" fill="none" stroke="#8a97ad" stroke-width="1.4" stroke-dasharray="2 3"/>
+          <text x="880" y="70" text-anchor="middle" fill="#a9b6c9">FOUNDER INK</text>
+          <text x="880" y="112" text-anchor="middle" fill="#8fa0b8">8 approval boxes</text>
+          <circle cx="1000" cy="88" r="4" fill="none" stroke="#63c39a" stroke-width="1.6"/>
+          <text x="1000" y="70" text-anchor="middle" fill="#7fd6ae">GO</text>
+          <text x="1000" y="134" text-anchor="middle" fill="#8fa0b8">rehearsal + final SHA</text>
         </g>
       </svg>
     </div>
   </section>
 
-  <div class="divider reveal"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#cfa655" stroke-width="1.4"><path d="M12 3v13M6 16c0 3 2.7 4.5 6 4.5s6-1.5 6-4.5M5 9h14"/><circle cx="12" cy="4" r="1.6"/></svg><div class="r"></div></div>
+  <div class="divider reveal"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#d8b36a" stroke-width="1.4"><path d="M12 3v13M6 16c0 3 2.7 4.5 6 4.5s6-1.5 6-4.5M5 9h14"/><circle cx="12" cy="4" r="1.6"/></svg><div class="r"></div></div>
 
   <section id="done">
-    <div class="secline"><span class="n">02</span><h2 class="serif">Done, with proof</h2><div class="rule"></div></div>
-    <p class="lede">Receipts, not rhetoric. Tree empty before and after each run.</p>
+    <div class="secline"><span class="n">02</span><h2 class="display">Done, with proof</h2><div class="rule"></div></div>
+    <p class="lede">A receipts ledger, not a victory lap. Every row carries the test command that passed and where the proof lives. Tree was empty before and after each run; nothing was edited while receipts recorded.</p>
     <table class="ledger reveal">
-      <tr><th>What</th><th>Proof</th><th>Fact</th></tr>
-      <tr><td>Four-role journey</td><td class="mono">verify:browser <b>exit 0</b> at e41049b9</td><td>Four cameras on the real app. Zero commercial calls.</td></tr>
-      <tr><td>Restore drill</td><td class="mono">verify:restore <b>exit 0</b></td><td>91 tables, 17.11. Dump sha256 938f6c51&hellip;</td></tr>
-      <tr><td>1080p film</td><td class="mono">verify:recording <b>exit 0</b></td><td>122 s, frames inspected. The failed first try is filed too.</td></tr>
-      <tr><td>Clean batch</td><td class="mono">build, check, tooling <b>exit 0</b> at 64943d25</td><td>1,204 tests, nine suites, disposable PostgreSQL.</td></tr>
-      <tr><td>Earlier slices</td><td class="mono">343f051, e2413d9, a17b79b, 02ad7dcd</td><td>Custody, billing, reviews, support, console, restore.</td></tr>
-      <tr><td>Retro repairs</td><td class="mono">e41049b9, tooling <b>124/124</b></td><td>One named truth worktree. Unpushed work audited.</td></tr>
-      <tr><td>Issue sheet</td><td class="mono">#6, #7 <b>closed completed</b></td><td>Cited receipts. Evidence comments on 26, 27, 28.</td></tr>
-      <tr><td>Parity map</td><td class="mono">PARITY-GAP-20261109.md</td><td>Every claim carries its source path.</td></tr>
+      <tr><th style="width:29%">What</th><th style="width:31%">Proof of record</th><th>Pinned fact</th></tr>
+      <tr>
+        <td class="what">Four-role browser journey</td>
+        <td class="mono">verify:browser <b>exit 0</b> at e41049b9</td>
+        <td>Customer, ops, rider and pickup rider walked the real app on camera. Four distinct recordings, commercial calls 0, bag continuity proven. Digests in clean-revision-checkpoint-20261109.md.</td>
+      </tr>
+      <tr>
+        <td class="what">Restore rehearsal</td>
+        <td class="mono">verify:restore <b>exit 0</b> at e41049b9</td>
+        <td>PostgreSQL 17.11. 91 tables and all sequences matched. One delivered order, one manual receipt, zero gateway receipts, one private review, one support case. Dump sha256 938f6c51...</td>
+      </tr>
+      <tr>
+        <td class="what">Original 1080p recording</td>
+        <td class="mono">verify:recording <b>exit 0</b> at e41049b9</td>
+        <td>122.17 s, h264 30fps. All four sampled frames show real role UI. First attempt failed with exit 1 (missing scope env); the failure is filed too, not hidden.</td>
+      </tr>
+      <tr>
+        <td class="what">Full clean batch</td>
+        <td class="mono">build, check, contracts, tooling <b>exit 0</b> at 64943d25</td>
+        <td>1,204 suite tests across nine packages on a disposable PostgreSQL, plus 124 tooling cases. Totals: API 373, fixtures 237, customer 126, SDK 165, contracts 104, ops 87, partner 55, foundation 55, tokens 2.</td>
+      </tr>
+      <tr>
+        <td class="what">Earlier verified slices</td>
+        <td class="mono">clean checkpoints at 343f051dc, e2413d932, a17b79b06, 02ad7dcd8</td>
+        <td>Pickup and return custody, billing provenance, reviews, support, staff console, restore, native storage wiring (web-level only). Each carries its own receipt and SHA.</td>
+      </tr>
+      <tr>
+        <td class="what">Retro repairs</td>
+        <td class="mono">commit e41049b9, tooling <b>124/124</b></td>
+        <td>docs/CURRENT.md now names the one true worktree; branch-audit tool exposes unpushed work; issue-tracker rules rewritten; stale ledger marked historical.</td>
+      </tr>
+      <tr>
+        <td class="what">Issue back-sheet closed</td>
+        <td class="mono">GitHub #6, #7 closed completed</td>
+        <td>#6 source consolidation and #7 reference analysis shut with cited receipts. Evidence comments land on #26, #27, #28; #26 got a full receipts follow-up today (comment 6735954685).</td>
+      </tr>
+      <tr>
+        <td class="what">Parity gap analysis filed</td>
+        <td class="mono">docs/research/laundrymate/PARITY-GAP-20261109.md</td>
+        <td>Fact and inference labeled, every claim carries its source path. Feeds the next planning pass directly.</td>
+      </tr>
     </table>
-    <p class="kicker" style="margin-top:32px">Suites</p>
+
+    <p class="kicker" style="margin-top:40px">Suite totals, clean batch at 64943d25</p>
     <div class="bars reveal">
-      <div class="bar"><span>API</span><div class="track"><div class="fill" style="width:100%"></div></div><span class="num">373</span></div>
-      <div class="bar"><span>Fixtures</span><div class="track"><div class="fill" style="width:64%"></div></div><span class="num">237</span></div>
-      <div class="bar"><span>SDK</span><div class="track"><div class="fill" style="width:44%"></div></div><span class="num">165</span></div>
-      <div class="bar"><span>Customer</span><div class="track"><div class="fill" style="width:34%"></div></div><span class="num">126</span></div>
-      <div class="bar"><span>Contracts</span><div class="track"><div class="fill" style="width:28%"></div></div><span class="num">104</span></div>
-      <div class="bar"><span>Tooling</span><div class="track"><div class="fill" style="width:33%"></div></div><span class="num">124</span></div>
-      <div class="bar"><span>Ops</span><div class="track"><div class="fill" style="width:23%"></div></div><span class="num">87</span></div>
-      <div class="bar"><span>Partner</span><div class="track"><div class="fill" style="width:15%"></div></div><span class="num">55</span></div>
-      <div class="bar"><span>Foundation</span><div class="track"><div class="fill" style="width:15%"></div></div><span class="num">55</span></div>
-      <div class="bar"><span>Tokens</span><div class="track"><div class="fill" style="width:2%"></div></div><span class="num">2</span></div>
+      <div class="bar"><span class="name">API</span><div class="track"><div class="fill" style="width:100%"></div></div><span class="num">373</span></div>
+      <div class="bar"><span class="name">Fixtures</span><div class="track"><div class="fill" style="width:63.5%"></div></div><span class="num">237</span></div>
+      <div class="bar"><span class="name">SDK</span><div class="track"><div class="fill" style="width:44.2%"></div></div><span class="num">165</span></div>
+      <div class="bar"><span class="name">Customer</span><div class="track"><div class="fill" style="width:33.8%"></div></div><span class="num">126</span></div>
+      <div class="bar"><span class="name">Contracts</span><div class="track"><div class="fill" style="width:27.9%"></div></div><span class="num">104</span></div>
+      <div class="bar"><span class="name">Tooling (extra suite)</span><div class="track"><div class="fill" style="width:33.2%"></div></div><span class="num">124</span></div>
+      <div class="bar"><span class="name">Ops</span><div class="track"><div class="fill" style="width:23.3%"></div></div><span class="num">87</span></div>
+      <div class="bar"><span class="name">Partner</span><div class="track"><div class="fill" style="width:14.7%"></div></div><span class="num">55</span></div>
+      <div class="bar"><span class="name">Foundation</span><div class="track"><div class="fill" style="width:14.7%"></div></div><span class="num">55</span></div>
+      <div class="bar"><span class="name">Design tokens</span><div class="track"><div class="fill" style="width:2%"></div></div><span class="num">2</span></div>
     </div>
   </section>
 
-  <div class="divider reveal"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#cfa655" stroke-width="1.4"><path d="M12 3v13M6 16c0 3 2.7 4.5 6 4.5s6-1.5 6-4.5M5 9h14"/><circle cx="12" cy="4" r="1.6"/></svg><div class="r"></div></div>
+  <div class="divider reveal"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#d8b36a" stroke-width="1.4"><path d="M12 3v13M6 16c0 3 2.7 4.5 6 4.5s6-1.5 6-4.5M5 9h14"/><circle cx="12" cy="4" r="1.6"/></svg><div class="r"></div></div>
 
   <section id="next">
-    <div class="secline"><span class="n">03</span><h2 class="serif">Next three moves</h2><div class="rule"></div></div>
+    <div class="secline"><span class="n">03</span><h2 class="display">Next three moves</h2><div class="rule"></div></div>
+    <p class="lede">Ordered by what can actually start today without waiting on a human signature.</p>
     <div class="cards reveal">
-      <div class="card"><div class="head"><span>MOVE 01</span><span class="tag eng">engineering</span></div><h4>Verify #37, #39, #40 on one branch</h4><p>Real catalog reads, booking regression, tracking tied to events. Nobody's signature needed.</p><p style="margin-top:10px"><span class="tag ok">~2 days</span></p></div>
-      <div class="card"><div class="head"><span>MOVE 02</span><span class="tag hum">founder, parallel</span></div><h4>Ink #45's eight checkboxes</h4><p>Rates, capacity, policies, identity, credentials, spend, owners, rehearsal. Sign early, hold the date.</p><p style="margin-top:10px"><span class="tag bad">gates everything</span></p></div>
-      <div class="card"><div class="head"><span>MOVE 03</span><span class="tag eng">engineering</span></div><h4>#43 speed, then #44 finale</h4><p>Faster dispatch and returns, then regression, rehearsal, verdict. #44 goes last on purpose.</p><p style="margin-top:10px"><span class="tag hum">needs rehearsal</span></p></div>
+      <div class="card"><div class="head"><span class="num">MOVE 01</span><span class="tag eng">engineering</span></div>
+        <h4>Verify the Day-5 family, issues 37 39 40, on one task branch</h4>
+        <p>Real catalog reads and rate disclosure, booking-path regression, tracking stages tied to real fulfillment events. Runs on owned API config, no approval needed. #38 copy work waits for policies where any wording sounds like a promise.</p>
+        <div class="foot"><span class="tag eng">~2 days</span><span class="tag ok">unblocks itself</span></div></div>
+      <div class="card"><div class="head"><span class="num">MOVE 02</span><span class="tag hum">founder, parallel</span></div>
+        <h4>Chase the eight approval checkboxes on issue #45</h4>
+        <p>Area and rates, capacity windows, cancellation and care policies, identity and staff MFA channel, provider credentials, spending ceiling, named owners with a real phone. Sign this week and the best-case date holds; drift a week and December wins.</p>
+        <div class="foot"><span class="tag hum">founder only</span><span class="tag block">gates everything</span></div></div>
+      <div class="card"><div class="head"><span class="num">MOVE 03</span><span class="tag eng">engineering</span></div>
+        <h4>Ops speed slice, issue #43, then the final pass #44</h4>
+        <p>Faster dispatch, intake and return flows verified in the real apps, followed by the integrated regression, operational rehearsal with five consented physical orders, and the feature-matrix verdict on the final SHA. #44 goes last on purpose.</p>
+        <div class="foot"><span class="tag eng">~3 days</span><span class="tag hum">needs rehearsal booking</span></div></div>
     </div>
   </section>
 
-  <div class="divider reveal"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#cfa655" stroke-width="1.4"><path d="M12 3v13M6 16c0 3 2.7 4.5 6 4.5s6-1.5 6-4.5M5 9h14"/><circle cx="12" cy="4" r="1.6"/></svg><div class="r"></div></div>
+  <div class="divider reveal"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#d8b36a" stroke-width="1.4"><path d="M12 3v13M6 16c0 3 2.7 4.5 6 4.5s6-1.5 6-4.5M5 9h14"/><circle cx="12" cy="4" r="1.6"/></svg><div class="r"></div></div>
 
   <section id="left">
-    <div class="secline"><span class="n">04</span><h2 class="serif">What's left</h2><div class="rule"></div></div>
-    <p class="lede">Every body says the same thing: status scheduled, not verified. Nothing closes without a current SHA.</p>
+    <div class="secline"><span class="n">04</span><h2 class="display">What's left</h2><div class="rule"></div></div>
+    <p class="lede">The open parity sheet, issues 37 to 44, each with the smallest honest remaining step. Every body carries the same rule: status reads scheduled, not verified. Nothing closes without a current SHA and real evidence.</p>
     <div class="cards reveal">
-      <div class="card"><div class="head"><span>#37</span><span class="tag eng">eng + human</span></div><h4>Real catalog, availability</h4><p>Honest empty, unavailable and error states. Real needs partner config.</p></div>
-      <div class="card"><div class="head"><span>#38</span><span class="tag eng">eng waits</span></div><h4>Customer copy</h4><p>Silent wherever policies are unsigned.</p></div>
-      <div class="card"><div class="head"><span>#39</span><span class="tag eng">eng</span></div><h4>Discovery, booking</h4><p>Accessible walkthrough plus API regression, one SHA.</p></div>
-      <div class="card"><div class="head"><span>#40</span><span class="tag eng">eng</span></div><h4>Event-driven tracking</h4><p>Real pickup to payment events. No invented stages.</p></div>
-      <div class="card"><div class="head"><span>#41</span><span class="tag hum">human first</span></div><h4>Express gaps</h4><p>Partner rates first. Disabled without approval.</p></div>
-      <div class="card"><div class="head"><span>#42</span><span class="tag hum">human first</span></div><h4>Subscriptions</h4><p>Approved lifecycle rules first. Notify-me is nothing.</p></div>
-      <div class="card"><div class="head"><span>#43</span><span class="tag eng">eng</span></div><h4>Speed slice</h4><p>Faster rider and ops flows, verified in the apps.</p></div>
-      <div class="card"><div class="head"><span>#44</span><span class="tag bad">final</span></div><h4>Regression, drill, verdict</h4><p>Closes the #29 umbrella. Five consented orders rehearsed.</p></div>
-      <div class="card"><div class="head"><span>#27</span><span class="tag bad">native</span></div><h4>Device proofs</h4><p>Wiring done at web level. Awaiting cloud-runner build.</p></div>
-      <div class="card"><div class="head"><span>#45</span><span class="tag hum">human only</span></div><h4>Approvals</h4><p>Eight boxes, zero ink. Filed applications are not approvals.</p></div>
+      <div class="card"><div class="head"><span class="num">#37</span><span class="tag eng">eng + human</span></div><h4>Real catalog and availability verified</h4><p>One run on owned API config with honest empty, unavailable and error states across customer, rider and ops. Real-rather-than-synthetic depends on partner-approved configuration.</p></div>
+      <div class="card"><div class="head"><span class="num">#38</span><span class="tag eng">eng, copy waits</span></div><h4>Clear customer copy and promises</h4><p>Rewrite wording against actual behavior. Turnaround, refunds and claims stay silent until policy checkboxes on #45 supply the terms to phrase.</p></div>
+      <div class="card"><div class="head"><span class="num">#39</span><span class="tag eng">eng</span></div><h4>Discovery, home and booking walkthrough</h4><p>Accessible responsive pass plus an API regression on one SHA, with address and window selection and bag validation.</p></div>
+      <div class="card"><div class="head"><span class="num">#40</span><span class="tag eng">eng</span></div><h4>Tracking driven by real events</h4><p>Stage count follows honest pickup, intake, care, QC, return and payment events. No six-stage fiction bolted on, no invented promises.</p></div>
+      <div class="card"><div class="head"><span class="num">#41</span><span class="tag hum">human first</span></div><h4>Express and category gaps</h4><p>Partner-approved pricing and calendars first; a tested vertical slice second. Feature stays disabled without approval and demo rates are barred.</p></div>
+      <div class="card"><div class="head"><span class="num">#42</span><span class="tag hum">human first</span></div><h4>Subscription vertical slice</h4><p>A "notify me" page is not delivery parity. Needs approved recurring schedules, entitlement rules and pause or cancel flows before a line of it gets built.</p></div>
+      <div class="card"><div class="head"><span class="num">#43</span><span class="tag eng">eng</span></div><h4>Faster rider and ops fulfillment</h4><p>Operator UX against real tasks, persisted results, verified in the actual apps. Least dependent on the founder of the ten open threads.</p></div>
+      <div class="card"><div class="head"><span class="num">#44</span><span class="tag block">final</span></div><h4>Integrated regression and operational drill</h4><p>Full pass in actual apps, PostgreSQL and applicable devices; rehearsal repeated for changed behavior; final SHA with recordings. The umbrella #29 closes through this one.</p></div>
+      <div class="card"><div class="head"><span class="num">#27</span><span class="tag block">native</span></div><h4>Native device evidence</h4><p>Storage wiring passed its web-level receipts; device, APK, SQLCipher and live-provider proof flags are all false until a cloud-runner Android build plus device evidence exists.</p></div>
+      <div class="card"><div class="head"><span class="num">#45</span><span class="tag hum">human only</span></div><h4>Founder and facility approvals</h4><p>Eight checkboxes, zero checked, then five consented physical test orders booked, run and reconciled. A submitted application is never a passing checkbox, per the issue's own rule.</p></div>
     </div>
 
     <div class="gatebox reveal">
-      <h3>#45, checked 0 of 8</h3>
+      <h3>The founder's approval sheet (#45), checked 0 of 8</h3>
       <div class="gates">
-        <div class="gate"><span class="box"></span><span>Area, rates, taxes, minimums</span></div>
-        <div class="gate"><span class="box"></span><span>Windows, capacity, calendars</span></div>
-        <div class="gate"><span class="box"></span><span>Care, claim, refund policies</span></div>
-        <div class="gate"><span class="box"></span><span>Identity channel, staff MFA</span></div>
-        <div class="gate"><span class="box"></span><span>Laundry-owned credentials<small>no borrowed accounts</small></span></div>
-        <div class="gate"><span class="box"></span><span>Spending ceiling</span></div>
-        <div class="gate"><span class="box"></span><span>Named owners, real phone</span></div>
-        <div class="gate"><span class="box"></span><span>Rehearsal booking<small>five consented orders</small></span></div>
+        <div class="gate"><span class="box"></span><span>Service area and facility<small>with rates, taxes, minimums, rounding</small></span></div>
+        <div class="gate"><span class="box"></span><span>Feasible windows and capacity<small>turnaround, cutoffs, calendars</small></span></div>
+        <div class="gate"><span class="box"></span><span>Care, claim and refund policies<small>plus intake, cancellation, support</small></span></div>
+        <div class="gate"><span class="box"></span><span>Customer identity channel<small>and staff MFA provisioning</small></span></div>
+        <div class="gate"><span class="box"></span><span>Laundry-owned provider credentials<small>no borrowed project accounts</small></span></div>
+        <div class="gate"><span class="box"></span><span>Spending decision<small>what infrastructure may cost</small></span></div>
+        <div class="gate"><span class="box"></span><span>Named owners and real phone availability</span></div>
+        <div class="gate"><span class="box"></span><span>Physical rehearsal booking<small>five consented test orders</small></span></div>
       </div>
     </div>
 
-    <div class="gatebox reveal" style="border-color:rgba(222,186,118,.4); background:rgba(222,186,118,.05)">
-      <h3>Coordinator clipboard</h3>
+    <div class="gatebox reveal" style="border-color:rgba(216,179,106,.4); background:rgba(216,179,106,.05)">
+      <h3>Coordinator clipboard, small but not ignorable</h3>
       <div class="gates">
-        <div class="gate"><span class="box"></span><span>main one commit unpushed</span></div>
+        <div class="gate"><span class="box"></span><span>Local main one commit unpushed<small>decision to push or merge sits with the coordinator</small></span></div>
         <div class="gate"><span class="box"></span><span>cloud/c01-contract-freeze ahead by one</span></div>
-        <div class="gate"><span class="box"></span><span>three branches, no upstream</span></div>
-        <div class="gate"><span class="box"></span><span>no GitHub CI run yet<small>locals cannot stand in</small></span></div>
+        <div class="gate"><span class="box"></span><span>Three branches with no remote upstream<small>build/wandary, work/production-clean-build-fix, work/production-readiness</small></span></div>
+        <div class="gate"><span class="box"></span><span>Push-triggered CI run still absent<small>local receipts cannot substitute for one (audit exit 2 as expected)</small></span></div>
       </div>
     </div>
   </section>
 
-  <div class="divider reveal"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#cfa655" stroke-width="1.4"><path d="M12 3v13M6 16c0 3 2.7 4.5 6 4.5s6-1.5 6-4.5M5 9h14"/><circle cx="12" cy="4" r="1.6"/></svg><div class="r"></div></div>
+  <div class="divider reveal"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#d8b36a" stroke-width="1.4"><path d="M12 3v13M6 16c0 3 2.7 4.5 6 4.5s6-1.5 6-4.5M5 9h14"/><circle cx="12" cy="4" r="1.6"/></svg><div class="r"></div></div>
 
   <section id="eta">
-    <div class="secline"><span class="n">05</span><h2 class="serif">Days to production</h2><div class="rule"></div></div>
-    <p class="lede">Two tickets. Neither is a promise. Store publication and payments carry their own prerequisites, undated.</p>
-    <div class="tickets reveal">
-      <div class="ticket best">
-        <span class="punch t"></span><span class="punch b"></span>
-        <div class="class">Best case &middot; founder signs this week</div>
-        <div class="eta serif gold">Nov 21</div>
-        <div class="days">9 working days</div>
-        <div class="rows">
-          <div class="row"><b>Nov 10-14</b><span>ink lands, #37 39 40 run</span></div>
-          <div class="row"><b>Nov 17-19</b><span>#38 copy, #43 speed</span></div>
-          <div class="row"><b>Nov 20</b><span>#44, rehearsal, GO</span></div>
-        </div>
-        <div class="code">LR·09·GO</div>
+    <div class="secline"><span class="n">05</span><h2 class="display">How long till production</h2><div class="rule"></div></div>
+    <p class="lede">Two honest models. The plan's own rule is that dates move openly rather than gates getting waived, so neither number is a promise. Both cover only the launch this plan described; app-store publication and online payments each carry their own approved prerequisites, with no promise of approval by any date.</p>
+    <div class="scenarios reveal">
+      <div class="scen best">
+        <div class="sub">If the founder signs this week</div>
+        <h4>Best case</h4>
+        <div class="eta display">Nov 21</div>
+        <div class="sub">about 9 working days</div>
+        <ol>
+          <li><b>Nov 10 to 14.</b> Engineering runs issues 37, 39, 40 on owned config while the founder inks #45 and partner rules arrive.</li>
+          <li><b>Nov 17 to 19.</b> Issue 38 copy validated against signed policies; issue 43 speed slice verified in the real apps.</li>
+          <li><b>Nov 20 to 21.</b> Issue 44 regression, the physical rehearsal, final SHA with recordings. Go if nothing falls out.</li>
+        </ol>
       </div>
-      <div class="ticket">
-        <span class="punch t"></span><span class="punch b"></span>
-        <div class="class">Realistic &middot; approvals trail</div>
-        <div class="eta serif">Dec 4</div>
-        <div class="days">17 to 19 working days</div>
-        <div class="rows">
-          <div class="row"><b>Nov 10-19</b><span>engineering queue lands</span></div>
-          <div class="row"><b>Nov 20-28</b><span>gates late, 41 and 42 wait</span></div>
-          <div class="row"><b>Dec 1-4</b><span>#44, rehearsal, GO</span></div>
-        </div>
-        <div class="code">LR·12·SLIP</div>
+      <div class="scen">
+        <div class="sub">If approvals trail one to two weeks</div>
+        <h4>Realistic case</h4>
+        <div class="eta display">Dec 4</div>
+        <div class="sub">about 17 to 19 working days</div>
+        <ol>
+          <li><b>Nov 10 to 19.</b> Engineering queue lands regardless: the Day-5 family, #43, support attachments and catalog-publication polish from the gap report.</li>
+          <li><b>Nov 20 to 28.</b> Gates land late; #41 and #42 stay disabled or arrive as approved verticals, never notify-me stubs.</li>
+          <li><b>Dec 1 to 4.</b> #44 regression, rehearsal, final SHA. Production opens only after that evidence exists.</li>
+        </ol>
       </div>
     </div>
-    <div class="floorticket reveal">
-      <b>The floor.</b> No identity, no credentials, no signed rates, no rehearsal: no launch. Remove one and the date is fiction. Founder dark: engineering stands ready, nothing ships.
+    <div class="floor reveal">
+      <b>The floor, whatever the schedule says.</b> No real customer sign-up without identity, staff MFA and provider credentials. No prices on screen without signed rates, taxes and minimums. No order promise without approved capacity windows and policies. No launch until five consented physical rehearsals have run and the final SHA has its recordings. Remove any one of these and the date is fiction.<br><span style="display:block; margin-top:8px">Worst case if founder attention disappears: engineering stays visibly ready, nothing ships, and every gate stays honest in the tracker instead of papered over.</span>
     </div>
-    <p class="footnote">Weekends excluded only. One engineer modeled. Both tickets die beside the receipts if any frame fails inspection.</p>
+    <p class="footnote">Timeline math: Nov 9 was a Monday. Working days exclude weekends only; no holiday mapping was attempted. Both scenarios assume one engineer and no rework shocks. History says that assumption costs the plan when receipts fail, and every one of these failures so far has cost one day, not one week.</p>
   </section>
 
-  <div class="divider reveal"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#cfa655" stroke-width="1.4"><path d="M12 3v13M6 16c0 3 2.7 4.5 6 4.5s6-1.5 6-4.5M5 9h14"/><circle cx="12" cy="4" r="1.6"/></svg><div class="r"></div></div>
+  <div class="divider reveal"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#d8b36a" stroke-width="1.4"><path d="M12 3v13M6 16c0 3 2.7 4.5 6 4.5s6-1.5 6-4.5M5 9h14"/><circle cx="12" cy="4" r="1.6"/></svg><div class="r"></div></div>
 
   <section id="risks">
-    <div class="secline"><span class="n">06</span><h2 class="serif">Risks</h2><div class="rule"></div></div>
+    <div class="secline"><span class="n">06</span><h2 class="display">Risks alongside</h2><div class="rule"></div></div>
     <div class="riskgrid reveal">
-      <div class="risk"><b>Synthetic everywhere.</b> Local fake providers only. Say otherwise and lie.</div>
-      <div class="risk"><b>No GitHub CI yet.</b> Local runs cannot stand in for one.</div>
-      <div class="risk"><b>The human row is empty.</b> Three missed dates came from that hole.</div>
-      <div class="risk warn"><b>Optimism lies.</b> Browsers don't. One 2kg defect hid under three suites.</div>
-      <div class="risk warn"><b>Unpushed work burned once.</b> Five exposures still open.</div>
-      <div class="risk warn"><b>Native is promise-shaped.</b> Wiring tested. Device proof absent.</div>
+      <div class="risk"><b>Everything is synthetic.</b> All receipts this branch proves are local fake providers and disposable databases. Narrating them as capability would repeat the exact failure the working agreement forbids.</div>
+      <div class="risk"><b>No GitHub CI result yet.</b> Container verification never ran on the local host. A push-triggered workflow run remains the one receipt local runs cannot substitute.</div>
+      <div class="risk"><b>The human row is empty.</b> Three missed dates came from the same hole. Planning the next slice around founder time is the only fix that trades on this history.</div>
+      <div class="risk warn"><b>Parity pressure inventing promises.</b> The bag-weight defect showed an optimistic badge surviving three test suites because only a browser run caught it. Time pressure invites that failure again; browser-verified evidence is the antidote.</div>
+      <div class="risk warn"><b>Unpushed work lost the hard way once.</b> The branch-audit tool exists because twelve days of work sat unpushed on a dead machine. Five exposures remain open at time of writing.</div>
+      <div class="risk warn"><b>Native remains promise-shaped.</b> SecureStore plus SQLCipher wiring passed every host-level test. Until a device build exists, the native story is a plan, not a fact.</div>
     </div>
   </section>
 
   <footer>
-    <p><span class="kicker">Basis</span></p>
-    <p style="margin-top:8px">Built 2026-11-09 in /home/batman/Projects/code/laundry-production-app on work/facility-recovery-20261026. Sources: checkpoint docs, PARITY-GAP-20261109.md, receipt manifests under .verification/checkpoints/, branch audit, live issue states.</p>
-    <p class="mono" style="margin-top:8px">batch 64943d25 &middot; receipts e41049b9 &middot; checkpoint 8d88c8b &middot; tip fdbbbce7</p>
+    <p><span class="kicker" style="letter-spacing:.22em">Basis of this report</span></p>
+    <p style="margin-top:10px; max-width:860px">Assembled 2026-11-09 from the canonical worktree /home/batman/Projects/code/laundry-production-app on branch work/facility-recovery-20261026. Sources: checkpoint docs under docs/implementation/production-application/ (state of record), PARITY-GAP-20261109.md, the receipt manifests under .verification/checkpoints/e41049b95c801f087343b58db61005d1172a93e6/, the branch audit, and live GitHub issue states fetched 2026-11-09.</p>
+    <p class="mono" style="margin-top:10px">Clean batch 64943d25 &middot; receipts e41049b95 &middot; checkpoint 8d88c8b &middot; docs tip a79168ab &middot; issue comments 67356..., 67359... (receipts follow-up)</p>
+    <p style="margin-top:10px"><span class="tag block">standing boundary</span> &nbsp;No live ordering, no production claims. Synthetic local providers only; the sea belongs to whoever the founder allows aboard.</p>
   </footer>
 
 </div>
 <script>
   document.addEventListener('DOMContentLoaded', () => {
-    const io = new IntersectionObserver(es => { for (const e of es) if (e.isIntersecting){ e.target.classList.add('in'); io.unobserve(e.target);} }, {threshold:.12});
+    const io = new IntersectionObserver((entries) => {
+      for (const entry of entries) if (entry.isIntersecting) { entry.target.classList.add('in'); io.unobserve(entry.target); }
+    }, { threshold: .12 });
     document.querySelectorAll('.reveal').forEach(el => io.observe(el));
-    const C = 2*Math.PI*27;
+    const circ = 2 * Math.PI * 24;
     document.querySelectorAll('circle[data-ring]').forEach(c => {
       const v = +c.dataset.ring, t = +c.dataset.total;
-      c.style.strokeDasharray = `0 ${C}`;
+      c.style.strokeDasharray = '0 ' + circ.toFixed(1);
       c.style.transition = 'stroke-dasharray 1.1s cubic-bezier(.2,.7,.2,1) .3s';
-      requestAnimationFrame(() => requestAnimationFrame(() => { c.style.strokeDasharray = `${(C*v/t).toFixed(1)} ${C}`; }));
+      requestAnimationFrame(() => requestAnimationFrame(() => {
+        c.style.strokeDasharray = (circ * v / t).toFixed(1) + ' ' + circ.toFixed(1);
+      }));
     });
   });
 </script>
