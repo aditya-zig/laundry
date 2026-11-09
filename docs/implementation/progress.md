@@ -1,3 +1,7 @@
+# Historical ledger
+
+**State of record superseded.** The live state of record is the newest checkpoint under docs/implementation/production-application/ (pointers in docs/CURRENT.md). This early ledger is retained for provenance only; do not read "Tasks:" or dates below as the current work plan.
+
 # Wandary implementation ledger
 
 Plan: docs/superpowers/plans/2026-10-11-laundry.md
