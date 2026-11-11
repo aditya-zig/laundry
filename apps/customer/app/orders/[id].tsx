@@ -47,8 +47,9 @@ function OwnedDetail({ id }: { id: string }) {
       <Text style={{ color: colors.inkMuted, marginTop: 8 }}>An order total or delivery update is not proof of payment. See the payment records below.</Text>
     </Card>
     {!error && !refreshing ? <AdjustmentDecisionCard key={`${order.id}:${order.version}`} order={order} onUpdated={() => setRevision(value => value + 1)} /> : null}
-    <OrderCustodyCard key={`custody:${order.id}:${order.version}:${revision}`} orderId={order.id} timezone={order.pickupWindow.timezone} />
-    <OrderBillingCard key={`billing:${order.id}`} orderId={order.id} />
+    {/* Re-read independent projections after a successful refresh, even without a version change. */}
+    <OrderCustodyCard key={`custody:${order.id}:${readAt}`} orderId={order.id} timezone={order.pickupWindow.timezone} />
+    <OrderBillingCard key={`billing:${order.id}:${readAt}`} orderId={order.id} />
     {!error && !refreshing ? <OrderReviewCard key={order.id} order={order} /> : null}
     <OrderSupportCard key={`support:${order.id}`} orderId={order.id} />
     <NoteCard kind="note" title="Check for updates" body="Rescheduling and cancellation are not yet connected on this screen. Payment records are read-only and do not initiate collection or a refund." actionLabel="Refresh" actionDisabled={refreshing} onAction={() => setRevision(value => value + 1)} />
