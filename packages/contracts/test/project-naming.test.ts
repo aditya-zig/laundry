@@ -89,7 +89,7 @@ describe("Laundry project naming", () => {
     expect(commands).toEqual([
       "sudo apt-get update && sudo apt-get install -y ffmpeg xvfb",
       "pnpm install --frozen-lockfile", "pnpm build", "pnpm check", "pnpm check:convex",
-      "pnpm contracts:check", "pnpm test:tooling", "pnpm test", "pnpm test:voice", "pnpm verify:container",
+      "pnpm contracts:check", "pnpm test:tooling", "pnpm test", "pnpm test:voice", "pnpm verify:container", "pnpm verify:isolation",
       "pnpm exec playwright install --with-deps chromium", "pnpm verify:browser", "pnpm verify:restore", "pnpm verify:recording",
     ]);
   });
