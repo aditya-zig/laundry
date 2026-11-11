@@ -19,6 +19,7 @@ export const apiV2 = {
   listOrders: () => getFoundation().authorized(client => client.listOrders()),
   getOrder: (id: string) => getFoundation().authorized(client => client.getOrder(id)),
   getOrderTimeline: (id: string) => getFoundation().authorized(client => client.getOrderTimeline(id)),
+  getCustodyReceipt: (id: string) => getFoundation().authorized(client => client.getCustodyReceipt(id)),
   getReviewEligibility: (id: string) => getFoundation().authorized(client => client.getReviewEligibility(id)),
   logout: () => getFoundation().logout(),
 };
