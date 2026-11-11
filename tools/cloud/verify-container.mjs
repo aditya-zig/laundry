@@ -33,7 +33,7 @@ async function main() {
   const image = `laundry-api-verification:${revision.slice(0, 12)}-${suffix}`;
   const container = `laundry-api-check-${suffix}`;
   const canaries = [join('apps/api', `.env.verify-${suffix}`), join('modules/shared', `verify-${suffix}.key`), join('packages/contracts', `verify-${suffix}.pem`)];
-  let database, running = false, built = false, proof;
+  let database, running = false, built = false, proof, verificationError;
   try {
     for (const path of canaries) await writeFile(path, 'synthetic-context-canary-not-a-credential', { flag: 'wx', mode: 0o600 });
     const probe = join(directory, 'context.Dockerfile');
@@ -83,7 +83,7 @@ async function main() {
     url.username = runtimeRole; url.password = runtimePassword;
     const envFile = join(directory, 'runtime.env');
     await writeFile(envFile, `NODE_ENV=test\nDEMO_MODE=false\nLAUNDRY_DATABASE_MODE=runtime\nDATABASE_URL=${url}\n`, { mode: 0o600 });
-    await docker(['run', '--detach', '--rm', '--name', container, '--network', `container:${database.describe().container}`, '--env-file', envFile, image], 'Start compiled artifact using a separate non-owner runtime database role');
+    await docker(['run', '--detach', '--name', container, '--network', `container:${database.describe().container}`, '--env-file', envFile, image], 'Start compiled artifact using a separate non-owner runtime database role');
     running = true;
     let ready = false;
     for (let i = 0; i < 60; i++) {
@@ -126,14 +126,22 @@ async function main() {
     `], 'Inspect the actual non-root, production-only runtime and fail-closed API'));
     proof = { testedSha: revision, dirty: false, checkedAt: new Date().toISOString(), imageId, runtime, legacyWorkerProductionClosed: true, compiledIdentityMaintenance: maintenance,
       scope: 'Compiled API container and isolated PostgreSQL; no SMS/provider calls; not whole-product production or native acceptance', productionReady: false };
+  } catch (error) {
+    verificationError = error;
+    throw error;
   } finally {
     const failures = [];
+    // Keep startup failures diagnosable before deleting only the owned container.
+    if (running) {
+      const logs = spawnSync('docker', ['logs', container], { encoding: 'utf8', timeout: 10_000 });
+      await appendFile(log, `Owned API startup logs\n${logs.stdout ?? ''}\n${logs.stderr ?? ''}\n`).catch(error => failures.push(error));
+    }
     for (const path of canaries) try { await rm(path, { force: true }); } catch (error) { failures.push(error); }
-    if (running) try { await docker(['stop', '--time', '15', container], 'Stop only the owned API container'); } catch (error) { failures.push(error); }
+    if (running) try { await docker(['rm', '--force', container], 'Remove only the owned API container'); } catch (error) { failures.push(error); }
     if (database) try { await database.stop(); } catch (error) { failures.push(error); }
     if (built) try { await docker(['image', 'rm', image], 'Remove only the owned verification image tag'); } catch (error) { failures.push(error); }
     try { await rm(directory, { recursive: true, force: true }); } catch (error) { failures.push(error); }
-    if (failures.length) throw new Error('Owned container verification resources did not all clean up; inspect the private log');
+    if (failures.length) throw new Error(`${verificationError ? verificationError.message + '; ' : ''}owned container verification resources did not all clean up; inspect the private log`, { cause: verificationError });
   }
   assert.equal(git('status', '--porcelain'), '', 'Source changed during verification');
   await writeFile('.verification/container.json', JSON.stringify({ ...proof, cleanupCompleted: true }, null, 2));
