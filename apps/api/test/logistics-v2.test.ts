@@ -1,5 +1,5 @@
 import 'reflect-metadata';
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { NestFactory } from '@nestjs/core';
 import type { NestExpressApplication } from '@nestjs/platform-express';
 import { createHmac, randomBytes, randomUUID } from 'node:crypto';
@@ -190,6 +190,47 @@ async function assignedPickup() {
   return { ...who, orderId, attempt, assignment };
 }
 
+describe('internal order delivery projections', () => {
+  it('batches actual latest attempts without leaking custody or provider fields', async () => {
+    const p = await assignedPickup();
+    const other = await seedOrder({ customerId: p.customer.actor.id, status: 'READY_FOR_RETURN', measured: true, qualityPassed: true });
+    const returning = await logistics.openLegAttempt(other, 'RETURN', { scheduledWindow: returnWindow });
+    const pickupJob = await logistics.getRiderJob(p.riderOne.token, p.attempt.id);
+    const query = vi.spyOn(getPool(), 'query');
+    try {
+      const summaries = await logistics.orderLegSummaries([p.orderId, other]);
+      expect(query).toHaveBeenCalledTimes(1);
+      expect(summaries.get(p.orderId)).toEqual([{ leg: 'PICKUP', status: 'ASSIGNED', version: pickupJob.version, assignedTo: p.riderOne.id }]);
+      expect(summaries.get(other)).toEqual([{ leg: 'RETURN', status: 'BOOKED', version: returning.version }]);
+      expect([...summaries.keys()].sort()).toEqual([p.orderId, other].sort());
+      expect(Object.keys(summaries.get(p.orderId)![0]).sort()).toEqual(['assignedTo', 'leg', 'status', 'version']);
+    } finally { query.mockRestore(); }
+  });
+
+  it('uses the latest retry, not an older cancelled attempt, and excludes unrequested orders', async () => {
+    const p = await actors();
+    const orderId = await seedOrder({ customerId: p.customer.actor.id });
+    const first = await logistics.openLegAttempt(orderId, 'PICKUP', { scheduledWindow: pickupWindow });
+    await logistics.cancelLeg(p.operator.accessToken, first.id, { expectedVersion: first.version, reason: 'Synthetic cancelled slot' }, key());
+    nextTime(1000);
+    const retry = await logistics.openLegAttempt(orderId, 'PICKUP', { scheduledWindow: pickupWindow });
+    const unrelated = await seedOrder({ customerId: p.customer.actor.id });
+    await logistics.openLegAttempt(unrelated, 'PICKUP', { scheduledWindow: pickupWindow });
+    const summaries = await logistics.orderLegSummaries([orderId]);
+    expect([...summaries.keys()]).toEqual([orderId]);
+    expect(summaries.get(orderId)).toEqual([{ leg: 'PICKUP', status: 'BOOKED', version: retry.version }]);
+    expect(retry.attemptNumber).toBe(first.attemptNumber + 1);
+  });
+
+  it('does not query for an empty authorized order page', async () => {
+    const query = vi.spyOn(getPool(), 'query');
+    try {
+      expect(await logistics.orderLegSummaries([])).toEqual(new Map());
+      expect(query).not.toHaveBeenCalled();
+    } finally { query.mockRestore(); }
+  });
+});
+
 describe('composed custody and final settlement', () => {
   async function preparedReturn() {
     const who = await actors();
@@ -362,6 +403,18 @@ describe('B06-01 assignment visibility', () => {
     expect((await getPool().query("SELECT count(*)::int AS n FROM logistics_assignment_events WHERE kind='ACCEPTED'")).rows[0].n).toBe(1);
   });
 
+  it.each(['DELIVERED', 'CANCELLED'] as const)('refuses a still-booked attempt after its order became %s', async status => {
+    const who = await actors();
+    const orderId = await seedOrder({ customerId: who.customer.actor.id });
+    const attempt = await logistics.openLegAttempt(orderId, 'PICKUP');
+    await getPool().query('UPDATE orders_v2_orders SET status=$2,version=version+1 WHERE id=$1', [orderId, status]);
+    await expect(logistics.assign(who.operator.accessToken, {
+      legAttemptId: attempt.id, riderId: who.riderOne.id, expectedVersion: attempt.version, reason: 'Stale dispatch console',
+    }, key())).rejects.toMatchObject({ code: 'INVALID_INPUT' });
+    expect(await activeAssignments(orderId)).toBe(0);
+    expect(notifier.sent).toHaveLength(0);
+  });
+
   it('refuses customer tokens on ops and rider surfaces and unassigned orders stay invisible', async () => {
     const who = await actors();
     const unassignedOrder = await seedOrder({ customerId: who.customer.actor.id });
@@ -375,6 +428,18 @@ describe('B06-01 assignment visibility', () => {
 });
 
 describe('B06-02 reassignment', () => {
+  it.each(['DELIVERED', 'CANCELLED'] as const)('does not release or reassign a rider after its order became %s', async status => {
+    const p = await assignedPickup();
+    const notified = notifier.sent.length;
+    await getPool().query('UPDATE orders_v2_orders SET status=$2,version=version+1 WHERE id=$1', [p.orderId, status]);
+    await expect(logistics.reassign(p.operator.accessToken, p.assignment.id, {
+      riderId: p.riderTwo.id, expectedVersion: p.assignment.version, reason: 'Stale dispatcher reassign',
+    }, key())).rejects.toMatchObject({ code: 'INVALID_INPUT' });
+    expect(await activeAssignments(p.orderId)).toBe(1);
+    expect(notifier.sent).toHaveLength(notified);
+    expect((await getPool().query('SELECT rider_id FROM logistics_assignments WHERE id=$1', [p.assignment.id])).rows[0].rider_id).toBe(p.riderOne.id);
+  });
+
   it('releases the old rider and keeps one active assignment', async () => {
     const { operator, riderOne, riderTwo, orderId, attempt, assignment } = await assignedPickup();
     const second = await logistics.reassign(operator.accessToken, assignment.id, {
@@ -615,6 +680,21 @@ describe('B06 tracking and custody ownership', () => {
       expect(ok.status).toBe(200);
       const body = v2.customerTrackingSchema.parse(await ok.json());
       expect(body.orderId).toBe(orderId);
+
+      const attempt = await logistics.openLegAttempt(orderId, 'PICKUP', { scheduledWindow: pickupWindow });
+      const dispatchUrl = `${base}/ops/logistics/orders/${orderId}/legs`;
+      const dispatch = await fetch(dispatchUrl, { headers: { authorization: `Bearer ${who.operator.accessToken}` } });
+      expect(dispatch.status).toBe(200);
+      expect(await dispatch.json()).toEqual([attempt]);
+      expect(dispatch.headers.get('cache-control')).toBe('no-store');
+      await provisionStaff('+919000061099', 'FACILITY');
+      const facility = await signin('+919000061099');
+      for (const token of [who.customer.accessToken, who.riderOne.token, facility.accessToken]) {
+        const denied = await fetch(dispatchUrl, { headers: { authorization: `Bearer ${token}` } });
+        expect(denied.status).toBe(403);
+        expect(v2.errorEnvelopeSchema.parse(await denied.json()).code).toBe('FORBIDDEN');
+      }
+      expect((await fetch(`${base}/ops/logistics/orders/${randomUUID()}/legs`, { headers: { authorization: `Bearer ${who.operator.accessToken}` } })).status).toBe(404);
 
       const forbidden = await fetch(`${base}/rider/jobs`, { headers: { authorization: `Bearer ${who.customer.accessToken}` } });
       expect(forbidden.status).toBe(403);

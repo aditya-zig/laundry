@@ -1,14 +1,8 @@
 // F04 operations workspace page. Coordinator composition mounts this export.
-// The bounded slice wires: OTP + optional TOTP staff sign-in (public identity
-// endpoints through the session foundation), the facility-scoped ops order
-// queue, selected-order detail, and exactly one server-permitted mutation
-// (care advance) with command-key retention across unknown outcomes.
-//
-// Not included in this slice and never faked: intake recording, quality-check
-// recording, hold/exception resolution, dispatch, reconciliation, refunds,
-// conversations, dead-letter tooling. Their panels explain that they are not
-// wired rather than presenting dead controls.
-import { useEffect, useState } from "react";
+// Staff sign-in, scoped orders, physical facility records and operator-only
+// dispatch/manual settlement. Hold/exception resolution, refunds, provider
+// reconciliation, conversations and dead letters remain separate work.
+import { useEffect, useState, type ReactNode } from "react";
 import type { SessionFoundation } from "@laundry/app-foundation";
 import type { V2Client } from "@laundry/api-client";
 import type { v2 } from "@laundry/contracts";
@@ -24,7 +18,13 @@ import {
   nextStaffCareAction,
   type CareAttempt,
   type StaffCareAction,
+  type FacilityRecordInput,
+  facilityRecordMode,
 } from "../features/careActions";
+import { FacilityRecordForm } from "../features/FacilityRecordForm";
+import { DispatchSettlementPanel } from "../features/DispatchSettlementPanel";
+import { CatalogReadinessPanel } from "../features/CatalogReadinessPanel";
+import { SupportConsole } from "../features/SupportConsole";
 import { useSyncedState } from "../features/useSyncedState";
 import type { PresentableError } from "../features/errors";
 import {
@@ -80,6 +80,7 @@ export function ProductOperationsApp(props: ProductOperationsAppProps = {}) {
       return null;
     }
   });
+  const [settlementBusy, setSettlementBusy] = useState(false);
   const signInState = useSyncedState(workspace?.signIn);
   const queueState = useSyncedState(workspace?.queue);
   const detailState = useSyncedState(workspace?.detail);
@@ -100,7 +101,7 @@ export function ProductOperationsApp(props: ProductOperationsAppProps = {}) {
   const actor = signInState?.phase === "signedIn" ? signInState.actor : null;
 
   useEffect(() => {
-    if (!workspace || !actor) return;
+    if (!workspace || !actor || actor.role === "SUPPORT") return;
     void workspace.queue.refresh();
   }, [workspace, actor]);
 
@@ -147,22 +148,58 @@ export function ProductOperationsApp(props: ProductOperationsAppProps = {}) {
       queue={queueState ?? { kind: "idle" }}
       detail={detailState ?? { kind: "idle" }}
       attempt={attemptState ?? { phase: "idle" }}
-      onOpenOrder={(orderId) => void workspace.detail.select(orderId)}
+      toolsPending={settlementBusy}
+      catalogTools={["OPERATOR", "ADMIN"].includes(currentActor.role) ? <CatalogReadinessPanel foundation={workspace.foundation} /> : null}
+      supportTools={["OPERATOR", "SUPPORT", "ADMIN"].includes(currentActor.role) ? <SupportConsole key={`${currentActor.id}:${currentActor.role}:${JSON.stringify(currentActor.scope)}`} foundation={workspace.foundation} actorId={currentActor.id} /> : null}
+      onOpenOrder={(orderId) => {
+        const attempt = workspace.care.getState();
+        if (settlementBusy || attempt.phase === "sending" || attempt.phase === "unknown") return;
+        workspace.care.clear();
+        void workspace.detail.select(orderId);
+      }}
       onRefreshQueue={() => void workspace.queue.refresh()}
       onLoadMore={() => void workspace.queue.loadMore()}
-      onRefreshDetail={() => void workspace.detail.refresh()}
+      onRefreshDetail={() => { if (!settlementBusy) void workspace.detail.refresh(); }}
+      // Keep reconciliation visible even if another event completed/cancelled
+      // the order while a command response was lost. New forms still gate state.
+      detailTools={(order, blocked) => !blocked && ["OPERATOR", "ADMIN"].includes(currentActor.role)
+        ? <DispatchSettlementPanel key={order.id} foundation={workspace.foundation} order={order} onBusyChange={setSettlementBusy} onChanged={() => {
+            const selected = workspace.detail.getState();
+            if (selected.kind === "ready" && selected.order.id === order.id) void workspace.detail.refresh();
+            void workspace.queue.refresh();
+          }} />
+        : null}
       onStartCare={() => {
         const detail = workspace.detail.getState();
         if (detail.kind !== "ready") return;
         void workspace.care
           .begin(detail.order, currentActor.role)
           .then((updated) => {
-            if (updated) workspace.detail.acceptUpdate(updated);
+            if (updated) {
+              workspace.detail.acceptUpdate(updated);
+              void workspace.queue.refresh();
+            }
           });
+      }}
+      onRecordFacility={(input) => {
+        const detail = workspace.detail.getState();
+        if (detail.kind !== "ready" || input.orderId !== detail.order.id || input.record.expectedVersion !== detail.order.version) return;
+        const result = input.kind === "INTAKE"
+          ? workspace.care.recordIntake(detail.order, currentActor.role, input.record)
+          : workspace.care.recordQualityCheck(detail.order, currentActor.role, input.record);
+        void result.then(updated => {
+          if (updated) {
+            workspace.detail.acceptUpdate(updated);
+            void workspace.queue.refresh();
+          }
+        });
       }}
       onRetryCare={() => {
         void workspace.care.retry().then((updated) => {
-          if (updated) workspace.detail.acceptUpdate(updated);
+          if (updated) {
+            workspace.detail.acceptUpdate(updated);
+            void workspace.queue.refresh();
+          }
         });
       }}
       onSignOut={() => void workspace.signIn.signOut()}
@@ -378,7 +415,12 @@ export interface OperationsWorkspaceViewProps {
   onRefreshDetail?: () => void;
   onStartCare?: () => void;
   onRetryCare?: () => void;
+  onRecordFacility?: (input: FacilityRecordInput) => void;
   onSignOut?: () => void;
+  detailTools?: (order: v2.Order, blocked: boolean) => ReactNode;
+  toolsPending?: boolean;
+  catalogTools?: ReactNode;
+  supportTools?: ReactNode;
 }
 
 function FreshnessLine(props: {
@@ -416,7 +458,7 @@ export function OperationsWorkspaceView(props: OperationsWorkspaceViewProps) {
           <span className="ops-mark" aria-hidden="true">L</span>
           <div>
             <span className="ops-brand-name">Laundry Ops</span>
-            <span className="ops-mini ops-muted">Facility queue and order detail</span>
+            <span className="ops-mini ops-muted">{actor.role === "SUPPORT" ? "Customer support workspace" : "Facility queue and order detail"}</span>
           </div>
         </div>
         <div className="ops-header-actions" data-testid="ops-identity">
@@ -430,6 +472,8 @@ export function OperationsWorkspaceView(props: OperationsWorkspaceViewProps) {
       </header>
 
       <main className="ops-sheets">
+        {props.catalogTools && <div style={{ gridColumn: "1 / -1", minWidth: 0 }}>{props.catalogTools}</div>}
+        {actor.role !== "SUPPORT" && <>
         <section className="ops-sheet" aria-label="Order queue">
           <div className="ops-sheet-head">
             <h2 className="ops-h2">Order queue</h2>
@@ -510,6 +554,7 @@ export function OperationsWorkspaceView(props: OperationsWorkspaceViewProps) {
                           type="button"
                           className="ops-ghost"
                           aria-label={`Open order ${shortId(order.id)}`}
+                          disabled={props.toolsPending || attempt.phase === "sending" || attempt.phase === "unknown"}
                           onClick={() => props.onOpenOrder?.(order.id)}
                         >
                           Open
@@ -564,7 +609,7 @@ export function OperationsWorkspaceView(props: OperationsWorkspaceViewProps) {
             </div>
           )}
 
-          {detail.kind === "ready" && (
+          {detail.kind === "ready" && <>
             <OrderDetailBody
               order={detail.order}
               actor={actor}
@@ -576,9 +621,13 @@ export function OperationsWorkspaceView(props: OperationsWorkspaceViewProps) {
               onRefreshDetail={props.onRefreshDetail}
               onStartCare={props.onStartCare}
               onRetryCare={props.onRetryCare}
+              onRecordFacility={props.onRecordFacility}
             />
-          )}
+            {props.detailTools?.(detail.order, detail.stale || detail.refreshError !== undefined || attempt.phase === "sending" || attempt.phase === "unknown")}
+          </>}
         </section>
+        </>}
+        {props.supportTools && <div style={{ gridColumn: "1 / -1", minWidth: 0 }}>{props.supportTools}</div>}
       </main>
     </div>
   );
@@ -595,8 +644,10 @@ function OrderDetailBody(props: {
   onRefreshDetail?: () => void;
   onStartCare?: () => void;
   onRetryCare?: () => void;
+  onRecordFacility?: (input: FacilityRecordInput) => void;
 }) {
   const order = props.order;
+  const recordMode = facilityRecordMode(order, props.actor.role);
   const timezone = order.pickupWindow.timezone;
   const retryBlocked = props.attempt.phase === "unknown";
   const sending = props.attempt.phase === "sending";
@@ -637,19 +688,20 @@ function OrderDetailBody(props: {
         <div><dt>Created</dt><dd>{formatInstantInTz(order.createdAt, timezone)}</dd></div>
         <div><dt>Pickup window</dt><dd>{formatWindow(order.pickupWindow)}</dd></div>
         <div><dt>Promised return</dt><dd>{formatWindow(order.promisedReturnWindow)}</dd></div>
-        <div><dt className="num">Total</dt><dd className="num">{formatInrMinor(order.totalMinor)}</dd></div>
+        <div><dt className="num">Current order total</dt><dd className="num">{formatInrMinor(order.totalMinor)}</dd></div>
       </dl>
 
-      <h4 className="ops-h3">Lines</h4>
+      <h4 className="ops-h3">Booked items</h4>
+      <p className="ops-muted">Original booking quantities and estimates. Measured facts and any customer-approved adjustment are recorded separately.</p>
       <div className="ops-scroll">
         <table className="ops-table">
           <thead>
             <tr>
               <th scope="col">Service</th>
               <th scope="col">Unit</th>
-              <th scope="col">Quantity</th>
+              <th scope="col">Booked quantity</th>
               <th scope="col" className="num">Garments declared</th>
-              <th scope="col" className="num">Line total</th>
+              <th scope="col" className="num">Booking estimate</th>
             </tr>
           </thead>
           <tbody>
@@ -755,7 +807,16 @@ function OrderDetailBody(props: {
 
       <div className="ops-panel" data-testid="ops-staff-action-panel">
         <h4 className="ops-h3">Staff next action</h4>
-        {props.action && (
+        {recordMode && (
+          <FacilityRecordForm
+            key={`${order.id}:${order.version}`}
+            mode={recordMode}
+            order={order}
+            disabled={sending || retryBlocked || props.stale}
+            onRecord={props.onRecordFacility}
+          />
+        )}
+        {props.action && !recordMode && (
           <>
             <button
               type="button"
@@ -776,7 +837,7 @@ function OrderDetailBody(props: {
 
         {props.attempt.phase === "unknown" && (
           <div className="ops-notice" role="alert">
-            <strong>Outcome unknown.</strong> The care command (key {shortId(props.attempt.commandKey)}) was not
+            <strong>Outcome unknown.</strong> The staff command (key {shortId(props.attempt.commandKey)}) was not
             confirmed by the server. Retry sends the identical command with the same
             key — do not re-count or re-measure until the server confirms.
             <div className="ops-form-actions">

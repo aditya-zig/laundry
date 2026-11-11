@@ -32,6 +32,7 @@ export {
 } from "./ports.js";
 
 export { createBrowserSessionFoundation, createAppSessionBinding, resolveApiV2BaseUrl, type BrowserFoundationOptions, type PlatformSessionStores } from "./app-helpers.js";
+export { openNativeSqliteSessionStores } from "./sqlite-stores.js";
 
 export { isMutationOutcomePending } from "./mutations.js";
 export { logoutNotice } from "./logout.js";

@@ -60,6 +60,27 @@ describe("staff OTP second-factor transport", () => {
   });
 });
 
+describe('verified framework-session exchange transport', () => {
+  it('carries proof only in the bearer header, an empty body and a stable retry key', async () => {
+    const calls: Call[] = [];
+    const session = { sessionId: id, accessToken: 'app-access', refreshToken: 'app-refresh', expiresAt: challenge.expiresAt,
+      actor: { id, role: 'CUSTOMER', facilityIds: [], scope: { facilityIds: [] } } };
+    const client = createV2Client({ baseUrl: 'https://api.test/v2', getToken: () => 'framework-token', fetchImpl: stub(calls, () => json(session)) });
+    expect(await client.exchangeAuthSession({ idempotencyKey: id })).toEqual({ ...session, expiresAt: '2026-10-22T09:00:00.000Z' });
+    expect(calls[0].url).toBe('https://api.test/v2/identity/session/exchange');
+    expect(calls[0].init.headers).toMatchObject({ Authorization: 'Bearer framework-token', 'Idempotency-Key': id });
+    expect(calls[0].init.body).toBe('{}');
+  });
+  it('preserves the unverified-mobile error without retrying or requesting SMS', async () => {
+    const calls: Call[] = [];
+    const client = createV2Client({ getToken: () => 'framework-token', fetchImpl: stub(calls, () => json({
+      code: 'UNAUTHENTICATED', message: 'Verify your mobile number', traceId: 'trace-auth', retryable: false,
+    }, 401)) });
+    await expect(client.exchangeAuthSession()).rejects.toMatchObject({ code: 'UNAUTHENTICATED', status: 401 });
+    expect(calls).toHaveLength(1);
+  });
+});
+
 describe("v2 client headers", () => {
   it("sends an idempotency key on a mutation", async () => {
     const calls: Call[] = [];
@@ -111,6 +132,23 @@ describe("v2 client headers", () => {
 
     const headers = calls[0].init.headers as Record<string, string>;
     expect(headers.Authorization).toBe("Bearer session-token");
+  });
+});
+
+describe('support read pagination', () => {
+  it.each(['incidents', 'ops-incidents', 'messages'] as const)('preserves the opaque cursor and limit for %s without a mutation key', async kind => {
+    const calls: Call[] = [];
+    const client = createV2Client({ baseUrl: 'https://api.test/v2', fetchImpl: stub(calls, () => json({ items: [], pageInfo: { hasMore: false } })) });
+    const cursor = 'opaque+/=cursor';
+    if (kind === 'incidents') await client.listIncidents({ cursor, limit: 25 });
+    else if (kind === 'ops-incidents') await client.listOpsIncidents({ cursor, limit: 25 });
+    else await client.listIncidentMessages(id, { cursor, limit: 25 });
+    const url = new URL(calls[0].url);
+    expect(url.pathname).toBe(kind === 'incidents' ? '/v2/incidents' : kind === 'ops-incidents' ? '/v2/ops/incidents' : `/v2/incidents/${id}/messages`);
+    expect(url.searchParams.get('cursor')).toBe(cursor);
+    expect(url.searchParams.get('limit')).toBe('25');
+    expect(calls[0].init.method).toBe('GET');
+    expect(calls[0].init.headers).not.toHaveProperty('Idempotency-Key');
   });
 });
 

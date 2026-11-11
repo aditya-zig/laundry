@@ -31,6 +31,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
           fetch-depth: 0
       - uses: pnpm/action-setup@v4
         with:
@@ -41,7 +42,7 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm exec playwright install --with-deps chromium
-      - name: Pilot browser journey, video, trace and restart persistence
+      - name: Retained legacy pilot browser and API restart regression
         run: pnpm verify:pilot
       - name: Retain pilot success and failure evidence
         if: always()
@@ -69,14 +70,18 @@ jobs:
     env:
       DATABASE_URL: postgres://laundry:verification_only@localhost:5448/laundry_verify_ci
       DEMO_MODE: 'true'
-      EXPO_PUBLIC_API_URL: http://localhost:4100/v1
-      VITE_API_URL: http://localhost:4100/v1
+      VERIFY_WEB_SCOPE: 'product'
+      LAUNDRY_PG_RUNTIME: 'docker'
+      LAUNDRY_VERIFY_OPS_FACILITY: 'true'
+      LAUNDRY_VERIFY_RIDER: 'true'
+      LAUNDRY_VERIFY_PICKUP: 'true'
       VERIFY_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
       VERIFY_BASE_SHA: ${{ github.event.pull_request.base.sha || '' }}
       CI: 'true'
     steps:
       - uses: actions/checkout@v4
         with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
           fetch-depth: 0
       - uses: pnpm/action-setup@v4
         with:
@@ -94,8 +99,9 @@ jobs:
       - run: pnpm build
       - run: pnpm check
       - run: pnpm test
-      # API tests can reset data. Browser startup and demo seeding follow them.
-      - name: Actual web smoke, recordings and current-revision manifest
+      # The current-product journey owns a separate disposable database and
+      # explicit synthetic exports; previous API-test state is never reused.
+      - name: Current four-role product journey and scoped revision manifest
         run: pnpm verify:browser
       - name: Retain success and failure evidence
         if: always()

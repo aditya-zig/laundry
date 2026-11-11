@@ -5,6 +5,7 @@ import type { v2 } from "@laundry/contracts";
 import { apiV2 } from "../../src/api-v2";
 import { CustomerPrivateScreen } from "../../src/features/booking/CustomerPrivateScreen";
 import { describeError } from "../../src/features/booking/presenters";
+import { paymentModelLabel } from "../../src/features/booking/order-billing";
 import { Card, Loading, NoteCard, Page } from "../../src/features/booking/ui";
 import { formatINR } from "../../src/guards";
 import { colors, minTouchTarget } from "../../src/theme";
@@ -28,7 +29,7 @@ function OwnedOrders() {
   return <>
     {page.items.length === 0 ? <NoteCard kind="note" title="No orders yet" body="Confirmed bookings will appear here. A bag or pending command is not an order." /> : null}
     {page.items.map(order => <Card key={order.id} title={order.status.replaceAll("_", " ")}>
-      <Text style={{ color: colors.ink, marginTop: 8 }}>{formatINR(order.totalMinor)} · {order.paymentModel === "DUE_AT_RETURN" ? "Payment due at return" : "Prepaid order"}</Text>
+      <Text style={{ color: colors.ink, marginTop: 8 }}>{formatINR(order.totalMinor)} · {paymentModelLabel(order.paymentModel)}</Text>
       <Link href={{ pathname: "/orders/[id]", params: { id: order.id } }} asChild>
         <Pressable accessibilityRole="button" accessibilityLabel={`Open order ${order.id}`} style={{ minHeight: minTouchTarget, justifyContent: "center" }}><Text style={{ color: colors.action }}>View order {order.id.slice(0, 8)}</Text></Pressable>
       </Link>

@@ -28,6 +28,32 @@ interface BagRow {
   garment?: v2.GarmentEligibility;
 }
 
+function KgWeightInput({ weightGrams, label, onCommit, onInvalid }: {
+  weightGrams: number;
+  label: string;
+  onCommit: (grams: number) => void;
+  onInvalid: () => void;
+}) {
+  const [draft, setDraft] = useState(String(weightGrams / 1000));
+  useEffect(() => { setDraft(String(weightGrams / 1000)); }, [weightGrams]);
+  return <TextInput
+    value={draft}
+    onChangeText={setDraft}
+    keyboardType="decimal-pad"
+    // react-native-web does not emit onEndEditing; commit the draft on blur.
+    onBlur={() => {
+      const grams = Math.round(Number.parseFloat(draft.replace(",", ".")) * 1000);
+      if (Number.isFinite(grams) && grams > 0) onCommit(grams);
+      else onInvalid();
+      // Normalize to the stored quantity, including when persistence failed.
+      // A successful commit updates weightGrams and synchronizes the draft.
+      setDraft(String(weightGrams / 1000));
+    }}
+    style={styles.qtyInput}
+    accessibilityLabel={label}
+  />;
+}
+
 export default function Basket() {
   const router = useRouter();
   const bag = bagStore();
@@ -170,17 +196,11 @@ export default function Basket() {
               {row.status === "ok" && row.line.kind === "KG" ? (
                 <View style={styles.qtyRow}>
                   <Text style={styles.qtyLabel}>Billed weight (kg)</Text>
-                  <TextInput
-                    value={String(row.line.weightGrams / 1000)}
-                    keyboardType="decimal-pad"
-                    onEndEditing={(event) => {
-                      if (!kg) return;
-                      const grams = Math.round(Number.parseFloat(event.nativeEvent.text.replace(",", ".")) * 1000);
-                      if (Number.isFinite(grams) && grams > 0) mutate((current) => setKgWeightGrams(current, kg.serviceId, grams));
-                      else setNotice("Enter a weight greater than 0 kg.");
-                    }}
-                    style={styles.qtyInput}
-                    accessibilityLabel={`Billed weight in kilograms for ${lineTitle(row)}`}
+                  <KgWeightInput
+                    weightGrams={row.line.weightGrams}
+                    label={`Billed weight in kilograms for ${lineTitle(row)}`}
+                    onCommit={(grams) => { if (kg) mutate((current) => setKgWeightGrams(current, kg.serviceId, grams)); }}
+                    onInvalid={() => setNotice("Enter a weight greater than 0 kg.")}
                   />
                 </View>
               ) : null}

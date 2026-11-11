@@ -3,7 +3,7 @@
 FROM node:24.22.0-bookworm-slim AS build
 RUN corepack enable
 WORKDIR /app
-COPY package.json pnpm-workspace.yaml pnpm-lock.yaml tsconfig.json tsconfig.base.json ./
+COPY package.json pnpm-workspace.yaml pnpm-lock.yaml .pnpmfile.cjs tsconfig.json tsconfig.base.json ./
 COPY patches ./patches
 COPY packages ./packages
 COPY modules ./modules

@@ -41,6 +41,8 @@ export interface OrdersOptions {
   onBooked?: (order: v2.Order, transaction: PoolClient) => Promise<void>;
   /** Reconcile final billing and open the return leg in the same transaction. */
   onReady?: (order: v2.Order, transaction: PoolClient) => Promise<v2.Obligation>;
+  /** Authorized, batched read projection supplied by logistics at composition. */
+  loadDeliveryLegs?: (orderIds: readonly string[], client: Pool | PoolClient) => Promise<Map<string, v2.DeliveryLegSummary[]>>;
   clock?: () => Date;
   adjustmentMinutes?: number;
   /** Trusted composition gate; defaults closed in production. Cached reads/replays remain available. */
@@ -213,7 +215,7 @@ function adjustment(row: AdjustmentRow): v2.Adjustment {
   };
 }
 
-function order(row: OrderRow, timeline: TimelineRow[], current?: AdjustmentRow): v2.Order {
+function order(row: OrderRow, timeline: TimelineRow[], current?: AdjustmentRow, deliveryLegs: v2.DeliveryLegSummary[] = []): v2.Order {
   const adjustmentState = current ? adjustment(current) : undefined;
   return v2.orderSchema.parse({
     id: row.id,
@@ -237,7 +239,7 @@ function order(row: OrderRow, timeline: TimelineRow[], current?: AdjustmentRow):
     containers: row.containers,
     ...(row.measured_lines === null ? {} : { measuredLines: row.measured_lines }),
     permittedActions: permittedActions(row.status, adjustmentState?.state),
-    deliveryLegs: [],
+    deliveryLegs,
   });
 }
 
@@ -321,6 +323,16 @@ export class OrdersService {
     return (await client.query<AdjustmentRow>(
       "SELECT * FROM orders_v2_adjustments WHERE order_id=$1 AND state IN ('PROPOSED','ACCEPTED','DECLINED','EXPIRED') ORDER BY created_at DESC LIMIT 1",
       [orderId])).rows[0];
+  }
+
+  private async deliveryLegs(orderIds: readonly string[], client: Pool | PoolClient = this.options.db): Promise<Map<string, v2.DeliveryLegSummary[]>> {
+    if (orderIds.length === 0 || !this.options.loadDeliveryLegs) return new Map();
+    return this.options.loadDeliveryLegs(orderIds, client);
+  }
+
+  private async project(row: OrderRow, timeline: TimelineRow[], current?: AdjustmentRow, client: Pool | PoolClient = this.options.db): Promise<v2.Order> {
+    const legs = await this.deliveryLegs([row.id], client);
+    return order(row, timeline, current, legs.get(row.id) ?? []);
   }
 
   private async appendTimeline(
@@ -534,6 +546,7 @@ export class OrdersService {
         });
         const booked = order(row, await this.timeline(orderId, tx));
         await this.options.onBooked?.(booked, tx);
+        booked.deliveryLegs = (await this.deliveryLegs([booked.id], tx)).get(booked.id) ?? [];
         await scope.publish({ eventId: randomUUID(), eventType: 'order.confirmed.v2', schemaVersion: 2,
           aggregateId: booked.id, aggregateVersion: booked.version, occurredAt: this.clock().toISOString(), traceId,
           payload: { order: booked, quote: quote(quoteRow) } });
@@ -604,11 +617,13 @@ export class OrdersService {
       "SELECT * FROM orders_v2_adjustments WHERE order_id = ANY($1) AND state IN ('PROPOSED','ACCEPTED','DECLINED','EXPIRED') ORDER BY created_at DESC",
       [pageRows.map(row => row.id)],
     ));
+    const legs = await this.deliveryLegs(pageRows.map(row => row.id));
     return {
       items: pageRows.map(row => order(
         row,
         timelines.filter(event => event.order_id === row.id),
         adjustments.find(item => item.order_id === row.id),
+        legs.get(row.id) ?? [],
       )),
       pageInfo: {
         hasMore: rows.length > page.limit,
@@ -619,7 +634,7 @@ export class OrdersService {
 
   async getOrder(token: string, orderId: string): Promise<v2.Order> {
     const { row } = await this.ownedOrder(token, orderId);
-    return order(row, await this.timeline(row.id), await this.currentAdjustment(row.id));
+    return this.project(row, await this.timeline(row.id), await this.currentAdjustment(row.id));
   }
 
   async getTimeline(token: string, orderId: string): Promise<v2.OrderTimelineEvent[]> {
@@ -696,7 +711,7 @@ export class OrdersService {
           before: { status: row.status, holdId: row.hold_id },
           after: { status, ...evidence },
         });
-        return order(updated, await this.timeline(orderId, tx), await this.currentAdjustment(orderId, tx)) as unknown as v2.JsonValue;
+        return await this.project(updated, await this.timeline(orderId, tx), await this.currentAdjustment(orderId, tx), tx) as unknown as v2.JsonValue;
       },
     );
     return v2.orderSchema.parse(result);
@@ -730,7 +745,7 @@ export class OrdersService {
         actor.id, actor.role, orderId, 'ORDER_CANCELLED', reason,
         JSON.stringify({ status: row.status }), JSON.stringify({ status: next.status, ...evidence }), randomUUID(),
       ]);
-      return order(updated, await this.timeline(orderId, tx), await this.currentAdjustment(orderId, tx));
+      return this.project(updated, await this.timeline(orderId, tx), await this.currentAdjustment(orderId, tx), tx);
     });
   }
 
@@ -784,7 +799,7 @@ export class OrdersService {
           before: { pickup: row.pickup_window.start, totalMinor: money(row.total_minor) },
           after: { pickup: quoteRow.pickup_window.start, totalMinor: money(quoteRow.total_minor) },
         });
-        return order(updated, await this.timeline(orderId, tx)) as unknown as v2.JsonValue;
+        return await this.project(updated, await this.timeline(orderId, tx), undefined, tx) as unknown as v2.JsonValue;
       },
     );
     return v2.orderSchema.parse(result);
@@ -828,7 +843,7 @@ export class OrdersService {
           before: { status: row.status, totalMinor: money(row.total_minor), ...(current === undefined ? {} : { adjustmentState: current.state }) },
           after: { status: decision.status, totalMinor: total, adjustmentState: state },
         });
-        return order(updated, await this.timeline(orderId, tx), await this.currentAdjustment(orderId, tx)) as unknown as v2.JsonValue;
+        return await this.project(updated, await this.timeline(orderId, tx), await this.currentAdjustment(orderId, tx), tx) as unknown as v2.JsonValue;
       },
     );
     return v2.orderSchema.parse(result);
@@ -875,7 +890,7 @@ export class OrdersService {
         actor.id, actor.role, orderId, 'ORDER_PICKUP_STARTED', 'Pickup leg started by logistics',
         JSON.stringify({ status: row.status }), JSON.stringify({ status: next.status }), randomUUID(),
       ]);
-      return order(updated, await this.timeline(orderId, tx), await this.currentAdjustment(orderId, tx));
+      return this.project(updated, await this.timeline(orderId, tx), await this.currentAdjustment(orderId, tx), tx);
     });
   }
 
@@ -939,7 +954,7 @@ export class OrdersService {
           before: { status: row.status, totalMinor: previous },
           after: { status, measuredTotal: total, ...(adjustment === undefined ? {} : { adjustmentId: adjustment.id }), containers: parsed.containers.length },
         });
-        return order(updated, await this.timeline(orderId, tx), adjustment) as unknown as v2.JsonValue;
+        return await this.project(updated, await this.timeline(orderId, tx), adjustment, tx) as unknown as v2.JsonValue;
       },
     );
     return v2.orderSchema.parse(result);
@@ -992,7 +1007,7 @@ export class OrdersService {
           before: { status: row.status },
           after: { status: next.status },
         });
-        return order(updated, await this.timeline(orderId, tx), current) as unknown as v2.JsonValue;
+        return await this.project(updated, await this.timeline(orderId, tx), current, tx) as unknown as v2.JsonValue;
       },
     );
     return v2.orderSchema.parse(result);
@@ -1036,7 +1051,7 @@ export class OrdersService {
           before: { status: row.status, containers: row.containers.length },
           after: { status: next.status, containers: parsed.containers.length },
         });
-        const ready = order(updated, await this.timeline(orderId, tx));
+        const ready = await this.project(updated, await this.timeline(orderId, tx), undefined, tx);
         if (parsed.passed && this.options.onReady) {
           const obligation = v2.obligationSchema.parse(await this.options.onReady(ready, tx));
           if (obligation.orderId !== ready.id || obligation.amountDueMinor !== ready.totalMinor) {
@@ -1045,6 +1060,7 @@ export class OrdersService {
           await scope.publish({ eventId: randomUUID(), eventType: 'order.ready-for-return.v2', schemaVersion: 2,
             aggregateId: ready.id, aggregateVersion: ready.version, occurredAt: this.clock().toISOString(), traceId,
             payload: { orderId: ready.id, readyAt: this.clock().toISOString(), obligation } });
+          ready.deliveryLegs = (await this.deliveryLegs([ready.id], tx)).get(ready.id) ?? [];
         }
         return ready as unknown as v2.JsonValue;
       },
@@ -1080,7 +1096,7 @@ export class OrdersService {
           before: { status: row.status },
           after: { status: next.status, ...(next.resumeStatus === undefined ? {} : { resumeStatus: next.resumeStatus }) },
         });
-        return order(updated, await this.timeline(orderId, tx), current) as unknown as v2.JsonValue;
+        return await this.project(updated, await this.timeline(orderId, tx), current, tx) as unknown as v2.JsonValue;
       },
     );
     return v2.orderSchema.parse(result);
@@ -1127,7 +1143,7 @@ export class OrdersService {
           before: { status: row.status },
           after: { status: next.status },
         });
-        return order(updated, await this.timeline(orderId, tx), await this.currentAdjustment(orderId, tx)) as unknown as v2.JsonValue;
+        return await this.project(updated, await this.timeline(orderId, tx), await this.currentAdjustment(orderId, tx), tx) as unknown as v2.JsonValue;
       },
     );
     return v2.orderSchema.parse(result);

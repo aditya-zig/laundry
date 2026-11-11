@@ -1,15 +1,19 @@
-# Temporary forge security backport
+# Published forge security fixes
 
-`node-forge` 1.4.0 remains the latest published release and the registry still reports CVE-2026-85393 / GHSA-86w9-cpqp-85rv. We have not changed that version, muted the advisory, or declared an unpublished version patched.
+## Current remediation (2026-11-11)
 
-`patches/node-forge@1.4.0.patch` implements the nested `DigestAlgorithm` child-count validation described in upstream digitalbazaar/forge PR #1152. The existing outer `DigestInfo` check was insufficient: extra nested children were silently ignored. The patch rejects anything beyond the OID and optional parameters while retaining both canonical NULL and absent-parameter forms. It changes only `lib/rsa.js`.
+The temporary 1.4.0 RSA backport is superseded by published `node-forge` **1.4.3**. The root override pins every consumer to that release; the obsolete patch and its single-advisory waiver are removed. Newer advisories affect more than RSA, so extending the old exception would not be safe.
 
-Verification:
+`pnpm release:security` retains the raw `pnpm audit --prod --audit-level moderate --json` output and fails on any moderate, high or critical finding, muted advisory, malformed report or audit error. Low/info reports remain visible at the existing threshold. An unexpected audit exit is not converted to success.
 
-- Original installed source failed all four malformed-signature rejection regressions. They generate local synthetic exponent-3 RSA keys and real signatures, not mocks or production keys.
-- Corrected source passes those four cases plus valid Node-generated SHA-256 signatures and canonical/absent optional parameters: seven RSA cases.
-- `release-security.mjs` follows all four known Expo / React Native consumer chains in both apps; verifies the global package patch mapping, patch scope, package version and exact RSA SHA256 `5019e28f1429de036f4d13be23639c30b4ce6df7183676608a9888f2714674c9`; then runs the RSA regressions against every resolved implementation.
-- The full raw audit is retained. The sole recognized version-based finding must match the exact package, version, advisory, CVE, severity and vulnerability totals. Unknown advisories, audit failures, muted advisories, altered/missing implementations and newly published patched versions fail. This is source-remediation verification, not a generic ignore list.
-- Focused security/tooling tests passed; the full `tools/cloud/*.test.mjs` suite passed 66 tests. `pnpm release:security` passed with the raw high-severity upstream version finding still visible and a separate verified-backport result.
+The additional source verifier follows all four known Expo/React Native consumer chains in both customer and partner apps. Every resolved implementation must match the pinned published version and reviewed RSA source digest, then pass seven real RSA cases: valid Node SHA-256, canonical/absent optional parameters, and four malformed nested `DigestAlgorithm` signatures. Exact-source verification supplements—not replaces—the registry audit.
 
-Replace this temporary backport with a published corrected version once available. This correction does not certify live integrations, cloud deployment, native builds, or physical fulfillment.
+Router query decoding is pinned to `decode-uri-component` 0.5.1. Modern glob consumers (versions 9+) use 14.0.4 and its patched minimatch dependency; legacy glob 7 consumers retain their existing API. Regression tests retain Unicode/arrays/fragments, malformed inputs, image metadata and real Expo build coverage. The distinct-percent-run decoder denial-of-service case executes in a bounded child process.
+
+Passing receipts must name a clean source SHA. This document describes the remediation, not a completed test run or deployment. See the current CI recovery checkpoint for results.
+
+## Historical backport
+
+At the earlier checkpoint, 1.4.0 was the available forge release. A one-file patch rejected unconsumed nested RSA children; its reviewed SHA256 was `5019e28f1429de036f4d13be23639c30b4ce6df7183676608a9888f2714674c9`. The narrow gate allowed only the original CVE-2026-85393 / GHSA-86w9-cpqp-85rv while its exact source and seven RSA cases passed. That is historical evidence, not a current waiver or a claim that 1.4.0 is now safe.
+
+No live authentication, provider approval, native-device proof or physical-fulfillment gate is changed.

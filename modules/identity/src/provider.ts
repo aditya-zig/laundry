@@ -51,6 +51,14 @@ export class TwilioSmsDelivery implements OtpDelivery {
 
 export function identityFromEnvironment(db: Pool, env: NodeJS.ProcessEnv = process.env): IdentityService | null {
   const name = env.LAUNDRY_IDENTITY_PROVIDER;
+  // Better Auth customer proofs use the existing v2 session/authorization
+  // boundary without enabling the old SMS sender or fabricating delivery.
+  if (env.LAUNDRY_AUTH_ENGINE === 'better-auth' && (!name || name === 'disabled')) {
+    return new IdentityService({ db, provider: { mode: 'LIVE', async send() {
+      throw new IdentityFault('PROVIDER_UNAVAILABLE', 'Use Better Auth phone verification');
+    } }, hashKey: env.LAUNDRY_IDENTITY_HASH_KEY ?? '', encryptionKey: env.LAUNDRY_IDENTITY_ENCRYPTION_KEY ?? '',
+    maxOtpPerHour: Number(env.LAUNDRY_SMS_HOURLY_BUDGET ?? 0) });
+  }
   // Explicit deferred-messaging deployment: no provider, login or fake identity.
   if (name === 'disabled') return null;
   if (!name) {

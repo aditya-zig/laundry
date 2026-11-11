@@ -9,6 +9,11 @@ import { ZodError } from 'zod';
 import { v2 } from '@laundry/contracts';
 import { IdentityService, IdentityFault } from '../../../../../modules/identity/src';
 
+import { fromNodeHeaders } from 'better-auth/node';
+import type { IncomingHttpHeaders } from 'node:http';
+import { verifiedAuthPhone, type LaundryAuth } from '../../../../../modules/identity/src/better-auth';
+
+const AUTH = Symbol('laundry.better-auth');
 const IDENTITY = Symbol('laundry.identity');
 interface RequestContext { socket?: { remoteAddress?: string } }
 function token(header: string | undefined): string {
@@ -49,7 +54,7 @@ export class IdentityEnvelopeFilter implements ExceptionFilter {
 @Controller('v2/identity')
 @UseFilters(IdentityEnvelopeFilter)
 export class IdentityController {
-  constructor(@Inject(IDENTITY) private readonly service: IdentityService | null) {}
+  constructor(@Inject(IDENTITY) private readonly service: IdentityService | null, @Inject(AUTH) private readonly auth: LaundryAuth | null) {}
   private get identity(): IdentityService {
     if (!this.service) throw new IdentityFault('PROVIDER_UNAVAILABLE', 'Identity delivery is not configured');
     return this.service;
@@ -71,6 +76,17 @@ export class IdentityController {
   refresh(@Body() input: unknown, @Headers('idempotency-key') key: string, @Req() request: RequestContext, @Res({ passthrough: true }) response: Response) {
     noStore(response);
     return this.identity.refresh(v2.sessionRefreshSchema.parse(input), key, peer(request));
+  }
+  @Post('session/exchange')
+  @HttpCode(200)
+  async exchange(@Body() input: unknown, @Headers() headers: IncomingHttpHeaders, @Req() request: RequestContext, @Res({ passthrough: true }) response: Response) {
+    noStore(response);
+    v2.authSessionExchangeSchema.parse(input);
+    if (!this.auth) throw new IdentityFault('PROVIDER_UNAVAILABLE', 'Better Auth is not enabled');
+    let proof;
+    try { proof = await verifiedAuthPhone(this.auth, fromNodeHeaders(headers)); }
+    catch { throw new IdentityFault('UNAUTHENTICATED', 'Sign in and verify your mobile number to continue'); }
+    return this.identity.exchangeVerifiedAuth(proof, String(headers['idempotency-key'] ?? ''), peer(request));
   }
   @Get('me')
   async me(@Headers('authorization') authorization: string | undefined, @Res({ passthrough: true }) response: Response) {
@@ -134,7 +150,7 @@ export class IdentityController {
 
 @Module({})
 export class IdentityModule {
-  static register(factory: () => IdentityService | null): DynamicModule {
-    return { module: IdentityModule, controllers: [IdentityController], providers: [{ provide: IDENTITY, useFactory: factory }] };
+  static register(factory: () => IdentityService | null, authFactory: () => LaundryAuth | null = () => null): DynamicModule {
+    return { module: IdentityModule, controllers: [IdentityController], providers: [{ provide: IDENTITY, useFactory: factory }, { provide: AUTH, useFactory: authFactory }] };
   }
 }

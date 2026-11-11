@@ -259,3 +259,4 @@ export type LaundryClient = ReturnType<typeof createClient>;
 
 // The v2 wire client is a separate factory so the v1 client keeps working.
 export * from "./v2.js";
+export { createBrowserIdentityClient } from './browser-identity.js';

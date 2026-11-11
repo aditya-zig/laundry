@@ -425,6 +425,20 @@ export class BillingService {
     });
   }
 
+  /** Separate staff route: do not relax ownership on any customer billing read. */
+  async listOpsOrderObligations(token: string, orderId: string, query: { cursor?: string; limit?: number } = {}): Promise<v2.Page<v2.Obligation>> {
+    await this.actorOf(token, STAFF);
+    v2.idSchema.parse(orderId);
+    const page = v2.pageQuerySchema.parse(query);
+    if (!(await this.options.db.query('SELECT id FROM orders_v2_orders WHERE id=$1', [orderId])).rows[0]) {
+      throw new BillingFault('NOT_FOUND', 'Order not found');
+    }
+    return this.page<ObligationRow, v2.Obligation>({
+      table: 'billing_obligations', filters: 'order_id = $1', values: [orderId],
+      orderColumn: 'created_at', at: row => row.created_at, page, project: obligationOf,
+    });
+  }
+
   async listOrderAttempts(token: string, orderId: string, query: { cursor?: string; limit?: number } = {}): Promise<v2.Page<v2.PaymentAttempt>> {
     const customer = await this.actorOf(token, CUSTOMER);
     await this.ownedOrder(customer.id, orderId);

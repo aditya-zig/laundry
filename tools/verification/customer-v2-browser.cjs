@@ -1,31 +1,67 @@
 // Owned automated test browser only. No signed-in cloud sessions or real providers.
 const {chromium, expect} = require('@playwright/test');
 const {readFile,writeFile,mkdir} = require('node:fs/promises');
-const {resolve} = require('node:path');
+const {resolve,relative} = require('node:path');
 const {execFileSync} = require('node:child_process');
 const {startFixture} = require('./customer-v2-fixture.cjs');
-async function main(proposeAdjustment) {
+const {browserLaunchOptions,reviewViewport} = require('./viewports.mjs');
+const {recordingCheckpoint} = require('./recording-checkpoint.mjs');
+async function main(proposeAdjustment, finishOps, captureOpsFailure, replyToSupport, closeOps) {
   const output=resolve('.data/browser-evidence/customer-v2'); await mkdir(output,{recursive:true});
-  const browser=await chromium.launch({headless:true});
-  const context=await browser.newContext({viewport:{width:1280,height:900}});
-  const page=await context.newPage(); const mutations=[], decisions=[], errors=[];
+  const browser=await chromium.launch(browserLaunchOptions());
+  const viewport=reviewViewport({width:1280,height:900});
+  const context=await browser.newContext({viewport,recordVideo:{dir:resolve(output,'videos'),size:viewport}});
+  const page=await context.newPage(); const mutations=[], decisions=[], reviews=[], errors=[];
   page.on('pageerror',error=>errors.push(error.message));
   page.on('request',request=>{
     if(request.method() !== 'POST') return;
     const record = {key:request.headers()['idempotency-key'],body:request.postData()};
     if(request.url()==='http://127.0.0.1:4499/v2/orders') mutations.push(record);
     if(request.url().endsWith('/adjustments/decision')) decisions.push(record);
+    if(request.url().endsWith('/reviews')) reviews.push(record);
   });
   try {
     await page.goto('http://127.0.0.1:4219',{waitUntil:'networkidle'});
     await expect(page.getByLabel(/^Synthetic wash and fold\..*Open details$/)).toBeVisible();
-    await expect(page.getByText('Indicative demo rate — not approved launch pricing')).toBeVisible();
+    await expect(page.getByText('Indicative demo rate — not approved launch pricing')).toHaveCount(2);
     await page.screenshot({path:resolve(output,'catalog-desktop.png'),fullPage:true});
-    await page.setViewportSize({width:390,height:844});
+    await page.setViewportSize(reviewViewport({width:390,height:844}));
+    await page.getByLabel(/^Synthetic dry cleaning\..*Open details$/).click();
+    await expect(page).toHaveURL(url => /^\/services\/[0-9a-f-]+$/.test(url.pathname));
+    await page.reload({waitUntil:'networkidle'});
+    await page.getByRole('button',{name:'Add one Synthetic shirt',exact:true}).click();
+    await page.getByRole('button',{name:'Add one Synthetic shirt',exact:true}).click();
+    await page.getByRole('button',{name:'Review bag',exact:true}).click();
+    const pieces = page.getByLabel('Count for Synthetic shirt',{exact:true});
+    await expect(pieces).toHaveValue('2');
+    await pieces.fill('3');
+    await expect(page.getByText('Synthetic dry cleaning · 3 items',{exact:true})).toBeVisible();
+    await pieces.fill('2');
+    await expect(page.getByText('Synthetic dry cleaning · 2 items',{exact:true})).toBeVisible();
+    await page.screenshot({path:resolve(output,'bag-pieces-mobile.png'),fullPage:true});
+    await page.getByRole('button',{name:'Remove Synthetic shirt from bag',exact:true}).click();
+    await expect(page.getByText('Your bag is empty',{exact:true})).toBeVisible();
+    await page.getByRole('button',{name:'Browse services',exact:true}).click();
     await page.getByLabel(/^Synthetic wash and fold\..*Open details$/).click();
+    await expect(page).toHaveURL(url => /^\/services\/[0-9a-f-]+$/.test(url.pathname));
+    await page.reload({waitUntil:'networkidle'});
+    await expect(page.getByLabel('Weight in kilograms for Synthetic wash and fold')).toBeVisible();
     await page.getByLabel('Weight in kilograms for Synthetic wash and fold').fill('1.5');
     await page.getByRole('button',{name:'Add weight to bag',exact:true}).click();
     await page.getByRole('button',{name:'Review bag',exact:true}).click();
+    const weight = page.getByLabel('Billed weight in kilograms for By weight', {exact:true});
+    await expect(weight).toHaveValue('1.5');
+    await weight.fill('2'); await weight.press('Tab');
+    await expect(weight).toHaveValue('2');
+    await expect(page.getByText('Synthetic wash and fold · about 2 kg', {exact:true})).toBeVisible();
+    await page.screenshot({path:resolve(output,'bag-weight-mobile.png'),fullPage:true});
+    await weight.fill(''); await weight.pressSequentially('1.5'); await weight.press('Tab');
+    await expect(weight).toHaveValue('1.5');
+    await expect(page.getByText('Synthetic wash and fold · about 1.5 kg', {exact:true})).toBeVisible();
+    await weight.fill('0'); await weight.press('Tab');
+    await expect(page.getByText('Enter a weight greater than 0 kg.', {exact:true})).toBeVisible();
+    await expect(weight).toHaveValue('1.5');
+    await expect(page.getByText('Synthetic wash and fold · about 1.5 kg', {exact:true})).toBeVisible();
     await page.getByRole('button',{name:'Continue to booking',exact:true}).click();
     await page.getByLabel('Phone number',{exact:true}).fill('+919600000007');
     await page.getByRole('button',{name:'Send one-time code',exact:true}).click();
@@ -54,11 +90,14 @@ async function main(proposeAdjustment) {
     await page.screenshot({path:resolve(output,'confirmed-mobile.png'),fullPage:true});
     await page.getByRole('button',{name:'View order',exact:true}).click();
     await expect(page.getByText('Recorded history',{exact:true})).toBeVisible();
+    await require('./customer-tracking-browser.cjs').customerTrackingJourney(page, output, 'booked');
+    await recordingCheckpoint(page,'booking');
     await page.screenshot({path:resolve(output,'owned-order-mobile.png'),fullPage:true});
     expect(mutations).toHaveLength(2); expect(mutations[0].key).toBeTruthy(); expect(mutations[0]).toEqual(mutations[1]);
     const evidence=await (await fetch('http://127.0.0.1:4499/__synthetic_evidence')).json();
     expect(evidence).toEqual({syntheticOnly:true,orders:1,obligations:1,legs:1,confirmed_events:1,accepted_decisions:0});
-    await proposeAdjustment();
+    await proposeAdjustment(browser);
+    await page.bringToFront();
     await page.getByRole('button',{name:'Refresh',exact:true}).click();
     await page.getByRole('button',{name:'Accept revised total INR 100.00',exact:true}).click();
     await expect(page.getByRole('button',{name:'Check original accept decision',exact:true})).toBeVisible();
@@ -71,23 +110,76 @@ async function main(proposeAdjustment) {
     await expect(page.getByText(/^Adjustment accepted/)).toBeVisible();
     await expect(page.getByRole('button',{name:'Check original accept decision',exact:true})).toHaveCount(0);
     await expect(page.getByText(/^State: ACCEPTED\./)).toBeVisible();
-    await expect(page.getByText('INR 100.00 · Payment due at return',{exact:true})).toBeVisible();
+    await expect(page.getByText('INR 100.00 · Pay-on-return model',{exact:true})).toBeVisible();
+    await require('./customer-billing-browser.cjs').customerBillingJourney(page, output, false);
+    await require('./customer-tracking-browser.cjs').customerTrackingJourney(page, output, 'intake');
     await page.screenshot({path:resolve(output,'adjustment-accepted-mobile.png'),fullPage:true});
     expect(decisions).toHaveLength(2); expect(decisions[0].key).toBeTruthy(); expect(decisions[0]).toEqual(decisions[1]);
     const finalEvidence=await (await fetch('http://127.0.0.1:4499/__synthetic_evidence')).json();
     expect(finalEvidence).toEqual({...evidence,accepted_decisions:1});
+    const opsEvidence = finishOps ? await finishOps() : null;
+    let supportEvidence = {}, billingEvidence = {}, trackingEvidence = {};
+    if (finishOps) {
+      await page.bringToFront();
+      await page.getByRole('button',{name:'Refresh',exact:true}).click();
+      await expect(page.getByText('Delivered',{exact:true})).toBeVisible();
+      trackingEvidence = await require('./customer-tracking-browser.cjs').customerTrackingJourney(page, output, 'delivered');
+      await recordingCheckpoint(page,'delivered');
+      await expect(page.getByText('INR 100.00 · Payment due at return',{exact:true})).toHaveCount(0);
+      billingEvidence = await require('./customer-billing-browser.cjs').customerBillingJourney(page, output, true);
+      await expect(page.getByRole('button',{name:'Submit review',exact:true})).toBeDisabled();
+      const consent = page.getByRole('checkbox',{name:'Allow publication after moderation',exact:true});
+      await expect(consent).not.toBeChecked();
+      await page.getByRole('radio',{name:'Rate 4 out of 5',exact:true}).click();
+      await page.getByLabel('Review feedback',{exact:true}).fill('Synthetic private feedback after recorded delivery.');
+      await page.screenshot({path:resolve(output,'review-mobile.png'),fullPage:true});
+      await page.setViewportSize(reviewViewport({width:1280,height:900}));
+      await page.screenshot({path:resolve(output,'review-desktop.png'),fullPage:true});
+      expect(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth)).toBe(true);
+      await page.setViewportSize(reviewViewport({width:390,height:844}));
+      await page.getByRole('button',{name:'Submit review',exact:true}).click();
+      await expect(page.getByRole('button',{name:'Check original review',exact:true})).toBeVisible();
+      await page.goBack();
+      await page.getByRole('button',{name:'View order',exact:true}).click();
+      await page.getByRole('button',{name:'Check original review',exact:true}).click();
+      await expect(page.getByText('Review recorded',{exact:true})).toBeVisible();
+      await expect(page.getByText(/You did not consent to publication; this review is not public\./)).toBeVisible();
+      expect(reviews).toHaveLength(2); expect(reviews[0].key).toBeTruthy(); expect(reviews[0]).toEqual(reviews[1]);
+      expect(JSON.parse(reviews[0].body)).toMatchObject({overall:4,publishConsent:false,mediaIds:[]});
+      const reviewEvidence=await (await fetch('http://127.0.0.1:4499/__synthetic_reviews_evidence')).json();
+      expect(reviewEvidence).toEqual({syntheticOnly:true,reviews:1,publication_consents:0,public_reviews:0});
+      await page.getByRole('button',{name:'Refresh',exact:true}).click();
+      await expect(page.getByText(/A review is already recorded for this order/)).toBeVisible();
+      await expect(page.getByRole('button',{name:'Submit review',exact:true})).toHaveCount(0);
+      await page.screenshot({path:resolve(output,'review-recorded-mobile.png'),fullPage:true});
+      supportEvidence = await require('./customer-support-browser.cjs').customerSupportJourney(page, output, replyToSupport);
+    }
+    const completedEvidence = finishOps ? await (await fetch('http://127.0.0.1:4499/__synthetic_evidence')).json() : finalEvidence;
+    expect(completedEvidence).toEqual({ ...finalEvidence, legs: finishOps ? 2 : 1 });
     expect(errors).toEqual([]);
-    await writeFile(resolve(output,'result.json'),JSON.stringify({status:'passed',sourceRevision:execFileSync('git',['rev-parse','HEAD'],{encoding:'utf8'}).trim(),sourceDirty:Boolean(execFileSync('git',['status','--porcelain'],{encoding:'utf8'}).trim()),syntheticOnly:true,commercialCalls:0,sameBookingKeyAndBody:true,sameAdjustmentKeyAndBody:true,...finalEvidence,browserErrors:errors},null,2));
+    await writeFile(resolve(output,'result.json'),JSON.stringify({status:'passed',sourceRevision:execFileSync('git',['rev-parse','HEAD'],{encoding:'utf8'}).trim(),sourceDirty:Boolean(execFileSync('git',['status','--porcelain'],{encoding:'utf8'}).trim()),syntheticOnly:true,commercialCalls:0,customerDeepLinkReloadProven:true,customerBagQuantityEditsProven:true,customerPieceQuantityEditsProven:true,opsCatalogReadOnlyProven:opsEvidence?.opsCatalogReadOnlyProven===true,opsCatalogFailedReadsNotEmptyOrZero:opsEvidence?.opsCatalogFailedReadsNotEmptyOrZero===true,sameBookingKeyAndBody:true,sameAdjustmentKeyAndBody:true,sameReviewKeyAndBody:finishOps?true:null,...supportEvidence,...billingEvidence,...trackingEvidence,scope:opsEvidence?.rider?'customer-ops-rider':finishOps?'customer-and-ops':'customer',riderBrowser:opsEvidence?.rider??null,pickupRiderBrowser:opsEvidence?.pickup??null,pickupBrowserProven:opsEvidence?.pickup?.pickupBrowserProven===true,pickupBagContinuity:opsEvidence?.pickupBagContinuity===true,recordings:{customer:relative(output,await page.video().path()),ops:opsEvidence?.video,rider:opsEvidence?.rider?.video,pickupRider:opsEvidence?.pickup?.video},...completedEvidence,browserErrors:errors},null,2));
+    if(finishOps) {
+      console.log('PASS: owner review after recorded delivery, no default rating or publication consent, one private review after reply loss and navigation/retry, and no second-review form.');
+      console.log(supportEvidence.staffConsoleBrowserProven
+        ? 'PASS: customer case/message and actual operator console reply, each with committed reply-loss retry and exact keys/bodies; failed reads are not empty results. No order status/version change, live notification or staffed-SLA claim.'
+        : 'PASS: customer case/message with synthetic service staff reply; no staffed-console or live-notification claim.');
+    }
     console.log('PASS: actual customer UI + SDK + compiled HTTP services + disposable PostgreSQL. First committed reply replaced by 503/unknown; navigation/retry reused key/body; exactly one order/obligation/pickup/event. Explicit intake-adjustment acceptance also survives reply loss/navigation with one decision audit. Synthetic OTP/prices/capacity only.');
   } catch(error) {
+    await captureOpsFailure?.();
     console.error('Browser runtime errors:', errors);
     await page.screenshot({path:resolve(output,'failed.png'),fullPage:true}).catch(()=>{});
     await writeFile(resolve(output,'failed-body.txt'),await page.locator('body').innerText());
     throw error;
-  } finally { await context.close(); await browser.close(); }
+  } finally { try { await closeOps?.(); } finally { try { await context.close(); } finally { await browser.close(); } } }
 }
 async function run() {
-  const close = await startFixture();
-  try { await main(close.proposeAdjustment); } finally { await close(); }
+  const withOps = process.env.LAUNDRY_VERIFY_OPS_FACILITY === 'true';
+  const withRider = process.env.LAUNDRY_VERIFY_RIDER === 'true';
+  const withPickup = process.env.LAUNDRY_VERIFY_PICKUP === 'true';
+  const close = await startFixture({ withOps, withRider, withPickup });
+  const ops = withOps ? require('./ops-facility-browser.cjs').opsFacilityJourney(close, withRider, withPickup) : null;
+  try { await main(ops ? ops.proposeAdjustment : close.proposeAdjustment, ops?.finish, ops?.captureFailure, ops ? ops.replyToSupport : close.replyToSupport, ops?.close); } finally { await close(); }
 }
-run().catch(error=>{console.error(error);process.exit(1);});
+module.exports = { run };
+if (require.main === module) run().catch(error=>{console.error(error);process.exit(1);});

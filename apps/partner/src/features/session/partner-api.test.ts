@@ -84,6 +84,13 @@ describe("partner feature API wrapper", () => {
     expect(authorizedRuns).toHaveLength(2);
   });
 
+  it("acceptance queues the exact active job and observed version without a plain-client mutation", async () => {
+    const enqueued: unknown[] = [];
+    const api = createPartnerApi({ foundation: fakeFoundation({ enqueued }) });
+    await api.acceptAssignment("22222222-2222-4222-8222-222222222222", 3);
+    expect(enqueued).toEqual([{ routeId: "logistics.rider.accept", params: { jobId: "22222222-2222-4222-8222-222222222222" }, body: { expectedVersion: 3 } }]);
+  });
+
   it("handover queues through the exact logistics.rider.handover route with preserved identity", async () => {
     const enqueued: unknown[] = [];
     const foundation = fakeFoundation({ enqueued });
@@ -106,6 +113,20 @@ describe("partner feature API wrapper", () => {
     expect(descriptor.params).toEqual({ jobId: "22222222-2222-4222-8222-222222222222" });
     // The typed handover DTO is preserved verbatim: same actionId, same version.
     expect(descriptor.body).toEqual(body);
+  });
+
+  it('replays the retained custody DTO/key, never new form values or timestamps', async () => {
+    const enqueued: unknown[] = [], record = queueRecord();
+    const api = createPartnerApi({ foundation: fakeFoundation({ enqueued, queue: [record] }) });
+    await api.retryHandover(record.params.jobId, record.idempotencyKey);
+    expect(enqueued).toEqual([{ routeId: record.routeId, params: record.params, body: JSON.parse(record.bodyJson!), retainedKey: record.idempotencyKey }]);
+  });
+
+  it.each(['missing', 'foreign actor'] as const)('refuses custody replay when the original retained intent is %s', async mode => {
+    const enqueued: unknown[] = [], record = queueRecord();
+    const api = createPartnerApi({ foundation: fakeFoundation({ enqueued, queue: mode === 'missing' ? [] : [{ ...record, actorId: '99999999-9999-4999-8999-999999999999' }] }) });
+    await expect(api.retryHandover(record.params.jobId, record.idempotencyKey)).rejects.toThrow(/without creating a replacement/);
+    expect(enqueued).toEqual([]);
   });
 
   it("signing out invokes foundation.logout and leaves no local identity", async () => {

@@ -1,6 +1,6 @@
 import type { Pool } from 'pg';
 
-const identityTables = ['identity_profiles', 'identity_otp_challenges', 'identity_rate_buckets', 'identity_session_families', 'identity_sessions', 'identity_command_results', 'identity_addresses', 'identity_audit', 'identity_staff', 'identity_staff_facilities', 'identity_staff_invitations', 'identity_staff_mfa', 'identity_staff_mfa_enrollments', 'identity_whatsapp_links', 'identity_session_staff_bindings', 'identity_staff_mfa_steps'];
+const identityTables = ['identity_profiles', 'identity_otp_challenges', 'identity_rate_buckets', 'identity_session_families', 'identity_sessions', 'identity_command_results', 'identity_addresses', 'identity_audit', 'identity_staff', 'identity_staff_facilities', 'identity_staff_invitations', 'identity_staff_mfa', 'identity_staff_mfa_enrollments', 'identity_whatsapp_links', 'identity_session_staff_bindings', 'identity_staff_mfa_steps', 'identity_external_sessions', 'laundry_auth_user', 'laundry_auth_session', 'laundry_auth_account', 'laundry_auth_verification', 'laundry_auth_rate_limit'];
 const provisioningTables = new Set(['identity_staff', 'identity_staff_facilities']);
 
 /** Runtime credentials must not also be migration/owner credentials. This checks

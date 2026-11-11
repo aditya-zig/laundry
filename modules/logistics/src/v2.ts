@@ -253,6 +253,7 @@ interface TimelineRow {
 }
 
 const OPS = new Set<v2.ActorRole>(['FACILITY', 'OPERATOR', 'ADMIN']);
+const DISPATCH = new Set<v2.ActorRole>(['OPERATOR', 'ADMIN']);
 const RIDER = new Set<v2.ActorRole>(['RIDER']);
 const CUSTOMER = new Set<v2.ActorRole>(['CUSTOMER']);
 const PROVIDER_ACTOR_ID = '00000000-0000-4000-8000-0000000000b6';
@@ -335,6 +336,43 @@ export class LogisticsService {
     if (!Number.isSafeInteger(this.freshMinutes) || this.freshMinutes < 1 || this.freshMinutes > 1440) {
       throw new Error('Location freshness must be between 1 and 1440 minutes');
     }
+  }
+
+  /** Internal composition port: orders authorizes the rows before supplying IDs.
+   * One query per page, latest attempt per leg, no custody code or provider data. */
+  async orderLegSummaries(orderIds: readonly string[], client: Pool | PoolClient = this.options.db): Promise<Map<string, v2.DeliveryLegSummary[]>> {
+    const summaries = new Map<string, v2.DeliveryLegSummary[]>();
+    if (orderIds.length === 0) return summaries;
+    const rows = (await client.query<Pick<AttemptRow, 'order_id' | 'leg' | 'status' | 'version' | 'assigned_to' | 'completed_at'>>(
+      `SELECT DISTINCT ON (order_id,leg) order_id,leg,status,version,assigned_to,completed_at
+       FROM logistics_leg_attempts WHERE order_id=ANY($1::uuid[])
+       ORDER BY order_id,leg,attempt_number DESC`, [[...orderIds]],
+    )).rows;
+    for (const row of rows) {
+      const legs = summaries.get(row.order_id) ?? [];
+      legs.push(v2.deliveryLegSummarySchema.parse({
+        leg: row.leg, status: row.status, version: row.version,
+        ...(row.assigned_to === null ? {} : { assignedTo: row.assigned_to }),
+        ...(row.completed_at === null ? {} : { completedAt: row.completed_at.toISOString() }),
+      }));
+      summaries.set(row.order_id, legs);
+    }
+    return summaries;
+  }
+
+  /** Operator-only dispatch identifiers. Customer summaries intentionally omit IDs.
+   * Return at most the latest pickup and return attempt, never custody secrets. */
+  async getDispatchLegs(token: string, orderId: string): Promise<v2.LegAttempt[]> {
+    await this.actorOf(token, DISPATCH);
+    v2.idSchema.parse(orderId);
+    const order = (await this.options.db.query('SELECT id FROM orders_v2_orders WHERE id=$1', [orderId])).rows[0];
+    if (!order) throw new LogisticsFault('NOT_FOUND', 'Order not found');
+    const rows = (await this.options.db.query<AttemptRow>(
+      `SELECT DISTINCT ON (leg) id,leg_id,order_id,leg,version,status,attempt_number,
+       provider,provider_reference,assigned_to,scheduled_window,started_at,completed_at,failure_reason
+       FROM logistics_leg_attempts WHERE order_id=$1 ORDER BY leg,attempt_number DESC`, [orderId],
+    )).rows;
+    return v2.WIRE_SCHEMAS.DispatchLegList.parse(rows.map(attemptView));
   }
 
   /** Reads and non-command writes still run in one bounded transaction. */
@@ -532,6 +570,9 @@ export class LogisticsService {
         const attempt = await this.lockAttempt(tx, parsed.legAttemptId);
         const order = await this.lockOrder(tx, attempt.order_id);
         this.facilityScope(actor, order);
+        if (order.status === 'DELIVERED' || order.status === 'CANCELLED') {
+          throw new LogisticsFault('INVALID_INPUT', 'A terminal order cannot receive a rider assignment');
+        }
         if (attempt.version !== parsed.expectedVersion) {
           throw new LogisticsFault('VERSION_CONFLICT', 'Delivery leg changed since it was read', attempt.version);
         }
@@ -605,6 +646,9 @@ export class LogisticsService {
         if (!current) throw new LogisticsFault('NOT_FOUND', 'Assignment not found');
         const order = await this.lockOrder(tx, current.order_id);
         this.facilityScope(actor, order);
+        if (order.status === 'DELIVERED' || order.status === 'CANCELLED') {
+          throw new LogisticsFault('INVALID_INPUT', 'A terminal order cannot receive a rider reassignment');
+        }
         if (current.released_at !== null || current.cancelled_at !== null) {
           throw new LogisticsFault('INVALID_INPUT', 'This assignment is no longer active');
         }

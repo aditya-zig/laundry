@@ -20,4 +20,10 @@ for (const app of ['customer', 'partner']) {
     assert.equal(resolved.type, 'sourceFile');
     assert.equal(resolved.filePath, fileURLToPath(new URL('../../packages/app-foundation/dist/index.js', import.meta.url)));
   });
+  test(`${app} release export cannot reuse Metro's previous public environment`, () => {
+    const manifest = JSON.parse(readFileSync(new URL(`../../apps/${app}/package.json`, import.meta.url), 'utf8'));
+    assert.match(manifest.scripts.build, /\bexpo export\b/);
+    assert.match(manifest.scripts.build, /(?:^|\s)--clear(?:\s|$)/,
+      'Metro can retain a previously inlined EXPO_PUBLIC_API_V2_URL after it is unset; release exports must invalidate that cache');
+  });
 }

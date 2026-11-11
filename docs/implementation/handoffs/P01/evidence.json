@@ -1,0 +1,71 @@
+{
+  "task": "P01",
+  "issue": "https://github.com/aditya-zig/laundry/issues/8",
+  "worker": "direct coordinator session; no child agents",
+  "branch": "fix/p01-cloud-ci-20261111",
+  "baseSha": "80a19ec02683772c8e5eb38563c6a28af6e51fd8",
+  "sourceSha": "4c48e66608e80f0df5756740685bee9783ef2816",
+  "testedSha": "4c48e66608e80f0df5756740685bee9783ef2816",
+  "state": "IMPLEMENTED",
+  "stateAsOf": "Local application acceptance before publication; follow-up peer gate and final exact-head cloud acceptance are recorded separately",
+  "contractVersion": "laundry-wire-v2.0.0",
+  "contractDigest": null,
+  "contractDigestStatus": "No new C01 dispatch-freeze certificate is issued by P01; executable contract checks passed",
+  "designVersion": null,
+  "designStatus": "Existing app design retained; no new D01 freeze is claimed",
+  "schemaProposals": [],
+  "registrationRequests": [],
+  "providerModes": {
+    "postgres": "real task-owned disposable PostgreSQL",
+    "api": "actual compiled HTTP services and SDK",
+    "identityNotificationsPaymentsRiders": "explicit synthetic external ports only",
+    "productionDatabaseOrDeployment": "not used"
+  },
+  "commandResults": [
+    { "argv": ["pnpm", "install", "--frozen-lockfile"], "exitCode": 0 },
+    { "argv": ["pnpm", "release:security"], "exitCode": 0 },
+    { "argv": ["pnpm", "verify:container"], "exitCode": 0 },
+    { "argv": ["pnpm", "check"], "exitCode": 0 },
+    { "argv": ["pnpm", "test:isolated"], "exitCode": 0, "testsPassed": 1245, "filesPassed": 89 },
+    { "argv": ["pnpm", "contracts:check"], "exitCode": 0, "schemaTestsPassed": 7 },
+    { "argv": ["pnpm", "test:tooling"], "exitCode": 0, "testsPassed": 125, "skipped": 0 },
+    { "argv": ["pnpm", "build"], "exitCode": 0 },
+    { "argv": ["pnpm", "verify:browser"], "exitCode": 0, "scope": "current-product four-role fulfillment" },
+    { "argv": ["pnpm", "verify:restore"], "env": { "LAUNDRY_RESTORE_SOURCE": "customer-v2", "VERIFY_WEB_SCOPE": "product" }, "exitCode": 0 },
+    { "argv": ["pnpm", "check:convex"], "exitCode": 0 },
+    { "argv": ["pnpm", "test:voice"], "exitCode": 0, "testsPassed": 23 },
+    { "argv": ["pnpm", "verify:recording"], "exitCode": 0, "runtime": "signature-verified task-local Xvfb plus installed ffmpeg/ffprobe" }
+  ],
+  "originalRecording": {
+    "pathOutsideGit": ".verification/hq/browser-original-1080p30.mp4",
+    "sha256": "4a0132a4967163372b3de0589991c75869cbe272cb02770308c0a3d2729ce71a",
+    "bytes": 6685032,
+    "codec": "h264",
+    "width": 1920,
+    "height": 1080,
+    "fps": "30/1",
+    "durationSeconds": 141.166667,
+    "sampleFrames": 4,
+    "visualInspection": "not claimed: image reading unavailable; automated content and metadata gates passed"
+  },
+  "scenarioResults": {
+    "P01-01": "Local frozen install and actual runtime pass; require final fresh GitHub job",
+    "P01-02": "Actual migrations/API/SDK/four-role browser pass on the local clean revision",
+    "P01-03": "Local original recording passes; cloud upload/download and exact-head digest readback required before VERIFIED",
+    "P01-04": "Actual temporary two-database probe passed; the permanent nonconditional CI gate must pass on its own candidate revision"
+  },
+  "cloudArtifacts": [],
+  "cloudArtifactPolicy": "Final issue #8 evidence supplies exact PR head, successful GitHub run URLs, authenticated artifact download URLs, digests/bytes and media readback. Empty here means pending, not unavailable work counted as passing.",
+  "preservedFailures": [
+    "Frozen image configuration mismatch before the pnpm hook repair",
+    "Unexpected dependency advisories before published upgrades",
+    "Compiled runtime identity grants before the fixture repair",
+    "Stale open billing obligation after actual settlement before projection refresh repair",
+    "Local mixed product/legacy restore invocation; corrected explicit product-source command passed",
+    "Missing local Xvfb exited 127; verified task-local runtime recording subsequently passed"
+  ],
+  "remainingGates": ["exact-head cloud CI and original artifact round-trip", "native Android and physical/provider/business launch evidence remain outside P01"],
+  "syntheticOnly": true,
+  "commercialCalls": 0,
+  "productionReady": false
+}

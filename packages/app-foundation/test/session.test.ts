@@ -67,6 +67,65 @@ describe('F00 restore, revocation and secure persistence', () => {
   });
 });
 describe('F00 refresh and stable command identities', () => {
+  it('retains rider acceptance with its exact job, version and actor-bound key after reply loss', async () => {
+    const h = new Harness(); h.actor = { ...h.actor, role: 'RIDER' };
+    const f = await h.signedIn();
+    const descriptor = { routeId: 'logistics.rider.accept' as const, params: { jobId: fixtures.Assignment.legAttemptId }, body: { expectedVersion: 3 } };
+    const path = `/rider/jobs/${fixtures.Assignment.legAttemptId}/accept`;
+    h.handle = req => req.path.endsWith(path) ? response({ code: 'PROVIDER_UNAVAILABLE', message: 'Reply lost after commit', traceId: 'synthetic', retryable: true }, 503) : h.defaultHandle(req);
+    await expect(f.enqueueMutation(descriptor)).rejects.toMatchObject({ status: 503 });
+    const [pending] = await f.listQueuedMutations();
+    const reopened = h.build(); await reopened.initialize();
+    await expect(reopened.enqueueMutation({ ...descriptor, body: { expectedVersion: 4 }, retainedKey: pending.idempotencyKey })).rejects.toBeInstanceOf(StorageError);
+    h.handle = req => req.path.endsWith(path) ? response(fixtures.Assignment) : h.defaultHandle(req);
+    expect(await reopened.enqueueMutation({ ...descriptor, retainedKey: pending.idempotencyKey })).toEqual(fixtures.Assignment);
+    const calls = h.calls.filter(req => req.path.endsWith(path));
+    expect(calls).toHaveLength(2);
+    expect(calls.map(req => req.body)).toEqual([{ expectedVersion: 3 }, { expectedVersion: 3 }]);
+    expect(calls[0].headers.get('idempotency-key')).toBe(calls[1].headers.get('idempotency-key'));
+    expect(await reopened.listQueuedMutations()).toEqual([]);
+  });
+  it.each(['incident', 'message'] as const)('retains the exact support %s and actor-bound key after a committed reply is lost', async kind => {
+    const h = new Harness(), f = await h.signedIn();
+    const descriptor = kind === 'incident'
+      ? { routeId: 'support.incidents.create' as const, body: v2.incidentInputSchema.parse(fixtures.IncidentInput) }
+      : { routeId: 'support.incidents.messages' as const, params: { incidentId: fixtures.Incident.id }, body: v2.incidentMessageInputSchema.parse(fixtures.IncidentMessageInput) };
+    const path = kind === 'incident' ? `/orders/${fixtures.IncidentInput.orderId}/incidents` : `/incidents/${fixtures.Incident.id}/messages`;
+    h.handle = req => req.path.endsWith(path) ? response({ code: 'PROVIDER_UNAVAILABLE', message: 'Reply lost after commit', traceId: 'synthetic', retryable: true }, 503) : h.defaultHandle(req);
+    await expect(f.enqueueMutation(descriptor)).rejects.toMatchObject({ status: 503 });
+    const [pending] = await f.listQueuedMutations();
+    expect(JSON.parse(pending.bodyJson!)).toEqual(descriptor.body);
+    const reopened = h.build(); await reopened.initialize();
+    const altered = kind === 'incident'
+      ? { routeId: 'support.incidents.create' as const, body: { ...fixtures.IncidentInput, summary: 'Changed concern' } }
+      : { routeId: 'support.incidents.messages' as const, params: { incidentId: fixtures.Incident.id }, body: { ...fixtures.IncidentMessageInput, body: 'Changed message' } };
+    await expect(reopened.enqueueMutation({ ...altered, retainedKey: pending.idempotencyKey })).rejects.toBeInstanceOf(StorageError);
+    h.handle = req => req.path.endsWith(path) ? response(kind === 'incident' ? fixtures.Incident : fixtures.IncidentMessage) : h.defaultHandle(req);
+    await reopened.enqueueMutation({ ...descriptor, retainedKey: pending.idempotencyKey });
+    const calls = h.calls.filter(req => req.path.endsWith(path));
+    expect(calls).toHaveLength(2);
+    expect(calls[0].body).toEqual(calls[1].body);
+    expect(calls[0].headers.get('idempotency-key')).toBe(calls[1].headers.get('idempotency-key'));
+    expect(await reopened.listQueuedMutations()).toEqual([]);
+  });
+  it('retains an explicit post-delivery review and its publication consent after reply loss', async () => {
+    const h = new Harness(), f = await h.signedIn();
+    const body = v2.reviewInputSchema.parse({ ...fixtures.ReviewInput, overall: 4, comment: 'Synthetic private feedback', mediaIds: [], publishConsent: false });
+    const descriptor = { routeId: 'reviews.create' as const, body };
+    h.handle = req => req.path.endsWith('/reviews') ? response({ code: 'PROVIDER_UNAVAILABLE', message: 'Reply lost after commit', traceId: 'synthetic', retryable: true }, 503) : h.defaultHandle(req);
+    await expect(f.enqueueMutation(descriptor)).rejects.toMatchObject({ status: 503 });
+    const [pending] = await f.listQueuedMutations();
+    expect(JSON.parse(pending.bodyJson!)).toEqual(body);
+    const reopened = h.build(); await reopened.initialize();
+    await expect(reopened.enqueueMutation({ ...descriptor, body: { ...body, publishConsent: true }, retainedKey: pending.idempotencyKey })).rejects.toBeInstanceOf(StorageError);
+    h.handle = req => req.path.endsWith('/reviews') ? response({ ...fixtures.Review, ...body }) : h.defaultHandle(req);
+    expect(await reopened.enqueueMutation({ ...descriptor, retainedKey: pending.idempotencyKey })).toMatchObject({ overall: 4, publishConsent: false });
+    const calls = h.calls.filter(req => req.path.endsWith('/reviews'));
+    expect(calls).toHaveLength(2);
+    expect(calls[0].body).toEqual(calls[1].body);
+    expect(calls[0].headers.get('idempotency-key')).toBe(calls[1].headers.get('idempotency-key'));
+    expect(await reopened.listQueuedMutations()).toEqual([]);
+  });
   it.each(['ACCEPT', 'DECLINE'] as const)('replays an explicit %s adjustment decision with the original terms and command key after navigation', async decision => {
     const h = new Harness(), f = await h.signedIn();
     const body = v2.adjustmentDecisionSchema.parse({ adjustmentId: fixtures.Order.id, adjustmentVersion: 1, expectedVersion: fixtures.Order.version, decision });
@@ -84,6 +143,45 @@ describe('F00 refresh and stable command identities', () => {
     expect(calls[0].headers.get('idempotency-key')).toBe(calls[1].headers.get('idempotency-key'));
     expect(await reopened.listQueuedMutations()).toEqual([]);
   });
+  it.each(['dispatch', 'manual payment'] as const)('reconciles %s with the exact frozen intent after rebuilding a host', async kind => {
+    const h = new Harness();
+    h.actor = { ...h.actor, role: 'OPERATOR' };
+    const f = await h.signedIn();
+    const descriptor = kind === 'dispatch'
+      ? { routeId: 'logistics.ops.assign' as const, body: v2.assignmentInputSchema.parse(fixtures.AssignmentInput) }
+      : { routeId: 'billing.manual.confirm' as const, params: { obligationId: fixtures.Receipt.obligationId }, body: v2.manualPaymentConfirmationSchema.parse(fixtures.ManualPaymentConfirmation) };
+    const path = kind === 'dispatch' ? '/ops/logistics/assignments' : `/ops/billing/obligations/${fixtures.Receipt.obligationId}/confirm-manual`;
+    h.handle = req => req.path.endsWith(path) ? response({ code: 'PROVIDER_UNAVAILABLE', message: 'Reply lost after commit', traceId: 'synthetic', retryable: true }, 503) : h.defaultHandle(req);
+    await expect(f.enqueueMutation(descriptor)).rejects.toMatchObject({ status: 503 });
+    const [pending] = await f.listQueuedMutations();
+    expect(JSON.parse(pending.bodyJson!)).toEqual(descriptor.body);
+    const reopened = h.build(); await reopened.initialize();
+    h.handle = req => req.path.endsWith(path) ? response(kind === 'dispatch' ? fixtures.Assignment : fixtures.Receipt) : h.defaultHandle(req);
+    const altered = clone(descriptor);
+    altered.body.reason = 'Changed after outcome became unknown';
+    await expect(reopened.enqueueMutation({ ...altered, retainedKey: pending.idempotencyKey })).rejects.toBeInstanceOf(StorageError);
+    await reopened.enqueueMutation({ ...descriptor, retainedKey: pending.idempotencyKey });
+    const calls = h.calls.filter(req => req.path.endsWith(path));
+    expect(calls).toHaveLength(2);
+    expect(calls[0].body).toEqual(calls[1].body);
+    expect(calls[0].headers.get('idempotency-key')).toBe(calls[1].headers.get('idempotency-key'));
+    expect(await reopened.listQueuedMutations()).toEqual([]);
+  });
+
+  it.each(['missing', 'different actor'] as const)('never replaces a pinned retained key when %s', async mode => {
+    const h = new Harness(), f = await h.signedIn();
+    h.handle = req => { if (req.path.endsWith('/orders')) throw new Error('Reply lost'); return h.defaultHandle(req); };
+    await expect(f.enqueueMutation(booking())).rejects.toBeInstanceOf(UnknownOutcomeError);
+    const [record] = await f.listQueuedMutations();
+    if (mode === 'missing') await h.queue.clear();
+    else h.actor = { ...h.actor, id: fixtures.Receipt.id };
+    const reopened = h.build(); await reopened.initialize();
+    const before = h.books().length;
+    await expect(reopened.enqueueMutation({ ...booking(), retainedKey: record.idempotencyKey })).rejects.toBeInstanceOf(StorageError);
+    expect(h.books()).toHaveLength(before);
+    expect(await h.queue.list()).toHaveLength(mode === 'missing' ? 0 : 1);
+  });
+
   it('SES-05 concurrent expiry launches exactly one refresh', async () => {
     const h = new Harness(), f = await h.signedIn(); h.now += 960_000;
     await Promise.all([f.ensureAuthenticated(), f.ensureAuthenticated(), f.ensureAuthenticated()]);

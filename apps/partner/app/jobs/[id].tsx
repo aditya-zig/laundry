@@ -1,8 +1,7 @@
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 import type { v2 } from "@laundry/contracts";
-import { UnknownOutcomeError } from "@laundry/api-client";
 import { getFoundation } from "../../src/foundation/session";
 import {
   assignmentState,
@@ -16,7 +15,9 @@ import {
   describePendingHandover,
   emptyHandoverDraft,
   handoverEligible,
+  handoverResultState,
   pendingHandoverForJob,
+  resolveHandoverContainers,
   validateHandoverDraft,
   type HandoverCondition,
   type HandoverDraft,
@@ -24,6 +25,7 @@ import {
   type HandoverUiState,
 } from "../../src/features/jobs/handover";
 import { createPartnerApi, pendingHandoverReceipts } from "../../src/features/session/partner-api";
+import { AssignmentAcceptancePanel } from "../../src/features/jobs/AssignmentAcceptancePanel";
 import { usePartnerSession } from "../../src/features/session/use-partner-session";
 import {
   Badge,
@@ -46,7 +48,8 @@ import {
 const CONDITIONS: HandoverCondition[] = ["GOOD", "DAMAGED", "STAINTED", "MISSING"];
 
 function useRiderApi() {
-  return createPartnerApi({ foundation: getFoundation() });
+  const foundation = getFoundation();
+  return useMemo(() => createPartnerApi({ foundation }), [foundation]);
 }
 
 function ConditionPicker(props: { value: HandoverCondition; onSelect: (value: HandoverCondition) => void }) {
@@ -163,7 +166,7 @@ function JobDetailContent() {
             <Text style={styles.bodyMuted}>
               Window {windowLabel(job.window.start, job.window.end)} ({job.window.timezone})
             </Text>
-            <Text style={styles.bodyMuted}>Containers: {job.containerCount}</Text>
+            <Text style={styles.bodyMuted}>Containers recorded on order: {job.containerCount}</Text>
             <Text style={styles.bodyMuted}>Next: {nextActionLabel(job)}</Text>
           </View>
         </Card>
@@ -225,7 +228,12 @@ function HandoverPanel(props: {
   const [uiState, setUiState] = useState<HandoverUiState>({ kind: "IDLE" });
   const [pending, setPending] = useState<HandoverPending | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const inFlight = useRef(false);
   const [formError, setFormError] = useState<string | null>(null);
+  const [codeLocked, setCodeLocked] = useState(false);
+  const acceptanceIdentity = `${api.actor()?.id}:${props.job.id}:${props.job.version}`;
+  const [acceptedIdentity, setAcceptedIdentity] = useState<string | null>(null);
+  const confirmAcceptance = useCallback(() => setAcceptedIdentity(acceptanceIdentity), [acceptanceIdentity]);
 
   async function refreshPending() {
     const atLoad = api.actor()?.id ?? null;
@@ -250,11 +258,53 @@ function HandoverPanel(props: {
     void refreshPending();
   }, [props.job.id]);
 
+  const outcomePending = pending !== null || uiState.kind === 'OUTCOME_UNKNOWN' || uiState.kind === 'PENDING_SYNC';
+
+  async function receive(result: v2.HandoverResult, actionId: string, actorId: string) {
+    if (api.actor()?.id !== actorId) return;
+    setPending(null);
+    setUiState(handoverResultState(result, actionId));
+    setCodeLocked(!result.accepted && !result.nextAttemptAllowed);
+    setDraft(d => ({ ...d, code: '', ...(result.accepted ? { note: '' } : { actionId: crypto.randomUUID() }) }));
+    if (result.accepted) {
+      try {
+        const refreshed = await api.getAssignedJob(props.job.id);
+        if (api.actor()?.id === actorId) props.onJobRefreshed(refreshed);
+      } catch { /* Keep the authoritative receipt even when the fresh read is unavailable. */ }
+    }
+  }
+
+  function failed(error: unknown, actionId: string) {
+    const failure = classifyHandoverFailure(error, actionId);
+    setUiState(failure);
+    if (failure.kind === 'OUTCOME_UNKNOWN') void refreshPending();
+    else setDraft(d => ({ ...d, code: '', actionId: crypto.randomUUID() }));
+  }
+
+  async function retryRetained() {
+    const actorId = api.actor()?.id;
+    if (inFlight.current || !actorId || !pending || acceptedIdentity !== acceptanceIdentity) return;
+    inFlight.current = true;
+    setSubmitting(true);
+    try { await receive(await api.retryHandover(props.job.id, pending.idempotencyKey), pending.actionId, actorId); }
+    catch (error) { failed(error, pending.actionId); }
+    finally { inFlight.current = false; setSubmitting(false); }
+  }
+
   async function submit() {
+    if (inFlight.current || outcomePending || codeLocked || acceptedIdentity !== acceptanceIdentity) return;
+    let containerIds: string[];
+    try {
+      const observed = draft.containerIdsText.trim() ? draft.containerIdsText.trim().split(/[\s,]+/) : [];
+      containerIds = resolveHandoverContainers(props.job, observed);
+    } catch (error) {
+      setFormError(error instanceof Error ? error.message : 'The physical bag labels could not be validated.');
+      return;
+    }
     const issue = validateHandoverDraft({
       code: draft.code,
       garmentCount: draft.garmentCount,
-      containerIds: props.job.containerIds,
+      containerIds,
     });
     if (issue) {
       setFormError(issue.message);
@@ -263,43 +313,28 @@ function HandoverPanel(props: {
     setFormError(null);
     const actorId = api.actor()?.id;
     if (!actorId || !handoverEligible(props.job, actorId)) return;
+    inFlight.current = true;
     setSubmitting(true);
     try {
       const body = buildHandoverBody(props.job, {
         actionId: draft.actionId,
         code: draft.code,
         garmentCount: Number(draft.garmentCount),
+        containerIds,
         condition: draft.condition,
         note: draft.note.trim() === "" ? undefined : draft.note.trim(),
       });
-      const result = await api.submitHandover(props.job.id, body);
-      setUiState({ kind: "CONFIRMED_ONLINE", receipt: result });
-      setDraft(d => ({ ...d, code: "", note: "" }));
-      try {
-        const refreshed = await api.getAssignedJob(props.job.id);
-        if (api.actor()?.id === actorId) props.onJobRefreshed(refreshed);
-      } catch {
-        // The receipt still reflects the authoritative server outcome.
-      }
-    } catch (err) {
-      if (err instanceof UnknownOutcomeError) {
-        setUiState({ kind: "OUTCOME_UNKNOWN", actionId: draft.actionId });
-        void refreshPending();
-      } else {
-        const failure = classifyHandoverFailure(err, draft.actionId);
-        setUiState({
-          kind: "REJECTED",
-          actionId: draft.actionId,
-          message: failure.kind === "REJECTED" ? failure.message : String(err),
-          canRetryWithSameDetails: failure.canRetryWithSameDetails,
-        });
-      }
+      await receive(await api.submitHandover(props.job.id, body), draft.actionId, actorId);
+    } catch (error) {
+      failed(error, draft.actionId);
     } finally {
+      inFlight.current = false;
       setSubmitting(false);
     }
   }
 
   if (!props.eligible) {
+    if (uiState.kind === 'CONFIRMED_ONLINE') return <Receipt receipt={uiState.receipt} />;
     return (
       <Card tone="warning">
         <Text style={styles.heading}>Custody handover</Text>
@@ -313,6 +348,13 @@ function HandoverPanel(props: {
   return (
     <Card>
       <SectionTitle>Custody handover</SectionTitle>
+      <AssignmentAcceptancePanel key={acceptanceIdentity} api={api} job={props.job} onConfirmed={confirmAcceptance}
+        onRefresh={async () => {
+          const actorId = api.actor()?.id;
+          const refreshed = await api.getAssignedJob(props.job.id);
+          if (!actorId || api.actor()?.id !== actorId) throw new Error('Session changed');
+          props.onJobRefreshed(refreshed);
+        }} />
       <Text style={styles.bodyMuted}>
         Ask the customer (pickup) or facility staff (return) for the six-digit custody code. The code is
         never displayed in this app. Container and garment facts come from the bag labels you actually
@@ -347,8 +389,12 @@ function HandoverPanel(props: {
         />
       ) : null}
 
-      {uiState.kind !== "CONFIRMED_ONLINE" ? (
+      {uiState.kind !== "CONFIRMED_ONLINE" && !outcomePending ? (
         <>
+          {props.job.leg === 'PICKUP' && props.job.containerIds.length === 0 ? <Field label="Pickup bag-label UUIDs" hint="Enter each existing UUID from the physical sealed-bag labels, separated by commas or newlines (up to 100). This app does not generate IDs or verify a physical seal.">
+            <Input value={draft.containerIdsText} onChangeText={value => setDraft(d => ({ ...d, containerIdsText: value }))}
+              accessibilityLabel="Pickup bag-label UUIDs" multiline maxLength={4000} placeholder="UUIDs printed on the bags" />
+          </Field> : null}
           <Field label="Custody code (six digits)">
             <Input
               value={draft.code}
@@ -391,17 +437,20 @@ function HandoverPanel(props: {
             onPress={() => void submit()}
             busy={submitting}
             disabled={
+              acceptedIdentity !== acceptanceIdentity ||
+              codeLocked ||
               draft.code.length !== 6 ||
               draft.garmentCount === "" ||
               Number.isNaN(Number(draft.garmentCount))
             }
           />
           {formError ? <NoticeBox title="Check the handover details" body={formError} tone="warning" /> : null}
-          {uiState.kind === "OUTCOME_UNKNOWN" || pending ? (
-            <PrimaryButton label="Check sync status" tone="quiet" onPress={() => void refreshPending()} />
-          ) : null}
         </>
-      ) : (
+      ) : outcomePending ? <>
+        {pending ? <PrimaryButton label="Retry retained custody request" busy={submitting}
+          disabled={acceptedIdentity !== acceptanceIdentity} onPress={() => void retryRetained()} /> : null}
+        <PrimaryButton label="Check sync status" tone="quiet" onPress={() => void refreshPending()} />
+      </> : (
         <PrimaryButton label="Back to task list" tone="quiet" onPress={() => router.replace("/")} />
       )}
     </Card>

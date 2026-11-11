@@ -1,7 +1,15 @@
-// Explicit v2 adapter. Memory-only on web; native ports must be injected before use.
+// Web remains memory-only; native startup must install protected ports first.
 import { createAppSessionBinding, resolveApiV2BaseUrl, type PlatformSessionStores } from '@laundry/app-foundation';
 export function getApiV2BaseUrl(): string { return resolveApiV2BaseUrl(process.env.EXPO_PUBLIC_API_V2_URL); }
-const binding = createAppSessionBinding(getApiV2BaseUrl);
+import { createPlatformStores, requiresProtectedStorage } from './platform-storage';
+export { requiresProtectedStorage } from './platform-storage';
+const binding = createAppSessionBinding(getApiV2BaseUrl, requiresProtectedStorage);
+let preparation: Promise<void> | undefined;
+export function prepareSessionStorage(): Promise<void> {
+  return preparation ??= createPlatformStores().then(stores => {
+    if (stores) binding.configure(stores);
+  }).catch(error => { preparation = undefined; throw error; });
+}
 export type PartnerFoundationStores = PlatformSessionStores;
 export const configurePartnerSessionStores = binding.configure;
 export const getFoundation = binding.getFoundation;

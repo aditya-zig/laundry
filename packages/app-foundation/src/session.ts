@@ -11,15 +11,23 @@ type CommandArgs = {
   'orders.adjustment.decide': { params: { orderId: string }; body: v2.AdjustmentDecision };
   'identity.address.create': { body: v2.AddressInput };
   'logistics.rider.handover': { params: { jobId: string }; body: Omit<v2.RiderHandover, 'jobId'> };
+  'logistics.rider.accept': { params: { jobId: string }; body: v2.VersionedCommand };
+  'logistics.ops.assign': { body: v2.AssignmentInput };
   'billing.manual.confirm': { params: { obligationId: string }; body: v2.ManualPaymentConfirmation };
   'billing.refund.create': { body: v2.RefundRequest };
+  'reviews.create': { body: v2.ReviewInput };
+  'support.incidents.create': { body: v2.IncidentInput };
+  'support.incidents.messages': { params: { incidentId: string }; body: v2.IncidentMessageInput };
 };
 type CommandResults = {
   'orders.book': v2.Order; 'orders.quote': v2.Quote; 'orders.adjustment.decide': v2.Order; 'identity.address.create': v2.Address;
-  'logistics.rider.handover': v2.HandoverResult; 'billing.manual.confirm': v2.Receipt; 'billing.refund.create': v2.Refund;
+  'logistics.rider.accept': v2.Assignment; 'logistics.rider.handover': v2.HandoverResult; 'logistics.ops.assign': v2.Assignment; 'billing.manual.confirm': v2.Receipt; 'billing.refund.create': v2.Refund;
+  'reviews.create': v2.Review;
+  'support.incidents.create': v2.Incident;
+  'support.incidents.messages': v2.IncidentMessage;
 };
 type CommandRoute = keyof CommandArgs;
-export type QueuedMutationDescriptor<K extends CommandRoute = CommandRoute> = { routeId: K; params?: Record<string, string> } & CommandArgs[K];
+export type QueuedMutationDescriptor<K extends CommandRoute = CommandRoute> = { routeId: K; params?: Record<string, string>; /** Require this exact retained actor-bound key; never mint a replacement. */ retainedKey?: string } & CommandArgs[K];
 export interface SessionFoundationOptions {
   /** Pure client factory: may also create a short-lived revocation client. */
   wireClient: (getAccessToken: () => string | undefined) => V2Client;
@@ -82,9 +90,14 @@ function sendRecord(client: V2Client, record: QueuedMutationRecord): Promise<unk
       return client.decideAdjustment(record.params.orderId, decision.adjustmentId, decision.adjustmentVersion, decision.decision, decision.expectedVersion, opts);
     }
     case 'identity.address.create': return client.createAddress(body, opts);
+    case 'logistics.rider.accept': return client.acceptJob(record.params.jobId, v2.versionedCommandSchema.parse(body).expectedVersion, opts);
     case 'logistics.rider.handover': return client.recordHandover(record.params.jobId, body, opts);
+    case 'logistics.ops.assign': return client.assignDelivery(body, opts);
     case 'billing.manual.confirm': return client.confirmManualPayment(record.params.obligationId, body, opts);
     case 'billing.refund.create': return client.createRefund(body, opts);
+    case 'reviews.create': return client.createReview(v2.reviewInputSchema.parse(body), opts);
+    case 'support.incidents.create': return client.createIncident(v2.incidentInputSchema.parse(body), opts);
+    case 'support.incidents.messages': return client.postIncidentMessage(record.params.incidentId, v2.incidentMessageInputSchema.parse(body), opts);
     default: return Promise.reject(new UnknownOutcomeError('No approved replay sender exists; reconcile the retained intent', undefined, record.idempotencyKey));
   }
 }
@@ -202,7 +215,7 @@ export function createSessionFoundation(options: SessionFoundationOptions): Sess
     enqueueMutation<K extends CommandRoute>(descriptor: QueuedMutationDescriptor<K>): Promise<CommandResults[K]> {
       const intent = copy(descriptor), started = generation;
       const bodyJson = canonicalJson(intent.body), params = copy(intent.params ?? {});
-      const fingerprint = canonicalJson({ started, routeId: intent.routeId, params, bodyJson });
+      const fingerprint = canonicalJson({ started, routeId: intent.routeId, params, bodyJson, retainedKey: intent.retainedKey });
       const active = activeCommands.get(fingerprint);
       if (active) return active as Promise<CommandResults[K]>;
       const work = (async () => {
@@ -213,7 +226,15 @@ export function createSessionFoundation(options: SessionFoundationOptions): Sess
           const records = await queue.list(), scope = identityKey(actor);
           const existing = records.find(r => r.actorId === actor.id && r.identityKey === scope && r.routeId === intent.routeId &&
             canonicalJson(r.params) === canonicalJson(params) && canonicalJson(JSON.parse(r.bodyJson ?? 'null')) === bodyJson);
-          if (existing) return existing; // Reconcile an UNKNOWN attempt; never mint another key.
+          if (intent.retainedKey !== undefined) {
+            const retained = records.find(r => r.idempotencyKey === intent.retainedKey);
+            if (!retained || retained.actorId !== actor.id || retained.identityKey !== scope || retained.routeId !== intent.routeId ||
+              canonicalJson(retained.params) !== canonicalJson(params) || canonicalJson(JSON.parse(retained.bodyJson ?? 'null')) !== bodyJson) {
+              throw new StorageError('Retained command is missing or does not match this actor and exact intent; reconcile it without creating a replacement');
+            }
+            return retained;
+          }
+          if (existing) return existing; // Reconcile an UNKNOWN attempt; never mint another key;
           if (records.length >= 100) throw new StorageError('Reconcile retained commands before creating more intents');
           const record: QueuedMutationRecord = { idempotencyKey: generateKey(), routeId: intent.routeId, params, bodyJson,
             actorId: actor.id, identityKey: scope, createdAt: clock().toISOString() };

@@ -20,9 +20,9 @@ jobs:
           node-version: 24.22.0
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      # Retain the raw version-based audit. The pinned forge backport requires
-      # exact installed-source hashes and real RSA rejection regressions;
-      # unexpected findings, missing patches and audit errors still fail closed.
+      # Retain raw registry evidence and require published fixes. The pinned
+      # forge release must pass exact-source and real RSA regressions;
+      # unexpected findings and audit errors still fail closed, without waivers.
       - run: |
           mkdir -p .verification
           pnpm release:security --json > .verification/dependency-audit.log 2>&1

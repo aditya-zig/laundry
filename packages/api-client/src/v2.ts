@@ -222,6 +222,10 @@ export function createV2Client(options: V2ClientOptions = {}) {
     verifyOtp: (challengeId: string, code: string, opts?: V2MutatingOpts & { mfaCode?: string }) =>
       call("identity.otp.verify", v2.sessionSchema, { body: v2.otpVerifySchema.parse({ challengeId, code, ...(opts?.mfaCode === undefined ? {} : { mfaCode: opts.mfaCode }) }), opts }),
 
+    // Construct this client with getToken returning the Better Auth bearer
+    // token for exchange; use the returned access token for business calls.
+    exchangeAuthSession: (opts?: V2MutatingOpts) =>
+      call("identity.session.exchange", v2.sessionSchema, { body: {}, opts }),
     refreshSession: (refreshToken: string, opts?: V2MutatingOpts) =>
       call("identity.session.refresh", v2.sessionSchema, { body: v2.sessionRefreshSchema.parse({ refreshToken }), opts }),
 
@@ -349,6 +353,9 @@ export function createV2Client(options: V2ClientOptions = {}) {
     listOrderObligations: (orderId: string, query?: Query) =>
       call("billing.obligations", v2.WIRE_SCHEMAS.ObligationList, { params: { orderId }, query }),
 
+    listOpsOrderObligations: (orderId: string, query?: Query) =>
+      call("billing.ops.obligations", v2.WIRE_SCHEMAS.ObligationList, { params: { orderId }, query }),
+
     listOrderPaymentAttempts: (orderId: string, query?: Query) =>
       call("billing.attempts", v2.WIRE_SCHEMAS.PaymentAttemptList, { params: { orderId }, query }),
 
@@ -385,14 +392,17 @@ export function createV2Client(options: V2ClientOptions = {}) {
     getDownloadUrl: (mediaId: string, opts?: V2MutatingOpts) =>
       call("media.download", mediaDownload, { params: { mediaId }, opts }),
 
-    listIncidents: () =>
-      call("support.incidents.list", incidentList),
+    listIncidents: (query?: Query) =>
+      call("support.incidents.list", incidentList, { query }),
+
+    listOpsIncidents: (query?: Query) =>
+      call("support.ops.incidents.list", incidentList, { query }),
 
     createIncident: (input: v2.IncidentInput, opts?: V2MutatingOpts) =>
       call("support.incidents.create", incident, { params: { orderId: v2.idSchema.parse(input.orderId) }, body: v2.incidentInputSchema.parse(input), opts }),
 
-    listIncidentMessages: (incidentId: string) =>
-      call("support.incidents.messages.list", v2.pageSchema(v2.incidentMessageSchema), { params: { incidentId } }),
+    listIncidentMessages: (incidentId: string, query?: Query) =>
+      call("support.incidents.messages.list", v2.pageSchema(v2.incidentMessageSchema), { params: { incidentId }, query }),
 
     postIncidentMessage: (
       incidentId: string,
@@ -517,6 +527,9 @@ export function createV2Client(options: V2ClientOptions = {}) {
 
     reconciliation: (period: string, opts?: V2MutatingOpts) =>
       call("billing.reconcile", v2.reconciliationSchema, { body: v2.reconciliationRequestSchema.parse({ period }), opts }),
+
+    getDispatchLegs: (orderId: string) =>
+      call("logistics.ops.legs", v2.WIRE_SCHEMAS.DispatchLegList, { params: { orderId } }),
 
     assignDelivery: (input: v2.AssignmentInput, opts?: V2MutatingOpts) =>
       call("logistics.ops.assign", v2.assignmentSchema, { body: v2.assignmentInputSchema.parse(input), opts }),

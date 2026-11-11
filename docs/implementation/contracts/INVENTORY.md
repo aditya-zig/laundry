@@ -4,7 +4,7 @@ Contract target: `laundry-wire-v2.0.0`.
 
 C01 is not frozen. This file records declarations generated from `packages/contracts/src/v2/routes.ts`. A schema name does not prove that the schema exists or that a backend implements it. Permission and transaction behavior below are requirements, not acceptance evidence. See `IDENTITY-AND-ROUTING.md` for the latest SDK checks and remaining gaps.
 
-Published operations: 84.
+Published operations: 87.
 Event types: 10.
 Error codes: 17.
 Service codes: 4.
@@ -32,6 +32,7 @@ Billing units: 2.
 |---|---|---|---|---|---|---|
 | `POST` | `/v2/identity/otp` | `OtpRequest` | `OtpChallenge` | PUBLIC | REQUIRED | INVALID_INPUT, RATE_LIMITED, PROVIDER_UNAVAILABLE, PROVIDER_OUTCOME_UNKNOWN |
 | `POST` | `/v2/identity/otp/verify` | `OtpVerify` | `Session` | PUBLIC | REQUIRED | INVALID_INPUT, UNAUTHENTICATED, PROVIDER_UNAVAILABLE, PROVIDER_OUTCOME_UNKNOWN, RATE_LIMITED |
+| `POST` | `/v2/identity/session/exchange` | `AuthSessionExchange` | `Session` | PUBLIC | REQUIRED | UNAUTHENTICATED, FORBIDDEN, PROVIDER_UNAVAILABLE, RATE_LIMITED, PROVIDER_OUTCOME_UNKNOWN |
 | `POST` | `/v2/identity/session/refresh` | `SessionRefresh` | `Session` | PUBLIC | REQUIRED | UNAUTHENTICATED, PROVIDER_UNAVAILABLE, PROVIDER_OUTCOME_UNKNOWN, RATE_LIMITED |
 | `POST` | `/v2/identity/logout` | - | `LogoutResult` | CUSTOMER, RIDER, FACILITY, OPERATOR, SUPPORT, ADMIN | REQUIRED | UNAUTHENTICATED, PROVIDER_UNAVAILABLE, PROVIDER_OUTCOME_UNKNOWN, RATE_LIMITED |
 | `POST` | `/v2/identity/sessions/{sessionId}/revoke` | - | `SessionRevocation` | CUSTOMER, RIDER, FACILITY, OPERATOR, SUPPORT, ADMIN | REQUIRED | UNAUTHENTICATED, FORBIDDEN, NOT_FOUND, PROVIDER_UNAVAILABLE, PROVIDER_OUTCOME_UNKNOWN, RATE_LIMITED |
@@ -93,6 +94,7 @@ Billing units: 2.
 | `GET` | `/v2/orders/{orderId}/billing/attempts` | - | `PaymentAttemptList` | CUSTOMER | NOT_APPLICABLE | NOT_FOUND, FORBIDDEN, PROVIDER_UNAVAILABLE, PROVIDER_OUTCOME_UNKNOWN, RATE_LIMITED |
 | `GET` | `/v2/orders/{orderId}/billing/receipts` | - | `ReceiptList` | CUSTOMER | NOT_APPLICABLE | NOT_FOUND, FORBIDDEN, PROVIDER_UNAVAILABLE, PROVIDER_OUTCOME_UNKNOWN, RATE_LIMITED |
 | `GET` | `/v2/orders/{orderId}/billing/refunds` | - | `RefundList` | CUSTOMER | NOT_APPLICABLE | NOT_FOUND, FORBIDDEN, PROVIDER_UNAVAILABLE, PROVIDER_OUTCOME_UNKNOWN, RATE_LIMITED |
+| `GET` | `/v2/ops/billing/orders/{orderId}/obligations` | - | `ObligationList` | OPERATOR, ADMIN | NOT_APPLICABLE | NOT_FOUND, FORBIDDEN, INVALID_INPUT, PROVIDER_UNAVAILABLE, PROVIDER_OUTCOME_UNKNOWN, RATE_LIMITED |
 | `POST` | `/v2/ops/billing/obligations/{obligationId}/confirm-manual` | `ManualPaymentConfirmation` | `Receipt` | OPERATOR, ADMIN | REQUIRED | VERSION_CONFLICT, FORBIDDEN, PROVIDER_UNAVAILABLE, PROVIDER_OUTCOME_UNKNOWN, RATE_LIMITED |
 | `POST` | `/v2/ops/billing/refunds` | `RefundRequest` | `Refund` | OPERATOR, ADMIN | REQUIRED | VERSION_CONFLICT, FORBIDDEN, INVALID_INPUT, PROVIDER_UNAVAILABLE, PROVIDER_OUTCOME_UNKNOWN, RATE_LIMITED |
 | `POST` | `/v2/ops/billing/reconciliation` | `ReconciliationRequest` | `Reconciliation` | OPERATOR, ADMIN | REQUIRED | FORBIDDEN, INVALID_INPUT, PROVIDER_UNAVAILABLE, PROVIDER_OUTCOME_UNKNOWN, RATE_LIMITED |
@@ -112,6 +114,7 @@ Billing units: 2.
 | `POST` | `/v2/rider/handovers` | `RiderHandover` | `HandoverResult` | RIDER | REQUIRED | VERSION_CONFLICT, FORBIDDEN, INVALID_INPUT, PROVIDER_UNAVAILABLE, PROVIDER_OUTCOME_UNKNOWN, RATE_LIMITED |
 | `POST` | `/v2/rider/jobs/{jobId}/exception` | `DeliveryException` | `LegAttempt` | RIDER | REQUIRED | VERSION_CONFLICT, FORBIDDEN, PROVIDER_UNAVAILABLE, PROVIDER_OUTCOME_UNKNOWN, RATE_LIMITED |
 | `POST` | `/v2/rider/location` | `RiderLocationReport` | `Location` | RIDER | REQUIRED | FORBIDDEN, INVALID_INPUT, PROVIDER_UNAVAILABLE, PROVIDER_OUTCOME_UNKNOWN, RATE_LIMITED |
+| `GET` | `/v2/ops/logistics/orders/{orderId}/legs` | - | `DispatchLegList` | OPERATOR, ADMIN | NOT_APPLICABLE | NOT_FOUND, FORBIDDEN, INVALID_INPUT, PROVIDER_UNAVAILABLE, PROVIDER_OUTCOME_UNKNOWN, RATE_LIMITED |
 | `POST` | `/v2/ops/logistics/assignments` | `AssignmentInput` | `Assignment` | OPERATOR, ADMIN | REQUIRED | VERSION_CONFLICT, FORBIDDEN, PROVIDER_UNAVAILABLE, PROVIDER_OUTCOME_UNKNOWN, RATE_LIMITED |
 | `POST` | `/v2/ops/logistics/assignments/{assignmentId}/reassign` | `ReassignmentInput` | `Assignment` | OPERATOR, ADMIN | REQUIRED | VERSION_CONFLICT, FORBIDDEN, PROVIDER_UNAVAILABLE, PROVIDER_OUTCOME_UNKNOWN, RATE_LIMITED |
 | `POST` | `/v2/ops/logistics/legs/{legAttemptId}/cancel` | `LegCancellation` | `LegAttempt` | OPERATOR, ADMIN | REQUIRED | VERSION_CONFLICT, FORBIDDEN, PROVIDER_UNAVAILABLE, PROVIDER_OUTCOME_UNKNOWN, RATE_LIMITED |

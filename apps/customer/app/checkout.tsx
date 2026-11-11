@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
-import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { useRouter } from "expo-router";
 import { v2 } from "@laundry/contracts";
 import { apiV2 } from "../src/api-v2";
@@ -26,6 +26,8 @@ import { bagTotals, viewBagLines } from "../src/features/booking/view";
 import { canConfirmBooking, formatINR, isQuoteExpired } from "../src/guards";
 import { Card, Loading, NoteCard } from "../src/features/booking/ui";
 import { AddressEditor } from "../src/features/booking/AddressEditor";
+import { BrowserSignInPanel } from "../src/features/booking/BrowserSignInPanel";
+import { customerSignInMode } from "../src/features/booking/browser-sign-in";
 import { colors, minTouchTarget, radius, spacing } from "../src/theme";
 
 // Product checkout. Sequence: public phone OTP sign-in (no prior session), an
@@ -118,6 +120,18 @@ function BackBar() {
 }
 
 function SignInScreen() {
+  const mode = customerSignInMode(Platform.OS, process.env.EXPO_PUBLIC_AUTH_ENGINE);
+  if (mode === 'legacy') return <LegacySignInScreen />;
+  return <ScreenShell>
+    <BackBar />
+    <Text style={styles.title} accessibilityRole="header">Sign in to book</Text>
+    {mode === 'browser' ? <BrowserSignInPanel /> : <NoteCard kind="blocked"
+      title="This sign-in build is not supported"
+      body="Google, Apple and mobile sign-in need a verified native callback and secure-storage adapter on this device. Use the Laundry web app until that adapter is ready. No demo or legacy identity is substituted." />}
+  </ScreenShell>;
+}
+
+function LegacySignInScreen() {
   const [phone, setPhone] = useState("");
   const [code, setCode] = useState("");
   const [challenge, setChallenge] = useState<v2.OtpChallenge | null>(null);

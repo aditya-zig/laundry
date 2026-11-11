@@ -1,7 +1,8 @@
 // Custody handover feature logic (F03).
 // Types/explicit states: CONFIRMED_ONLINE, OUTCOME_UNKNOWN, PENDING_SYNC,
 // REJECTED. Receipt copy is derived only from the authoritative HandoverResult.
-import { UnknownOutcomeError, V2ApiError } from "@laundry/api-client";
+import { V2ApiError } from "@laundry/api-client";
+import { isMutationOutcomePending } from "@laundry/app-foundation";
 import { v2 } from "@laundry/contracts";
 import type { QueuedMutationRecord } from "@laundry/app-foundation";
 import { assignmentState } from "./access";
@@ -20,6 +21,12 @@ export type HandoverUiState =
   | { kind: "PENDING_SYNC"; pending: HandoverPending }
   | { kind: "REJECTED"; actionId: string; message: string; canRetryWithSameDetails: boolean };
 
+export function handoverResultState(receipt: v2.HandoverResult, actionId: string): HandoverUiState {
+  return receipt.accepted
+    ? { kind: 'CONFIRMED_ONLINE', receipt }
+    : { kind: 'REJECTED', actionId, message: `${receipt.reason ?? 'Custody was not accepted'}. Attempt count: ${receipt.attemptCount}.`, canRetryWithSameDetails: receipt.nextAttemptAllowed };
+}
+
 export interface HandoverPending {
   jobId: string;
   actionId: string;
@@ -33,6 +40,7 @@ export type HandoverCondition = v2.GarmentCondition;
 export interface HandoverDraft {
   code: string;
   garmentCount: string;
+  containerIdsText: string;
   condition: HandoverCondition;
   note: string;
   actionId: string;
@@ -45,6 +53,7 @@ export function emptyHandoverDraft(): HandoverDraft {
   return {
     code: "",
     garmentCount: "",
+    containerIdsText: "",
     condition: "GOOD",
     note: "",
     actionId: crypto.randomUUID(),
@@ -93,10 +102,20 @@ const TERMINAL: ReadonlySet<v2.RiderJob["status"]> = new Set([
   "BOOKING_UNKNOWN",
 ]);
 
+/** Only an unregistered pickup may supply labels observed on the actual bags. */
+export function resolveHandoverContainers(job: v2.RiderJob, observedIds: readonly string[] = []): string[] {
+  if (job.containerIds.length > 0) return [...job.containerIds];
+  if (job.leg !== 'PICKUP') throw new Error('Return containers must come from the facility record; ask dispatch to reconcile the bags.');
+  if (observedIds.length === 0 || observedIds.length > 100 || new Set(observedIds).size !== observedIds.length || observedIds.some(id => !v2.idSchema.safeParse(id).success)) {
+    throw new Error('Record 1–100 distinct bag-label UUIDs from the physical pickup bags; do not invent container IDs.');
+  }
+  return [...observedIds];
+}
+
 /** Builds the exact typed DTO; never embeds the expected code server-side. */
 export function buildHandoverBody(
   job: v2.RiderJob,
-  args: { actionId: string; code: string; garmentCount: number; condition?: HandoverCondition; note?: string; capturedAt?: string },
+  args: { actionId: string; code: string; garmentCount: number; containerIds?: readonly string[]; condition?: HandoverCondition; note?: string; capturedAt?: string },
 ): Omit<v2.RiderHandover, "jobId"> {
   return {
     legAttemptId: job.id,
@@ -105,7 +124,7 @@ export function buildHandoverBody(
     method: "CODE",
     code: args.code,
     capturedAt: args.capturedAt ?? new Date().toISOString(),
-    containerIds: [...job.containerIds],
+    containerIds: resolveHandoverContainers(job, args.containerIds),
     garmentCount: args.garmentCount,
     condition: args.condition ?? "GOOD",
     ...(args.note ? { note: args.note } : {}),
@@ -118,10 +137,7 @@ export type HandoverFailure =
 
 /** Unknown outcomes are never reclassified as confirmations or failures. */
 export function classifyHandoverFailure(error: unknown, actionId: string): HandoverFailure {
-  if (
-    error instanceof UnknownOutcomeError ||
-    (error instanceof V2ApiError && error.status >= 500)
-  ) {
+  if (isMutationOutcomePending(error)) {
     return { kind: "OUTCOME_UNKNOWN", actionId, canRetryWithSameDetails: false };
   }
   if (error instanceof V2ApiError) {
