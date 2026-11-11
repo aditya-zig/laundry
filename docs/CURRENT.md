@@ -10,6 +10,8 @@ Canonical branch: `work/facility-recovery-20261026` (pushed to `origin`)
 - Verification runs only in the canonical worktree while `git status --porcelain` is empty. Do not edit tracked sources while receipts are being recorded.
 - After any work session, `pnpm agents:local-status` must be checked; unpushed commits have no backup.
 
+Active slice (2026-11-11): GitHub #40, customer order tracking from recorded fulfillment events. Test-first checkpoint adds presenter regressions before implementation; these tests are expected to fail until the presenter exists. No readiness or launch gate changes. Implementation notes and new clean-revision receipts will follow under `docs/implementation/production-application/`.
+
 Latest verified evidence (update on each checkpoint):
 
 - 2026-11-09: clean-revision receipts at `e41049b95c801f087343b58db61005d1172a93e6` with an empty worktree: four-role browser journey (exit 0; four distinct role videos), customer-v2 restore rehearsal (exit 0; PostgreSQL 17.11, 91 tables matched, delivered order plus one private review and one support case) and the original 1080p30 recording (exit 0; 122.17 s, four sample frames inspected). Digest indexes live under `.verification/checkpoints/<that sha>/`; see `production-application/clean-revision-checkpoint-20261109.md`. The same day's earlier full clean batch at `64943d25`: build/check/contracts/tooling plus the workspace suite on a disposable Docker PostgreSQL (API 373, contracts 104, fixtures 237, SDK 165, foundation 55, customer 126, partner 55, ops 87, tokens 2).
