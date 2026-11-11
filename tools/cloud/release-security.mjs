@@ -7,37 +7,32 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { spawnSync } from 'node:child_process';
 
 const root = fileURLToPath(new URL('../../', import.meta.url));
-const rsaSha256 = '5019e28f1429de036f4d13be23639c30b4ce6df7183676608a9888f2714674c9';
-const advisoryId = 'GHSA-86w9-cpqp-85rv';
+const forgeVersion = '1.4.3';
+// Published 1.4.3 canonical-DER verification, checked alongside real signature cases.
+const rsaSha256 = '6632e195295ce76f6bb9131ee770dcd6cc1ee4ffac7906302208b00faf95a87f';
 
-export function assertPatchedRsa(bytes) {
-  assert.equal(createHash('sha256').update(bytes).digest('hex'), rsaSha256, 'Installed RSA implementation is not the reviewed security backport');
+export function assertReviewedRsa(bytes) {
+  assert.equal(createHash('sha256').update(bytes).digest('hex'), rsaSha256, 'Installed RSA implementation is not the reviewed published release');
 }
 
-export function assertAuditRemediable(audit) {
-  assert(audit && !audit.error && audit.metadata?.vulnerabilities && audit.advisories && !Array.isArray(audit.advisories), 'Invalid audit response');
+/** The raw registry evidence stays visible. No advisory is waived or muted. */
+export function assertAuditClean(audit) {
+  assert(audit && !audit.error && audit.metadata?.vulnerabilities && audit.advisories && typeof audit.advisories === 'object' && !Array.isArray(audit.advisories), 'Invalid audit response');
   assert.deepEqual(audit.muted ?? [], [], 'Muted advisories are not allowed');
-  const entries = Object.values(audit.advisories);
-  assert.equal(entries.length, 1, 'Unexpected security finding; refusing release');
-  const item = entries[0];
-  assert.equal(item.github_advisory_id, advisoryId, 'Unremediated advisory');
-  assert.equal(item.module_name, 'node-forge');
-  assert.equal(item.severity, 'high');
-  assert.equal(item.vulnerable_versions, '<=1.4.0');
-  assert.equal(item.patched_versions, '<0.0.0', 'A published fix must replace this temporary backport');
-  assert.deepEqual(item.cves, ['CVE-2026-85393']);
-  assert(Array.isArray(item.findings) && item.findings.length > 0);
-  for (const finding of item.findings) assert.equal(finding.version, '1.4.0', 'Unreviewed forge version');
-  assert.deepEqual(audit.metadata.vulnerabilities, { info: 0, low: 0, moderate: 0, high: 1, critical: 0 }, 'Unexpected vulnerability totals');
+  for (const level of ['info', 'low', 'moderate', 'high', 'critical']) {
+    const count = audit.metadata.vulnerabilities[level];
+    assert(Number.isInteger(count) && count >= 0, 'Invalid vulnerability totals');
+    if (!['info', 'low'].includes(level)) assert.equal(count, 0, 'Unremediated security findings; refusing release');
+  }
+  for (const item of Object.values(audit.advisories)) {
+    assert(item && ['info', 'low'].includes(item.severity), 'Unremediated advisory; refusing release');
+  }
 }
 
-export function verifyInstalledBackport() {
+export function verifyInstalledForge() {
   const manifest = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8'));
-  const patch = manifest.pnpm?.patchedDependencies?.['node-forge@1.4.0'];
-  assert.equal(patch, 'patches/node-forge@1.4.0.patch', 'The global forge backport must be pinned');
-  const patchText = readFileSync(join(root, patch), 'utf8');
-  assert.equal((patchText.match(/^diff --git /gm) ?? []).length, 1, 'Backport must change only RSA parsing');
-  assert(patchText.startsWith('diff --git a/lib/rsa.js b/lib/rsa.js\n'), 'Unexpected backport scope');
+  assert.equal(manifest.pnpm?.overrides?.['node-forge'], forgeVersion, 'The published forge fix must be pinned');
+  assert(!Object.keys(manifest.pnpm?.patchedDependencies ?? {}).some(name => name.startsWith('node-forge@')), 'Remove the superseded temporary forge backport');
   const installations = new Set();
   const chains = [
     ['expo', '@expo/cli', 'node-forge'],
@@ -54,8 +49,8 @@ export function verifyInstalledBackport() {
         require = createRequire(path);
       }
       const directory = realpathSync(dirname(path));
-      assert.equal(JSON.parse(readFileSync(join(directory, 'package.json'), 'utf8')).version, '1.4.0');
-      assertPatchedRsa(readFileSync(join(directory, 'lib/rsa.js')));
+      assert.equal(JSON.parse(readFileSync(join(directory, 'package.json'), 'utf8')).version, forgeVersion);
+      assertReviewedRsa(readFileSync(join(directory, 'lib/rsa.js')));
       installations.add(directory);
     }
   }
@@ -70,21 +65,15 @@ export function verifyInstalledBackport() {
 
 export function main() {
   const result = spawnSync('pnpm', ['audit', '--prod', '--audit-level', 'moderate', '--json'], { cwd: root, encoding: 'utf8', timeout: 120_000, maxBuffer: 10 * 1024 * 1024 });
-  // Preserve the upstream audit verbatim, including the version-based advisory.
   process.stdout.write(result.stdout ?? '');
   process.stderr.write(result.stderr ?? '');
   if (result.error || result.signal) { console.error('Dependency audit could not complete'); return 1; }
   if (![0, 1].includes(result.status)) return result.status ?? 1;
   try {
-    const audit = JSON.parse(result.stdout);
-    assert(audit && !audit.error && audit.metadata?.vulnerabilities && audit.advisories, 'Invalid audit response');
-    const copies = verifyInstalledBackport();
-    if (result.status === 1) assertAuditRemediable(audit);
-    else {
-      for (const level of ['moderate', 'high', 'critical']) assert.equal(audit.metadata.vulnerabilities[level], 0, 'Audit status disagrees with findings');
-      for (const item of Object.values(audit.advisories)) assert(['info', 'low'].includes(item.severity), 'Unremediated advisory');
-    }
-    console.error(`Security backport VERIFIED in ${copies} installed implementation(s): ${advisoryId}; exact source digest and seven RSA regression cases passed. The upstream version advisory remains in the raw audit above.`);
+    assertAuditClean(JSON.parse(result.stdout));
+    assert.equal(result.status, 0, 'Audit exit disagrees with clean findings');
+    const copies = verifyInstalledForge();
+    console.error(`Published node-forge ${forgeVersion} VERIFIED in ${copies} installed implementation(s): exact source digest and seven RSA regression cases passed. No moderate, high or critical advisory waiver.`);
     return 0;
   } catch (error) {
     console.error('Security verification FAILED:', error instanceof Error ? error.message : 'Invalid security evidence');

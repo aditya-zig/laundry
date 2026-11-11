@@ -77,6 +77,24 @@ test('malformed URI runs cannot hang the router query decoder', () => {
   assert.equal(result.status, 0, result.stderr);
 });
 
+test('many distinct malformed URI runs cannot monopolize the query decoder', () => {
+  const appRequire = createRequire(new URL('apps/customer/package.json', root));
+  const queryPath = appRequire.resolve('query-string');
+  const result = spawnSync(process.execPath, ['--input-type=commonjs', '-e', `
+    const query = require(${JSON.stringify(queryPath)});
+    let payload = '';
+    for (let i = 0; i < 32000; i++) {
+      const high = Math.floor(i / 256).toString(16).padStart(2, '0');
+      const low = (i % 256).toString(16).padStart(2, '0');
+      payload += '%' + high + '%' + low + 'x';
+    }
+    const value = query.parse('note=' + payload + '%zz&good=ok');
+    if (typeof value.note !== 'string' || !value.note.length || value.good !== 'ok') process.exit(2);
+  `], { timeout: 5_000, encoding: 'utf8' });
+  assert.ifError(result.error);
+  assert.equal(result.status, 0, result.stderr);
+});
+
 test('the public security gate preserves unexpected audit failures without waivers', async () => {
   const manifest = JSON.parse(await readFile(new URL('package.json', root), 'utf8'));
   const directory = await mkdtemp(join(tmpdir(), 'laundry-audit-gate-'));

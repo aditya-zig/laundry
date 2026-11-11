@@ -4,7 +4,7 @@ const {resolve}=require('node:path');
 const {reviewViewport}=require('./viewports.mjs');
 async function customerTrackingJourney(page, output, phase) {
   const heading = phase==='booked'?'Booking confirmed':phase==='intake'?'At the laundry facility':'Delivered';
-  await expect(page.getByText(heading,{exact:true})).toBeVisible();
+  await expect(page.getByRole('heading',{name:heading,exact:true})).toBeVisible();
   await expect(page.getByText('Pickup and return journeys',{exact:true})).toBeVisible();
   await expect(page.getByText('Custody record',{exact:true})).toBeVisible();
   await expect(page.getByText(/^Last checked: .*Updates are not live/)).toBeVisible();

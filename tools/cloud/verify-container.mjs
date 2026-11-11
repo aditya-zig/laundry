@@ -43,7 +43,7 @@ async function main() {
     for (const path of [...canaries, '.env', '.git/config', '.data/platform.env', '.verification/manifest.json', 'apps/api/dist/package.json']) {
       assert.equal(await exists(join(exported, 'context', path)), false, `Private/generated context path escaped: ${path}`);
     }
-    for (const path of ['package.json', 'patches/metro@0.81.5.patch', 'tools/build-node.mjs', 'apps/api/src/main.ts', 'apps/customer/package.json', 'modules/schema/migrations/007_identity.sql']) {
+    for (const path of ['package.json', '.pnpmfile.cjs', 'patches/metro@0.81.5.patch', 'tools/build-node.mjs', 'apps/api/src/main.ts', 'apps/customer/package.json', 'modules/schema/migrations/007_identity.sql']) {
       assert.equal(await exists(join(exported, 'context', path)), true, `Required build input omitted: ${path}`);
     }
     for (const path of canaries) await rm(path);
