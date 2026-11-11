@@ -65,6 +65,6 @@ describe('customer tracking is recorded evidence, not a synthetic progress bar',
   it.each(v2.custodyReceiptSchema.shape.currentHandoff.options)('explains custody %s without implying a live position', currentHandoff => {
     const view = custodyView({ orderId: '00000000-0000-4000-8000-000000000001', estimatedQuantity: 0, sealedContainerCount: 0, amountDueAtReturnMinor: 0, currency: 'INR', currentHandoff, updatedAt: '2026-11-11T08:00:00Z' });
     expect(view.handoff).not.toContain('_');
-    expect(view.handoff).not.toMatch(/GPS|live|paid/i);
+    expect(view.handoff).not.toMatch(/\b(?:GPS|live|paid)\b/i); // "Delivery" contains "live" but does not claim live GPS.
   });
 });

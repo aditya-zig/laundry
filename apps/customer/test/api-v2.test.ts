@@ -1,8 +1,8 @@
 import { beforeEach, expect, it, vi } from 'vitest';
 import { v2WireFixtures } from '@laundry/test-fixtures';
 const mocks = vi.hoisted(() => ({ authorized: vi.fn(), getCustodyReceipt: vi.fn() }));
-vi.mock('./foundation/session', () => ({ getFoundation: () => ({ authorized: mocks.authorized }), getV2Client: vi.fn() }));
-import { apiV2 } from './api-v2';
+vi.mock('../src/foundation/session', () => ({ getFoundation: () => ({ authorized: mocks.authorized }), getV2Client: vi.fn() }));
+import { apiV2 } from '../src/api-v2';
 beforeEach(() => {
   vi.resetAllMocks();
   mocks.authorized.mockImplementation(work => work({ getCustodyReceipt: mocks.getCustodyReceipt }));
