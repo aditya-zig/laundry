@@ -72,9 +72,9 @@ async function main() {
       await owner.query(`CREATE ROLE ${runtimeRole} LOGIN PASSWORD '${runtimePassword}' NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS`);
       await owner.query(`GRANT CONNECT ON DATABASE "${database.describe().database}" TO ${runtimeRole}`);
       await owner.query(`GRANT USAGE ON SCHEMA public TO ${runtimeRole}`);
-      const tables = (await owner.query("SELECT tablename FROM pg_tables WHERE schemaname='public' AND left(tablename,9)='identity_'")).rows;
+      const tables = (await owner.query("SELECT tablename FROM pg_tables WHERE schemaname='public' AND (left(tablename,9)='identity_' OR left(tablename,13)='laundry_auth_')")).rows;
       for (const { tablename } of tables) {
-        if (!/^identity_[a-z_]+$/.test(tablename)) throw new Error('Unexpected runtime grant target');
+        if (!/^(identity_|laundry_auth_)[a-z_]+$/.test(tablename)) throw new Error('Unexpected runtime grant target');
         const privileges = ['identity_staff', 'identity_staff_facilities'].includes(tablename) ? 'SELECT' : 'SELECT,INSERT,UPDATE,DELETE';
         await owner.query(`GRANT ${privileges} ON TABLE public."${tablename}" TO ${runtimeRole}`);
       }
