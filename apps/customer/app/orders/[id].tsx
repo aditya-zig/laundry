@@ -8,6 +8,8 @@ import { AdjustmentDecisionCard } from "../../src/features/booking/AdjustmentDec
 import { OrderReviewCard } from "../../src/features/booking/OrderReviewCard";
 import { OrderSupportCard } from "../../src/features/booking/OrderSupportCard";
 import { OrderBillingCard } from "../../src/features/booking/OrderBillingCard";
+import { OrderCustodyCard, OrderTrackingCards } from "../../src/features/booking/OrderTrackingCards";
+import { checkedTrackingSnapshot } from "../../src/features/booking/order-tracking";
 import { paymentModelLabel } from "../../src/features/booking/order-billing";
 import { describeError } from "../../src/features/booking/presenters";
 import { Card, Loading, NoteCard, Page } from "../../src/features/booking/ui";
@@ -21,32 +23,34 @@ export default function OrderDetails() {
 }
 
 function OwnedDetail({ id }: { id: string }) {
-  const [data, setData] = useState<{ order: v2.Order; events: v2.OrderTimelineEvent[] } | null>(null);
+  const [data, setData] = useState<{ order: v2.Order; events: v2.OrderTimelineEvent[]; readAt: string } | null>(null);
   const [error, setError] = useState<unknown>(null);
+  const [refreshing, setRefreshing] = useState(true);
   const [revision, setRevision] = useState(0);
   useEffect(() => {
     let active = true;
-    setData(null); setError(null);
-    Promise.all([apiV2.getOrder(id), apiV2.getOrderTimeline(id)]).then(([order, events]) => { if (active) setData({ order, events }); }).catch(cause => { if (active) setError(cause); });
+    setError(null); setRefreshing(true);
+    Promise.all([apiV2.getOrder(id), apiV2.getOrderTimeline(id)]).then(([order, events]) => {
+      if (active) setData({ ...checkedTrackingSnapshot(order, events), readAt: new Date().toISOString() });
+    }).catch(cause => { if (active) setError(cause); }).finally(() => { if (active) setRefreshing(false); });
     return () => { active = false; };
   }, [id, revision]);
-  if (error) return <NoteCard kind="error" title={describeError(error).title} body={describeError(error).body} actionLabel="Retry" onAction={() => setRevision(value => value + 1)} />;
-  if (!data) return <Loading label="Loading owned order" />;
-  const { order, events } = data;
+  if (!data) return error ? <NoteCard kind="error" title={describeError(error).title} body={describeError(error).body} actionLabel="Retry" onAction={() => setRevision(value => value + 1)} /> : <Loading label="Loading owned order" />;
+  const { order, events, readAt } = data;
   return <>
-    <Card title={order.status.replaceAll("_", " ")}>
+    {error ? <NoteCard kind="warning" title="Order update unavailable" body={`Showing the last available record, not a current confirmation. ${describeError(error).body} Refresh before making a decision or review.`} actionLabel="Retry order update" onAction={() => setRevision(value => value + 1)} /> : null}
+    {refreshing ? <Loading label="Refreshing order record" /> : null}
+    <OrderTrackingCards order={order} events={events} readAt={readAt} />
+    <Card title="Order total">
       <Text style={{ color: colors.ink, marginTop: 8 }}>Order {order.id}</Text>
       <Text style={{ color: colors.ink, marginTop: 8 }}>{formatINR(order.totalMinor)} · {paymentModelLabel(order.paymentModel)}</Text>
-      <Text style={{ color: colors.inkMuted, marginTop: 8 }}>Scheduled pickup: {order.pickupWindow.start} — {order.pickupWindow.end}</Text>
-      <Text style={{ color: colors.inkMuted, marginTop: 8 }}>Promised return: {order.promisedReturnWindow.start} — {order.promisedReturnWindow.end}</Text>
+      <Text style={{ color: colors.inkMuted, marginTop: 8 }}>An order total or delivery update is not proof of payment. See the payment records below.</Text>
     </Card>
-    <AdjustmentDecisionCard key={`${order.id}:${order.version}`} order={order} onUpdated={() => setRevision(value => value + 1)} />
-    <Card title="Recorded history">
-      {events.length === 0 ? <Text style={{ color: colors.inkMuted }}>No timeline events have been recorded.</Text> : events.map((event, index) => <Text key={`${event.at}:${event.status}:${index}`} style={{ color: colors.ink, marginTop: 12 }}>{event.label}{"\n"}{event.at}{event.reason ? `\n${event.reason}` : ""}</Text>)}
-    </Card>
+    {!error && !refreshing ? <AdjustmentDecisionCard key={`${order.id}:${order.version}`} order={order} onUpdated={() => setRevision(value => value + 1)} /> : null}
+    <OrderCustodyCard key={`custody:${order.id}:${order.version}:${revision}`} orderId={order.id} timezone={order.pickupWindow.timezone} />
     <OrderBillingCard key={`billing:${order.id}`} orderId={order.id} />
-    <OrderReviewCard key={order.id} order={order} />
+    {!error && !refreshing ? <OrderReviewCard key={order.id} order={order} /> : null}
     <OrderSupportCard key={`support:${order.id}`} orderId={order.id} />
-    <NoteCard kind="note" title="Authoritative order record" body="A scheduled return is not a custody receipt or proof of payment. No rider location is simulated here. Rescheduling and cancellation are not yet connected on this screen. Payment records are read-only and do not initiate collection or a refund." actionLabel="Refresh" onAction={() => setRevision(value => value + 1)} />
+    <NoteCard kind="note" title="Check for updates" body="Rescheduling and cancellation are not yet connected on this screen. Payment records are read-only and do not initiate collection or a refund." actionLabel="Refresh" actionDisabled={refreshing} onAction={() => setRevision(value => value + 1)} />
   </>;
 }

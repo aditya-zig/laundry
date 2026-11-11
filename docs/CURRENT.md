@@ -10,7 +10,7 @@ Canonical branch: `work/facility-recovery-20261026` (pushed to `origin`)
 - Verification runs only in the canonical worktree while `git status --porcelain` is empty. Do not edit tracked sources while receipts are being recorded.
 - After any work session, `pnpm agents:local-status` must be checked; unpushed commits have no backup.
 
-Active slice (2026-11-11): GitHub #40, customer order tracking from recorded fulfillment events. Test-first checkpoint adds presenter regressions before implementation; these tests are expected to fail until the presenter exists. No readiness or launch gate changes. Implementation notes and new clean-revision receipts will follow under `docs/implementation/production-application/`.
+Active slice (2026-11-11): GitHub #40, customer order tracking from recorded fulfillment events. Implementation checkpoint adds human-readable states, timezone-aware recorded history, separate journey/custody summaries, last-read/stale/error handling and extended four-role browser checks. The test-first checkpoint `8fbac0175cd5bbb7fce9ad7abe5188ca8150c829` failed as expected (presenter absent; existing 126 customer tests passed). Passing clean receipts are still pending. See `production-application/event-driven-order-tracking.md`. No readiness or launch gate changes.
 
 Latest verified evidence (update on each checkpoint):
 

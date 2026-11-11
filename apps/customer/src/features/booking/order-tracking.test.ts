@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { v2 } from '@laundry/contracts';
-import { orderStatusView, deliveryLegView, formatTrackingTime, formatTrackingWindow, recordedHistory, custodyView } from './order-tracking';
+import { v2WireFixtures } from '@laundry/test-fixtures';
+import { checkedTrackingSnapshot, orderStatusView, deliveryLegView, formatTrackingTime, formatTrackingWindow, recordedHistory, custodyView } from './order-tracking';
 
 describe('customer tracking is recorded evidence, not a synthetic progress bar', () => {
   it.each(v2.orderStatusSchema.options)('explains %s without exposing an enum', status => {
@@ -9,6 +10,13 @@ describe('customer tracking is recorded evidence, not a synthetic progress bar',
     expect(view.detail.length).toBeGreaterThan(20);
     expect(view.title).not.toMatch(/_|^[A-Z ]+$/);
     expect(view.attention).toBe(['AWAITING_ADJUSTMENT', 'ON_HOLD', 'RESOLUTION_REQUIRED', 'CANCEL_REQUESTED'].includes(status));
+  });
+  it('rejects crossed reads instead of claiming conflicting statuses are fresh', () => {
+    const order = v2.orderSchema.parse({ ...v2WireFixtures.Order, status: 'IN_CARE' });
+    const events: v2.OrderTimelineEvent[] = [{ status: 'QUALITY_CHECK', label: 'Quality check underway', at: '2026-11-11T08:00:00Z' }];
+    expect(() => checkedTrackingSnapshot(order, events)).toThrow('Your order changed');
+    expect(checkedTrackingSnapshot(order, [])).toEqual({ order, events: [] });
+    expect(checkedTrackingSnapshot(order, [{ ...events[0]!, status: 'IN_CARE' }]).order).toBe(order);
   });
   it('keeps cancellation and holds separate from successful delivery', () => {
     for (const status of ['ON_HOLD', 'CANCELLED', 'CANCEL_REQUESTED', 'RESOLUTION_REQUIRED'] as const) {

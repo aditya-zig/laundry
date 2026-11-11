@@ -90,6 +90,7 @@ async function main(proposeAdjustment, finishOps, captureOpsFailure, replyToSupp
     await page.screenshot({path:resolve(output,'confirmed-mobile.png'),fullPage:true});
     await page.getByRole('button',{name:'View order',exact:true}).click();
     await expect(page.getByText('Recorded history',{exact:true})).toBeVisible();
+    await require('./customer-tracking-browser.cjs').customerTrackingJourney(page, output, 'booked');
     await recordingCheckpoint(page,'booking');
     await page.screenshot({path:resolve(output,'owned-order-mobile.png'),fullPage:true});
     expect(mutations).toHaveLength(2); expect(mutations[0].key).toBeTruthy(); expect(mutations[0]).toEqual(mutations[1]);
@@ -111,16 +112,18 @@ async function main(proposeAdjustment, finishOps, captureOpsFailure, replyToSupp
     await expect(page.getByText(/^State: ACCEPTED\./)).toBeVisible();
     await expect(page.getByText('INR 100.00 · Pay-on-return model',{exact:true})).toBeVisible();
     await require('./customer-billing-browser.cjs').customerBillingJourney(page, output, false);
+    await require('./customer-tracking-browser.cjs').customerTrackingJourney(page, output, 'intake');
     await page.screenshot({path:resolve(output,'adjustment-accepted-mobile.png'),fullPage:true});
     expect(decisions).toHaveLength(2); expect(decisions[0].key).toBeTruthy(); expect(decisions[0]).toEqual(decisions[1]);
     const finalEvidence=await (await fetch('http://127.0.0.1:4499/__synthetic_evidence')).json();
     expect(finalEvidence).toEqual({...evidence,accepted_decisions:1});
     const opsEvidence = finishOps ? await finishOps() : null;
-    let supportEvidence = {}, billingEvidence = {};
+    let supportEvidence = {}, billingEvidence = {}, trackingEvidence = {};
     if (finishOps) {
       await page.bringToFront();
       await page.getByRole('button',{name:'Refresh',exact:true}).click();
-      await expect(page.getByText('DELIVERED',{exact:true})).toBeVisible();
+      await expect(page.getByText('Delivered',{exact:true})).toBeVisible();
+      trackingEvidence = await require('./customer-tracking-browser.cjs').customerTrackingJourney(page, output, 'delivered');
       await recordingCheckpoint(page,'delivered');
       await expect(page.getByText('INR 100.00 · Payment due at return',{exact:true})).toHaveCount(0);
       billingEvidence = await require('./customer-billing-browser.cjs').customerBillingJourney(page, output, true);
@@ -154,7 +157,7 @@ async function main(proposeAdjustment, finishOps, captureOpsFailure, replyToSupp
     const completedEvidence = finishOps ? await (await fetch('http://127.0.0.1:4499/__synthetic_evidence')).json() : finalEvidence;
     expect(completedEvidence).toEqual({ ...finalEvidence, legs: finishOps ? 2 : 1 });
     expect(errors).toEqual([]);
-    await writeFile(resolve(output,'result.json'),JSON.stringify({status:'passed',sourceRevision:execFileSync('git',['rev-parse','HEAD'],{encoding:'utf8'}).trim(),sourceDirty:Boolean(execFileSync('git',['status','--porcelain'],{encoding:'utf8'}).trim()),syntheticOnly:true,commercialCalls:0,customerDeepLinkReloadProven:true,customerBagQuantityEditsProven:true,customerPieceQuantityEditsProven:true,opsCatalogReadOnlyProven:opsEvidence?.opsCatalogReadOnlyProven===true,opsCatalogFailedReadsNotEmptyOrZero:opsEvidence?.opsCatalogFailedReadsNotEmptyOrZero===true,sameBookingKeyAndBody:true,sameAdjustmentKeyAndBody:true,sameReviewKeyAndBody:finishOps?true:null,...supportEvidence,...billingEvidence,scope:opsEvidence?.rider?'customer-ops-rider':finishOps?'customer-and-ops':'customer',riderBrowser:opsEvidence?.rider??null,pickupRiderBrowser:opsEvidence?.pickup??null,pickupBrowserProven:opsEvidence?.pickup?.pickupBrowserProven===true,pickupBagContinuity:opsEvidence?.pickupBagContinuity===true,recordings:{customer:relative(output,await page.video().path()),ops:opsEvidence?.video,rider:opsEvidence?.rider?.video,pickupRider:opsEvidence?.pickup?.video},...completedEvidence,browserErrors:errors},null,2));
+    await writeFile(resolve(output,'result.json'),JSON.stringify({status:'passed',sourceRevision:execFileSync('git',['rev-parse','HEAD'],{encoding:'utf8'}).trim(),sourceDirty:Boolean(execFileSync('git',['status','--porcelain'],{encoding:'utf8'}).trim()),syntheticOnly:true,commercialCalls:0,customerDeepLinkReloadProven:true,customerBagQuantityEditsProven:true,customerPieceQuantityEditsProven:true,opsCatalogReadOnlyProven:opsEvidence?.opsCatalogReadOnlyProven===true,opsCatalogFailedReadsNotEmptyOrZero:opsEvidence?.opsCatalogFailedReadsNotEmptyOrZero===true,sameBookingKeyAndBody:true,sameAdjustmentKeyAndBody:true,sameReviewKeyAndBody:finishOps?true:null,...supportEvidence,...billingEvidence,...trackingEvidence,scope:opsEvidence?.rider?'customer-ops-rider':finishOps?'customer-and-ops':'customer',riderBrowser:opsEvidence?.rider??null,pickupRiderBrowser:opsEvidence?.pickup??null,pickupBrowserProven:opsEvidence?.pickup?.pickupBrowserProven===true,pickupBagContinuity:opsEvidence?.pickupBagContinuity===true,recordings:{customer:relative(output,await page.video().path()),ops:opsEvidence?.video,rider:opsEvidence?.rider?.video,pickupRider:opsEvidence?.pickup?.video},...completedEvidence,browserErrors:errors},null,2));
     if(finishOps) {
       console.log('PASS: owner review after recorded delivery, no default rating or publication consent, one private review after reply loss and navigation/retry, and no second-review form.');
       console.log(supportEvidence.staffConsoleBrowserProven
