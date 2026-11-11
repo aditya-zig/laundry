@@ -25,7 +25,7 @@ test('default current-app browser CI uses owned product scope without dropping p
     for (const flag of ['LAUNDRY_VERIFY_OPS_FACILITY','LAUNDRY_VERIFY_RIDER','LAUNDRY_VERIFY_PICKUP']) assert.equal(job.env[flag], 'true');
     requireSteps(job, ['pnpm build','pnpm check','pnpm test:tooling','pnpm test','pnpm verify:browser']);
   }
-  requireSteps((await workflow('ci.yml')).jobs.verify, ['pnpm check:convex','pnpm contracts:check','pnpm test:voice','pnpm verify:container','pnpm verify:restore','pnpm verify:recording']);
+  requireSteps((await workflow('ci.yml')).jobs.verify, ['pnpm check:convex','pnpm contracts:check','pnpm test:voice','pnpm verify:container','pnpm verify:isolation','pnpm verify:restore','pnpm verify:recording']);
 });
 
 test('restore CI uses the actual current-app source while retaining the separate legacy API-restart regression', async () => {
